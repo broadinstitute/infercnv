@@ -416,7 +416,7 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
     # check that rows add to k_nn
     # sum(adjacency_matrix[1,]) == k_nn
     # table(apply(adjacency_matrix, 1, sum))
-    partition <- leiden(adjacency_matrix, resolution=leiden_resolution)
+    partition <- leiden(adjacency_matrix, resolution_parameter=leiden_resolution)
 
     tmp_full_phylo = NULL
     added_height = 1
