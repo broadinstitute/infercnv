@@ -643,36 +643,64 @@ get_predicted_CNV_regions <- function(infercnv_obj, by=c("consensus", "subcluste
     else {
         stop("Error, shouldn't get here ... bug")
     }
-    
-    cnv_regions = list()
 
-    cnv_counter_start = 0
-    for (cell_group_name in names(cell_groups)) {
-        
+    mc.cores = infercnv.env$GLOBAL_NUM_THREADS
+    futile.logger::flog.info(paste("Processing cnv regions in parallel with", mc.cores, "cores"))
+
+    num_cell_groups = length(cell_groups)
+    cell_group_names = names(cell_groups)
+
+    state_par_func <- function(i){
+        cell_group_name = cell_group_names[[i]]
         cell_group = cell_groups[[cell_group_name]]
-        #flog.info(sprintf("cell group %s -> %s", cell_group_name, cell_group))
+        flog.info(sprintf("-processing (pass 1/2) cell_group_name: %s, size: %d",
+                          cell_group_name, length(cell_group)))
 
-        flog.info(sprintf("-processing cell_group_name: %s, size: %d", cell_group_name, length(cell_group)))
-                
         cell_group_mtx = infercnv_obj@expr.data[,cell_group,drop=FALSE]
-        cell_group_names = colnames(cell_group_mtx)
 
         state_consensus <- .get_state_consensus(cell_group_mtx)
         
         names(state_consensus) <- rownames(cell_group_mtx)
-        cnv_gene_regions <- .define_cnv_gene_regions(state_consensus, infercnv_obj@gene_order, cnv_counter_start)
+        num_cnvs <- .get_num_cnv_gene_regions(state_consensus, infercnv_obj@gene_order)
+        consensus_state_list = list(state_consensus=state_consensus,
+                                    cell_group_names_from_mtx=colnames(cell_group_mtx),
+                                    num_cnvs=num_cnvs)
+        consensus_state_list
+     }
+
+    state_return_obj <- parallel::mclapply(seq_along(cell_groups),
+                                           FUN = state_par_func,
+                                           mc.cores = mc.cores)
+
+    # calculate the unique identifier for region names using a counter
+    cnv_counter_pos = list()
+    cnv_counter_start = 0
+    for (i in 1:num_cell_groups) {
+        cnv_counter_pos[[i]] = cnv_counter_start
+        cnv_counter_start = cnv_counter_start + state_return_obj[[i]]$num_cnvs
+    }
+
+    regions_par_func <- function(i){
+        cell_group_name = cell_group_names[[i]]
+        flog.info(sprintf("-processing (pass 2/2) cell_group_name: %s, size: %d",
+                          cell_group_name, length(cell_groups[[cell_group_name]])))
+        cnv_gene_regions <- .define_cnv_gene_regions(state_return_obj[[i]]$state_consensus,
+                                                     infercnv_obj@gene_order,
+                                                     cnv_counter_pos[[i]])
         cnv_ranges <- .get_cnv_gene_region_bounds(cnv_gene_regions)
 
-        consensus_state_list = list(cell_group_name=cell_group_name,
-                                    cells=cell_group_names,
+        cnv_region_list = list(cell_group_name=cell_group_name,
+                                    cells=state_return_obj[[i]]$cell_group_names_from_mtx,
                                     gene_regions=cnv_gene_regions,
                                     cnv_ranges=cnv_ranges)
-        
-        cnv_regions[[length(cnv_regions)+1]] = consensus_state_list
-
-        cnv_counter_start = cnv_counter_start + length(cnv_gene_regions)
-        
+        cnv_region_list
     }
+
+    cnv_regions <- parallel::mclapply(seq_along(cell_groups),
+                                      FUN = regions_par_func,
+                                      mc.cores = mc.cores)
+
+        
     
     return(cnv_regions)
     
@@ -713,6 +741,7 @@ generate_cnv_region_reports <- function(infercnv_obj,
 
     ## cell clusters defined.
     cell_clusters_outfile = paste(out_dir, paste0(output_filename_prefix, ".cell_groupings"), sep="/")
+    flog.info(sprintf("-before writing cell clusters file: %s", cell_clusters_outfile))
 
     cell_clusters_df = lapply(cnv_regions, function(x) {
         cell_group_name = x$cell_group_name
@@ -901,6 +930,44 @@ adjust_genes_regions_report <- function(hmm.infercnv_obj,
     return(consensus)
 }
 
+#' @title .get_num_cnv_gene_regions
+#'
+#' @description gets the number of cnv regions for a given state consensus vector
+#'
+#' @param state_consensus state consensus vector
+#'
+#' @param gene_order the infercnv_obj@gene_order info
+#'#'
+#' @return cnv_region_counter used to provide unique region names.
+#'
+#' @noRd
+
+.get_num_cnv_gene_regions <- function(state_consensus, gene_order) {
+    cnv_region_counter = 0
+    chrs = unique(gene_order$chr)
+    for (chr in chrs) {
+        gene_idx = which(gene_order$chr==chr)
+        if (length(gene_idx) < 2) { next }
+
+        chr_states = state_consensus[gene_idx]
+        prev_state = chr_states[1]
+        cnv_region_counter = cnv_region_counter + 1
+
+        for (i in seq(2,length(gene_idx))) {
+            state = chr_states[i]
+            if (state != prev_state) {
+                ## state transition
+                ## start new cnv region
+                cnv_region_counter = cnv_region_counter + 1
+            }
+
+            prev_state = state
+        }
+
+    }
+
+    return(cnv_region_counter)
+}
 
 #' @title .define_cnv_gene_regions
 #'
