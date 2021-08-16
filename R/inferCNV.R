@@ -307,7 +307,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     obs_group_cell_indices = list()
     for (name_group in obs_group_names) {
         cell_indices = which(input_classifications[,1] == name_group)
-        obs_group_cell_indices[[ name_group ]] <- cell_indices
+        obs_group_cell_indices[[ toString(name_group) ]] <- cell_indices
     }
     
     object <- new(
