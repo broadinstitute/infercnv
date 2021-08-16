@@ -1,3 +1,8 @@
+Changes in 1.8.1 (2020-08-16)
++ Fix name generation error for step 15.
++ Handle annotation names as strings even if they look like numbers.
+
+
 Changes in version 1.7.2 (2020-05-05)
 + New dependencies : RANN, leiden, phyclust
 + Added new partition method for subclustering that uses the Leiden algorithm based on a K-nn adjacency matrix.
