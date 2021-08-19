@@ -10,6 +10,7 @@ workflow infercnv {
         String memory = "12G"
         String docker = "trinityctat/infercnv:1.7.1-S"
         Int preemptible = 2
+        Int extra_disk_space = 10
     }
 
     call run_infercnv {
@@ -20,6 +21,7 @@ workflow infercnv {
             additional_args=additional_args,
             cpu=cpu,
             memory=memory,
+            extra_disk_space=extra_disk_space,
             docker=docker,
             preemptible=preemptible
     }
@@ -39,6 +41,7 @@ task run_infercnv {
         String docker
         Int preemptible
         String additional_args
+        Int extra_disk_space
     }
 
     command <<<
@@ -63,7 +66,7 @@ task run_infercnv {
         docker: docker
         memory: memory
         bootDiskSizeGb: 12
-        disks: "local-disk " + ceil(size(raw_counts_matrix, "GB")*2 + 2) + " HDD"
+        disks: "local-disk " + ceil(size(raw_counts_matrix, "GB")*2 + extra_disk_space) + " HDD"
         cpu: cpu
         preemptible: preemptible
     }
