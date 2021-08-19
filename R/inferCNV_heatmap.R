@@ -224,7 +224,7 @@ plot_cnv <- function(infercnv_obj,
     #     contig_names <- c(contig_names,rep(contig_name,contig_tbl[contig_name]))
     # }
     contig_labels = names(contig_tbl)
-    contig_names = unlist(lapply(contig_labels, function(contig_name) {rep(contig_name, contig_tbl[contig_name])}))
+    contig_names = rep(contig_labels, contig_tbl)
 
     # contig_sizes = vapply(contig_labels, function(contig_name) {contig_tbl[contig_name]}, integer(1))
     # contig_positions =  c(1, cumsum(contig_sizes[seq_len(length(contig_sizes) - 1)]) + 1)
