@@ -30,9 +30,8 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
         flog.info(sprintf("define_signif_tumor_subclusters(), tumor: %s", tumor_group))
         
         tumor_group_idx <- tumor_groups[[ tumor_group ]]
-        # tumor_group_cell_names <- colnames(infercnv_obj@expr.data[,tumor_group_idx])
+        names(tumor_group_idx) <- colnames(infercnv_obj@expr.data[,tumor_group_idx])
         tumor_expr_data <- infercnv_obj@expr.data[,tumor_group_idx, drop=FALSE]
-        tumor_group_cell_names <- colnames(tumor_expr_data)
 
         if (restrict_to_DE_genes) {
             p_vals <- .find_DE_stat_significance(normal_expr_data, tumor_expr_data)
@@ -43,10 +42,10 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
         }
         
         if (partition_method == "leiden") {
-            tumor_subcluster_info <- .single_tumor_leiden_subclustering(tumor_group=tumor_group, tumor_group_idx=tumor_group_idx, tumor_group_cell_names=tumor_group_cell_names, tumor_expr_data=tumor_expr_data, k_nn=k_nn, leiden_resolution=leiden_resolution, hclust_method=hclust_method)
+            tumor_subcluster_info <- .single_tumor_leiden_subclustering(tumor_group=tumor_group, tumor_group_idx=tumor_group_idx, tumor_expr_data=tumor_expr_data, k_nn=k_nn, leiden_resolution=leiden_resolution, hclust_method=hclust_method)
         }
         else {
-            tumor_subcluster_info <- .single_tumor_subclustering(tumor_name=tumor_group, tumor_group_idx=tumor_group_idx, tumor_group_cell_names=tumor_group_cell_names, tumor_expr_data=tumor_expr_data, p_val=p_val, hclust_method=hclust_method, partition_method=partition_method)
+            tumor_subcluster_info <- .single_tumor_subclustering(tumor_name=tumor_group, tumor_group_idx=tumor_group_idx, tumor_expr_data=tumor_expr_data, p_val=p_val, hclust_method=hclust_method, partition_method=partition_method)
         }
 
         res$hc[[tumor_group]] <- tumor_subcluster_info$hc
@@ -68,7 +67,7 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
 
 
 
-.single_tumor_subclustering <- function(tumor_name, tumor_group_idx, tumor_group_cell_names, tumor_expr_data, p_val, hclust_method,
+.single_tumor_subclustering <- function(tumor_name, tumor_group_idx, tumor_expr_data, p_val, hclust_method,
                                         partition_method=c('qnorm', 'pheight', 'qgamma', 'shc', 'none')
                                         ) {
     
@@ -144,12 +143,9 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
             # subcluster_indices = tumor_group_idx[which(grps == g)]
             end_idx = start_idx + length(s[[g]]) - 1
             subcluster_indices = tumor_group_idx[hc$order[start_idx:end_idx]]
-            subcluster_names = tumor_group_cell_names[hc$order[start_idx:end_idx]]
             start_idx = end_idx + 1
             
             tumor_subcluster_info$subclusters[[ split_subcluster ]] = subcluster_indices
-            names(tumor_subcluster_info$subclusters[[ split_subcluster ]]) = subcluster_names
-
         }
     }
     else {
@@ -395,7 +391,7 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
 }
 
 
-.single_tumor_leiden_subclustering <- function(tumor_group, tumor_group_idx, tumor_group_cell_names, tumor_expr_data, k_nn, leiden_resolution, hclust_method) {
+.single_tumor_leiden_subclustering <- function(tumor_group, tumor_group_idx, tumor_expr_data, k_nn, leiden_resolution, hclust_method) {
     res = list()
     res$subclusters = list()
 
@@ -408,11 +404,11 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
 
     snn <- nn2(t(tumor_expr_data), k=k_nn)$nn.idx
     adjacency_matrix <- matrix(0L, ncol(tumor_expr_data), ncol(tumor_expr_data))
-    rownames(adjacency_matrix) <- colnames(adjacency_matrix) <- tumor_group_cell_names
+    rownames(adjacency_matrix) <- colnames(adjacency_matrix) <- colnames(tumor_expr_data)
     for(ii in seq_len(ncol(tumor_expr_data))) {
-        adjacency_matrix[ii, tumor_group_cell_names[snn[ii, ]]] <- 1L
+        adjacency_matrix[ii, colnames(tumor_expr_data)[snn[ii, ]]] <- 1L
     }
-
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
     # check that rows add to k_nn
     # sum(adjacency_matrix[1,]) == k_nn
     # table(apply(adjacency_matrix, 1, sum))
@@ -423,6 +419,7 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
     # find a way to sort partition by size to make sure not to start with a single cell partition
     for (i in unique(partition[grouping(partition)])) {  # grouping() is there to make sure we do not start looking at a one cell cluster since it cannot be added to a phylo object
         res$subclusters[[ paste(tumor_group, i, sep="_s") ]] = tumor_group_idx[which(partition == i)]
+        # names(res$subclusters[[ paste(tumor_group, i, sep="_s") ]]) = tumor_group_idx[which(partition == i)]
 
         if (length(which(partition == i)) >= 2) {
             tmp_phylo = as.phylo(hclust(dist(t(tumor_expr_data[, which(partition == i), drop=FALSE])), method=hclust_method))
@@ -451,7 +448,7 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
             }
         }
         else {  # ==1
-            tmp_full_phylo = add_single_branch_to_phylo(tmp_full_phylo, tumor_group_cell_names[which(partition == i)])
+            tmp_full_phylo = add_single_branch_to_phylo(tmp_full_phylo, colnames(tumor_expr_data)[which(partition == i)])
         }
     }
 
