@@ -532,14 +532,20 @@ plot_per_group <- function(infercnv_obj,
                 .hspike = infercnv_obj@.hspike)
 
             new_obj@observation_grouped_cell_indices[[sample_name]] = seq_along(infercnv_obj@reference_grouped_cell_indices[[sample_name]])
-            new_obj@tumor_subclusters$hc = list()
-            new_obj@tumor_subclusters$subclusters = list()
-            new_obj@tumor_subclusters$hc[[sample_name]] = infercnv_obj@tumor_subclusters$hc[[sample_name]]
 
-            # match(pre_obj@observation_grouped_cell_indices$CBTP3_187188XL, unlist(pre_obj@tumor_subclusters$subclusters$CBTP3_187188XL, use.names=FALSE))
-            # match -> pos1 in pos2
-            for (subcluster_id in names(infercnv_obj@tumor_subclusters$subclusters[[sample_name]])) {
-                new_obj@tumor_subclusters$subclusters[[sample_name]][[subcluster_id]] = unlist(match(infercnv_obj@tumor_subclusters$subclusters[[sample_name]][[subcluster_id]], infercnv_obj@reference_grouped_cell_indices[[sample_name]]))
+            if (!is.null(infercnv_obj@tumor_subclusters)) {
+                new_obj@tumor_subclusters$hc = list()
+                new_obj@tumor_subclusters$subclusters = list()
+                new_obj@tumor_subclusters$hc[[sample_name]] = infercnv_obj@tumor_subclusters$hc[[sample_name]]
+
+                # match(pre_obj@observation_grouped_cell_indices$CBTP3_187188XL, unlist(pre_obj@tumor_subclusters$subclusters$CBTP3_187188XL, use.names=FALSE))
+                # match -> pos1 in pos2
+                for (subcluster_id in names(infercnv_obj@tumor_subclusters$subclusters[[sample_name]])) {
+                    new_obj@tumor_subclusters$subclusters[[sample_name]][[subcluster_id]] = unlist(match(infercnv_obj@tumor_subclusters$subclusters[[sample_name]][[subcluster_id]], infercnv_obj@reference_grouped_cell_indices[[sample_name]]))
+                }
+            }
+            else {
+                new_obj@tumor_subclusters = NULL
             }
 
             if (sample) {
@@ -593,13 +599,19 @@ plot_per_group <- function(infercnv_obj,
                 .hspike = infercnv_obj@.hspike)
 
             new_obj@observation_grouped_cell_indices[[sample_name]] = seq_along(infercnv_obj@observation_grouped_cell_indices[[sample_name]])
-            new_obj@tumor_subclusters$hc = list()
-            new_obj@tumor_subclusters$subclusters = list()
-            new_obj@tumor_subclusters$hc[[sample_name]] = infercnv_obj@tumor_subclusters$hc[[sample_name]]
-
-            for (subcluster_id in names(infercnv_obj@tumor_subclusters$subclusters[[sample_name]])) {
-                new_obj@tumor_subclusters$subclusters[[sample_name]][[subcluster_id]] = unlist(match(infercnv_obj@tumor_subclusters$subclusters[[sample_name]][[subcluster_id]], infercnv_obj@observation_grouped_cell_indices[[sample_name]]))
+            if (!is.null(infercnv_obj@tumor_subclusters)) {
+                new_obj@tumor_subclusters$hc = list()
+                new_obj@tumor_subclusters$subclusters = list()
+                new_obj@tumor_subclusters$hc[[sample_name]] = infercnv_obj@tumor_subclusters$hc[[sample_name]]
+             
+                for (subcluster_id in names(infercnv_obj@tumor_subclusters$subclusters[[sample_name]])) {
+                    new_obj@tumor_subclusters$subclusters[[sample_name]][[subcluster_id]] = unlist(match(infercnv_obj@tumor_subclusters$subclusters[[sample_name]][[subcluster_id]], infercnv_obj@observation_grouped_cell_indices[[sample_name]]))
+                }
             }
+            else {
+                new_obj@tumor_subclusters = NULL
+            }
+
 
             if (sample) {
                 if (!is.null(above_m) && ncol(new_obj@expr.data) > above_m) {
