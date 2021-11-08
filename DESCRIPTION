@@ -1,8 +1,8 @@
 Package: infercnv
 Type: Package
 Title: Infer Copy Number Variation from Single-Cell RNA-Seq Data
-Version: 1.10.0
-Date: 2019-08-16
+Version: 1.10.1
+Date: 2021-11-08
 Authors@R: c( person("Timothy", "Tickle", email = "ttickle@broadinstitute.org", role = "aut"), person("Itay", "Tirosh", email = "tirosh@broadinstitute.org", role = "aut"), person("Christophe", "Georgescu", email = "cgeorges@broadinstitute.org", role = c("aut", "cre")), person("Maxwell", "Brown", email = "mbrown@broadinstitute.org", role = "aut"), person("Brian", "Haas", email = "bhaas@broadinstitute.org", role = "aut")) 
 BugReports: https://github.com/broadinstitute/inferCNV/issues
 Description: Using single-cell RNA-Seq expression to visualize CNV in cells.
