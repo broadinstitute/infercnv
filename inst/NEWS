@@ -1,9 +1,12 @@
-Changes in 1.8.1 (2020-08-16)
+Changes in 1.10.1 (2021-11-08)
++ Fix missing colnames in subcluster information when using the Leiden method (used downstream by add_to_seurat).
++ Fix "plot_per_group" to handle infercnv objects with NULL clustering information (mainly to be able to plot using existing results but changing the annotations).
+
+Changes in 1.8.1 (2021-08-16)
 + Fix name generation error for step 15.
 + Handle annotation names as strings even if they look like numbers.
 
-
-Changes in version 1.7.2 (2020-05-05)
+Changes in version 1.7.2 (2021-05-05)
 + New dependencies : RANN, leiden, phyclust
 + Added new partition method for subclustering that uses the Leiden algorithm based on a K-nn adjacency matrix.
 + Changed the default subclustering method to leiden which is much faster than the random trees method.
