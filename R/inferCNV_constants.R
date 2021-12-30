@@ -52,7 +52,13 @@ infercnv.env$GLOBAL_NUM_THREADS <- 1  # default is single-threaded.
 #' @importFrom GenomicRanges GRanges findOverlaps
 #' @importFrom IRanges IRanges `%over%`
 #' @importFrom GenomeInfoDb sortSeqlevels
-#' @importFrom S4Vectors queryHits subjectHits 
+#' @importFrom S4Vectors queryHits subjectHits
+#' @importFrom HiddenMarkov dthmm Viterbi
+#' @importFrom tidyr separate spread
+#' @importFrom stringr str_replace
+#' @importFrom dplyr mutate group_by summarise left_join arrange select n
+#' @import ggplot2
+#' @importFrom cowplot plot_grid 
 
 
 NULL
