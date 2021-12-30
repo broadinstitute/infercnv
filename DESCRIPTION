@@ -23,6 +23,8 @@ Collate:
     'inferCNV.R'
     'inferCNV_BayesNet.R'
     'inferCNV_HMM.R'
+    'inferCNV_allele.R'
+    'inferCNV_allele_HMM.R'
     'inferCNV_constants.R'
     'inferCNV_heatmap.R'
     'inferCNV_hidden_spike.R'
