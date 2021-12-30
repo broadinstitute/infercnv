@@ -31,6 +31,8 @@
 #'
 #' @slot .hspike a hidden infercnv object populated with simulated spiked-in data
 #' 
+#' @slot .allele an allele-based object if allele data provided
+#' 
 #' @export
 #'
 
@@ -44,7 +46,8 @@ infercnv <- methods::setClass(
                              observation_grouped_cell_indices = "list",
                              tumor_subclusters  = "ANY",
                              options = "list",
-                             .hspike = "ANY") )
+                             .hspike = "ANY",
+                             .allele = "ANY") )
 
 
 
@@ -54,6 +57,10 @@ infercnv <- methods::setClass(
 #' @param raw_counts_matrix  the matrix of genes (rows) vs. cells (columns) containing the raw counts
 #'                           If a filename is given, it'll be read via read.table()
 #'                           otherwise, if matrix or Matrix, will use the data directly.
+#' 
+#' @param raw_allele_matrix the matrix of alternate allele if provided
+#' 
+#' @param raw_coverage_matrix the matrix of coverage allele if provided
 #' 
 #' @param gene_order_file data file containing the positions of each gene along each chromosome in the genome.
 #'
@@ -67,6 +74,8 @@ infercnv <- methods::setClass(
 #' 
 #' @param min_max_counts_per_cell minimum and maximum counts allowed per cell. Any cells outside this range will be removed from the counts matrix. default=(100, +Inf) and uses all cells. If used, should be set as c(min_counts, max_counts)
 #'
+#' @param snp_split_by the string used for splitting the rowname of allele matrix (if allele data provided). default = "::"
+#' 
 #' @param chr_exclude list of chromosomes in the reference genome annotations that should be excluded from analysis.  Default = c('chrX', 'chrY', 'chrM')
 #'
 #' @description Creation of an infercnv object. This requires the following inputs:
@@ -131,37 +140,55 @@ infercnv <- methods::setClass(
 
 
 CreateInfercnvObject <- function(raw_counts_matrix,
+                                 raw_allele_matrix = NULL,
+                                 raw_coverage_matrix = NULL,
                                  gene_order_file,
                                  annotations_file,
                                  ref_group_names,
                                  delim="\t",
                                  max_cells_per_group=NULL,
                                  min_max_counts_per_cell=c(100, +Inf), # can be c(low,high) for colsums
+                                 snp_split_by = "::",
                                  chr_exclude=c('chrX', 'chrY', 'chrM') ) {
     
     ## input expression data
-    if (Reduce("|", is(raw_counts_matrix) == "character")) {
-        flog.info(sprintf("Parsing matrix: %s", raw_counts_matrix)) 
-
-        if (substr(raw_counts_matrix, nchar(raw_counts_matrix)-2, nchar(raw_counts_matrix)) == ".gz") {
-            raw.data <- read.table(connection <- gzfile(raw_counts_matrix, 'rt'), sep=delim, header=TRUE, row.names=1, check.names=FALSE)
-            close(connection)
-            raw.data <- as.matrix(raw.data)
+    # if (Reduce("|", is(raw_counts_matrix) == "character")) {
+    #     flog.info(sprintf("Parsing matrix: %s", raw_counts_matrix)) 
+    # 
+    #     if (substr(raw_counts_matrix, nchar(raw_counts_matrix)-2, nchar(raw_counts_matrix)) == ".gz") {
+    #         raw.data <- read.table(connection <- gzfile(raw_counts_matrix, 'rt'), sep=delim, header=TRUE, row.names=1, check.names=FALSE)
+    #         close(connection)
+    #         raw.data <- as.matrix(raw.data)
+    #     }
+    #     else if(substr(raw_counts_matrix, nchar(raw_counts_matrix)-3, nchar(raw_counts_matrix)) == ".rds") {
+    #         raw.data <- readRDS(raw_counts_matrix)
+    #     }
+    #     else {
+    #         raw.data <- read.table(raw_counts_matrix, sep=delim, header=TRUE, row.names=1, check.names=FALSE)
+    #         raw.data <- as.matrix(raw.data)
+    #     }
+    # } else if (Reduce("|", is(raw_counts_matrix) %in% c("dgCMatrix", "matrix"))) {
+    #     # use as is:
+    #     raw.data <- raw_counts_matrix
+    # } else if (Reduce("|", is(raw_counts_matrix) %in% c("data.frame"))) {
+    #     raw.data <- as.matrix(raw_counts_matrix)
+    # } else {
+    #     stop("CreateInfercnvObject:: Error, raw_counts_matrix isn't recognized as a matrix, data.frame, or filename")
+    # }
+    if(!is.null(raw_counts_matrix) & (!is.null(raw_allele_matrix) & !is.null(raw_coverage_matrix))){
+        flog.info("CreateInfercnvObject:: Leveraging both expression and allele data")
+        raw.data <- .read_count_matrix(matrix = raw_counts_matrix, delim = delim)
+        
+        if (is.null(snp_split_by)){
+            stop("CreateInfercnvObject:: Error, please specifiy the parameter: snp_split_by to indicate the string used
+                 for splitting the rownames of allele matrix")
         }
-        else if(substr(raw_counts_matrix, nchar(raw_counts_matrix)-3, nchar(raw_counts_matrix)) == ".rds") {
-            raw.data <- readRDS(raw_counts_matrix)
-        }
-        else {
-            raw.data <- read.table(raw_counts_matrix, sep=delim, header=TRUE, row.names=1, check.names=FALSE)
-            raw.data <- as.matrix(raw.data)
-        }
-    } else if (Reduce("|", is(raw_counts_matrix) %in% c("dgCMatrix", "matrix"))) {
-        # use as is:
-        raw.data <- raw_counts_matrix
-    } else if (Reduce("|", is(raw_counts_matrix) %in% c("data.frame"))) {
-        raw.data <- as.matrix(raw_counts_matrix)
-    } else {
-        stop("CreateInfercnvObject:: Error, raw_counts_matrix isn't recognized as a matrix, data.frame, or filename")
+        raw.allele.data <- .read_count_matrix(matrix = raw_allele_matrix, delim = delim)
+        raw.coverage.data <- .read_count_matrix(matrix = raw_coverage_matrix, delim = delim)
+        .allele_precheck(raw.allele.data, raw.coverage.data, raw.data)
+    } else if(!is.null(raw_counts_matrix)){
+        flog.info("CreateInfercnvObject:: Only Leveraging expression data")
+        raw.data <- .read_count_matrix(matrix = raw_counts_matrix, delim = delim)
     }
 
     ## get gene order info
@@ -211,9 +238,9 @@ CreateInfercnvObject <- function(raw_counts_matrix,
 
     ## extract the genes indicated in the gene ordering file:
     order_ret <- .order_reduce(data=raw.data, genomic_position=gene_order)
-
+    
     num_genes_removed = dim(raw.data)[1] - dim(order_ret$exp)[1]
-
+    
     if (num_genes_removed > 0) {
         flog.info(paste("num genes removed taking into account provided gene ordering list: ",
                         num_genes_removed,
@@ -231,7 +258,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
                                "position file. Analysis Stopped.")
         stop(error_message)
     }
-
+    
     ## Determine if we need to do filtering on counts per cell
     if (is.null(min_max_counts_per_cell)) {
         min_max_counts_per_cell = c(1, +Inf)
@@ -316,6 +343,40 @@ CreateInfercnvObject <- function(raw_counts_matrix,
                          "you may encounter an error while the hclust is being generated."))
     }
     
+    ## allele data if provided
+    if (exists("raw.allele.data") & exists("raw.coverage.data")){
+        raw.allele.data <- raw.allele.data[, colnames(raw.data)]
+        raw.coverage.data <- raw.coverage.data[, colnames(raw.data)]
+        
+        processed_allele_data <- .allele_preprocess(raw.allele.data, raw.coverage.data)
+        raw.allele.data <- processed_allele_data$allele.data
+        raw.coverage.data <- processed_allele_data$coverage.data
+        
+        order_ret_allele <- .order_reduce_allele(raw.allele.data,
+                                                 raw.coverage.data,
+                                                 snp_split_by,
+                                                 gene_order)
+        raw.allele.data <- order_ret_allele$allele.data
+        raw.coverage.data <- order_ret_allele$coverage.data
+        snps <- order_ret_allele$snps
+        
+        allele_obejct <- new(Class = "infercnv_allele",
+                             allele.data = raw.allele.data,
+                             coverage.data = raw.coverage.data,
+                             SNP_info = snps,
+                             gene_order = order_ret_allele$gene_order,
+                             reference_grouped_cell_indices = ref_group_cell_indices,
+                             observation_grouped_cell_indices = obs_group_cell_indices)
+        validate_infercnv_allele_obj(allele_obejct)
+    }
+    else{
+        raw.allele.data <- NULL
+        raw.coverage.data <- NULL
+        snps <- GRanges()
+        
+        allele_obejct <- new(Class = "infercnv_allele")
+    }
+    
     object <- new(
         Class = "infercnv",
         expr.data = raw.data, 
@@ -328,13 +389,84 @@ CreateInfercnvObject <- function(raw_counts_matrix,
                        "max_cells_per_group" = max_cells_per_group,
                        "min_max_counts_per_cell" = min_max_counts_per_cell,
                        "counts_md5" = digest(raw.data)),
-        .hspike = NULL)
+        .hspike = NULL,
+        .allele = allele_obejct)
 
     validate_infercnv_obj(object)
     
     return(object)
 }
 
+# Read a count matrix given specific path or object
+
+# matrix A full path to the file
+
+# delim A character used to separate contents using read.table
+
+# name A character used to label datasets
+
+.read_count_matrix <- function(matrix, delim){
+    #browser()
+    if (Reduce("|", is(matrix) == "character")) {
+        flog.info(sprintf("Parsing matrix: %s ...", matrix)) 
+        if (substr(matrix, nchar(matrix)-2, nchar(matrix)) == ".gz") {
+            raw.data <- read.table(connection <- gzfile(matrix, 'rt'), sep=delim, header=TRUE, row.names=1, check.names=FALSE) %>% as.matrix()
+            close(connection)
+            return(raw.data)
+        }
+        else if(substr(matrix, nchar(matrix)-3, nchar(matrix)) == ".rds") {
+            return(readRDS(matrix))
+        }
+        else {
+            raw.data <- read.table(matrix, sep=delim, header=TRUE, row.names=1, check.names=FALSE) %>% as.matrix()
+            return(raw.data)
+        }
+    } 
+    else if (Reduce("|", is(matrix) %in% c("dgCMatrix", "matrix"))) {
+        return(matrix)
+    } 
+    else if (Reduce("|", is(matrix) %in% c("data.frame"))) {
+        return(as.matrix(matrix))
+    } 
+    else {
+        stop(sprintf("CreateInfercnvObject:: Error, %s isn't recognized as a matrix, data.frame, or filename",
+                     matrix))
+    }
+}
+
+.allele_precheck <- function(allele.data, coverage.data, expression_data){
+    if(!isTRUE(all.equal(rownames(allele.data), rownames(coverage.data))) |
+       !isTRUE(all.equal(colnames(allele.data), colnames(coverage.data)))){
+        stop("CreateInfercnvAlleleObject:: Error, the dimension of allele data is not same as the coverage data")
+    }
+    
+    if(mean(colnames(expression_data) %in% colnames(allele.data)) != 1){
+        missing_cells <- colnames(expression_data)[ ! ( colnames(expression_data) %in% colnames(allele.data) ) ]
+        
+        error_message <- paste("Please make sure that all cells in expression data ",
+                               "can be found in allele data. ",
+                               "Attention to: ",
+                               paste(missing_cells, collapse=","))
+        stop(error_message)
+    }
+    return()
+}
+
+.allele_preprocess <- function(allele.data, coverage.data){
+    if(mean(allele.data > 0 & allele.data < 1) > 0){
+        allele.data[allele.data > 0 & allele.data < 1] <- 0 
+    }
+    if(mean(rowSums(coverage.data)==0) != 0){
+        len <- sum(rowSums(coverage.data) == 0)
+        filter_index <- rowSums(coverage.data) != 0
+        flog.info(sprintf("WARNING! %s SNPs with zero coverage will be removed", len))
+        
+        allele.data <- allele.data[filter_index,]
+        coverage.data <- coverage.data[filter_index,]
+    }
+    return(list("allele.data" = allele.data,
+                "coverage.data" = coverage.data))
+}
 
 # Order the data and subset the data to data in the genomic position file.
 #
@@ -426,6 +558,61 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     return(ret_results)
 }
 
+.order_reduce_allele <- function(allele.data, 
+                                 coverage.data, 
+                                 snp_split_by, 
+                                 gene_annot){
+    ## Initialize SNP sites
+    snps.df <- rownames(allele.data) 
+    snps.df <- data.frame(do.call(rbind,strsplit(snps.df,snp_split_by)), stringsAsFactors=F)
+    
+    if(ncol(snps.df)==2) {
+        snps.df <- cbind(snps.df, snps.df[,2])
+    }
+    colnames(snps.df) <- c(C_CHR,C_START,C_STOP)
+    
+    if(!grepl(C_CHR, snps.df[1,1])) {
+        snps.df[,1] <- paste0(C_CHR, snps.df[,1])
+    }
+    
+    ## create a Granges object for SNP
+    snps <- GRanges(snps.df[[C_CHR]],
+                    IRanges(as.numeric(as.character(snps.df[[C_START]])), 
+                           as.numeric(as.character(snps.df[[C_STOP]]))))
+    
+    names(snps) <- rownames(allele.data) <- 
+        rownames(coverage.data)  <-
+        rownames(snps.df) <-
+        apply(snps.df, 1, paste0, collapse=":")
+    
+    snps <- snps %>% sortSeqlevels() %>% sort()
+    
+    ## new changes: filter those snps that do not map onto gene
+    gene_ref <- GRanges(gene_annot[[C_CHR]],
+                        IRanges(as.numeric(as.character(gene_annot[[C_START]])),
+                                as.numeric(as.character(gene_annot[[C_STOP]]))))
+    gene_ref$gene_name <- gene_annot %>% rownames()
+    
+    flog.info(sprintf("%s%% snps filtered out due to inconsistent mapping with gene regions",
+                      round(mean(!snps %over% gene_ref)*100, 2)))
+    
+    snp_map <- findOverlaps(snps, gene_ref)
+    if(mean(duplicated(queryHits(snp_map))) > 0){
+        
+        flog.info("snps mapping with multiple genes will be mapped with its first match")
+        snp_map <- snp_map[!duplicated(queryHits(snp_map))]
+        
+    }
+    snps <- snps[queryHits(snp_map)]
+    snps$gene_name <- gene_ref$gene_name[subjectHits(snp_map)]
+    ##
+    
+    return(list("allele.data" = allele.data[names(snps),],
+                "coverage.data" = coverage.data[names(snps),],
+                "snps" = snps,
+                "gene_order" = snps.df[names(snps),]))
+}
+
 
 #' @title remove_genes()
 #'
@@ -467,39 +654,39 @@ remove_genes <- function(infercnv_obj, gene_indices_to_remove) {
 #'
 
 validate_infercnv_obj <- function(infercnv_obj) {
-
+    
     flog.info("validating infercnv_obj")
-
+    
     if (isTRUE(all.equal(rownames(infercnv_obj@expr.data), rownames(infercnv_obj@gene_order)))) {
-            # all good.
-                    return();
-
+        # all good.
+        return();
+        
     }
-        else {
-
+    else {
+        
         flog.error("hmm.... rownames(infercnv_obj@expr.data != rownames(infercnv_obj@gene_order))")
-                broken.infercnv_obj = infercnv_obj
-                        save('broken.infercnv_obj', file="broken.infercnv_obj")
-
+        broken.infercnv_obj = infercnv_obj
+        save('broken.infercnv_obj', file="broken.infercnv_obj")
+        
     }
-
-
+    
+    
     genes = setdiff(rownames(infercnv_obj@expr.data), rownames(infercnv_obj@gene_order))
-        if (length(genes) != 0) {
-                flog.error(paste("The following genes are in infercnv_obj@expr.data and not @gene_order:", paste(genes, collapse=","),
-                                         sep=" "))
-
+    if (length(genes) != 0) {
+        flog.error(paste("The following genes are in infercnv_obj@expr.data and not @gene_order:", paste(genes, collapse=","),
+                         sep=" "))
+        
     }
-
+    
     genes = setdiff(rownames(infercnv_obj@gene_order), rownames(infercnv_obj@expr.data))
-        if (length(genes) != 0) {
-                flog.error(paste("The following genes are in @gene_order and not infercnv_obj@expr.data:", paste(genes, collapse=","),
-                                         sep=" "))
-
+    if (length(genes) != 0) {
+        flog.error(paste("The following genes are in @gene_order and not infercnv_obj@expr.data:", paste(genes, collapse=","),
+                         sep=" "))
+        
     }
-
+    
     stop("Problem detected w/ infercnv_obj")
-
+    
 }
 
 
