@@ -28,7 +28,6 @@ infercnv_obj_example = infercnv::CreateInfercnvObject(raw_counts_matrix = expres
                                                       gene_order_file = path to your gene annotation,
                                                       annotations_file = annot[rownames(annot) %in% common_cell,,drop = F],
                                                       ref_group_names=c("Microglia/Macrophage"),
-                                                      ref_group_names=NULL,
                                                       max_cells_per_group = 100,
                                                       snp_split_by = "::")
                                                       
