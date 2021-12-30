@@ -31,5 +31,7 @@ Slots in the infercnv object include:
 \item{\code{options}}{<list> stores the options relevant to the analysis in itself (in contrast with options relevant to plotting or paths)}
 
 \item{\code{.hspike}}{a hidden infercnv object populated with simulated spiked-in data}
+
+\item{\code{.allele}}{an allele-based object if allele data provided}
 }}
 

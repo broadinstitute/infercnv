@@ -6,12 +6,15 @@
 \usage{
 CreateInfercnvObject(
   raw_counts_matrix,
+  raw_allele_matrix = NULL,
+  raw_coverage_matrix = NULL,
   gene_order_file,
   annotations_file,
   ref_group_names,
   delim = "\\t",
   max_cells_per_group = NULL,
   min_max_counts_per_cell = c(100, +Inf),
+  snp_split_by = "::",
   chr_exclude = c("chrX", "chrY", "chrM")
 )
 }
@@ -19,6 +22,10 @@ CreateInfercnvObject(
 \item{raw_counts_matrix}{the matrix of genes (rows) vs. cells (columns) containing the raw counts
 If a filename is given, it'll be read via read.table()
 otherwise, if matrix or Matrix, will use the data directly.}
+
+\item{raw_allele_matrix}{the matrix of alternate allele if provided}
+
+\item{raw_coverage_matrix}{the matrix of coverage allele if provided}
 
 \item{gene_order_file}{data file containing the positions of each gene along each chromosome in the genome.}
 
@@ -31,6 +38,8 @@ otherwise, if matrix or Matrix, will use the data directly.}
 \item{max_cells_per_group}{maximun number of cells to use per group. Default=NULL, using all cells defined in the annotations_file. This option is useful for randomly subsetting the existing data for a quicker preview run, such as using 50 cells per group instead of hundreds.}
 
 \item{min_max_counts_per_cell}{minimum and maximum counts allowed per cell. Any cells outside this range will be removed from the counts matrix. default=(100, +Inf) and uses all cells. If used, should be set as c(min_counts, max_counts)}
+
+\item{snp_split_by}{the string used for splitting the rowname of allele matrix (if allele data provided). default = "::"}
 
 \item{chr_exclude}{list of chromosomes in the reference genome annotations that should be excluded from analysis.  Default = c('chrX', 'chrY', 'chrM')}
 }
