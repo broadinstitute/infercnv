@@ -2,7 +2,7 @@ Visit project [wiki](https://github.com/broadinstitute/inferCNV/wiki) for InferC
 
 Run allele_based method:
 
-`
+`sample_id <- "MGH60" `
 sample_id <- "MGH60"
 ### allele data
 alt.matrix <- read.table(paste0("data/allele_data/",sample_id,
