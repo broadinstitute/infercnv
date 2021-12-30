@@ -264,208 +264,194 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
   return(infercnv_allele_obj)
 }
 
-#' @title calAlleleBoundaries
-#' 
-#' @description Determines the LOHs/Deletions boundaries using HMM model
-#' 
-#' @param infercnv_allele_obj infercnv_allele object
-#' 
-#' @param distance_method A method used for pre-processing NA value
-#' 
-#' @param ncores Number of cores used for parallel task
-#' 
-#' @param min.traverse The max number of groups used for cutting tree, default 3
-#' 
-#' @param t Transition probability, default 1e-6
-#' 
-#' @param pd Emission probability for LOH/deletion
-#' 
-#' @param Pn Emission probability for neutral
-#' 
-#' @param min.num.snps A cutoff of minimal length of SNPs used for determining LOH/deletion
-#' 
-#' @param trim
-#' 
-#' @return A list containing putative LOH/deletion boundary
-#' 
-#' @importFrom caTools runmean
-#' 
-#' @importFrom parallelDist parDist
-#' 
-#' @importFrom HiddenMarkov dthmm Viterbi
-#' 
-#' @keywords internal
-#' 
-#' @noRd
-calAlleleBoundaries <- function(infercnv_allele_obj, mode = c("all", "tumor", "normal"),
-                                distance_method = c("Filter_threshold", "Remove_NA", "HB"), ncores = 20,
-                                min.traverse = 3, t = 1e-6, pd = 0.1, pn = 0.45, 
-                                min.num.snps = 5, trim = 0.1){
-  
-  if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)){
-    flog.info("Initializing the lesser allele fraction ...")
-    infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
-  }
-  
-  ###
-  analysis_mode <- match.arg(mode)
-  flog.info(sprintf("Using %s mode ...", analysis_mode))
-  
-  fraction_method <- match.arg(distance_method)
-  flog.info(sprintf("Using %s to process matrix ...", fraction_method))
-  ###
-  allele.lesser.data <- infercnv_allele_obj@count.data
-  allele.data <- infercnv_allele_obj@allele.data
-  allele.coverage.data <- infercnv_allele_obj@coverage.data
-  
-  ###
-  if (analysis_mode == "tumor"){
-    allele.lesser.data <- allele.lesser.data[, unlist(infercnv_allele_obj@observation_grouped_cell_indices)]
-    allele.data <- allele.data[, unlist(infercnv_allele_obj@observation_grouped_cell_indices)]
-    allele.coverage.data <- allele.coverage.data[, unlist(infercnv_allele_obj@observation_grouped_cell_indices)]
-    
-    mat.tot <- infercnv_allele_obj@expr.data[, unlist(infercnv_allele_obj@observation_grouped_cell_indices)]
-  } else if (analysis_mode == "normal"){
-    allele.lesser.data <- allele.lesser.data[, unlist(infercnv_allele_obj@reference_grouped_cell_indices)]
-    allele.data <- allele.data[, unlist(infercnv_allele_obj@reference_grouped_cell_indices)]
-    allele.coverage.data <- allele.coverage.data[, unlist(infercnv_allele_obj@reference_grouped_cell_indices)]
-    
-    mat.tot <- infercnv_allele_obj@expr.data[, unlist(infercnv_allele_obj@reference_grouped_cell_indices)]
-  } else{
-    mat.tot <- infercnv_allele_obj@expr.data
-  }
-  ###
-  flog.info("Starting cluster cells from population ...")
-  
-  if(fraction_method == "Filter_threshold"){
-    mat.tot[is.na(mat.tot)] <- 0 # omit no coverage
-    mat.tot[allele.data == 0 & allele.coverage.data != 0] <- 0.001 # pseudo count for total coverage not 0
-    mat.tot[allele.coverage.data <= 2] <- 0 # filter with the cutoff of 3 coverage
-    
-    mat.smooth <- apply(mat.tot, 2, runmean, k=31)
-    
-    flog.info("Starting calculate distance ...")
-    d <- parDist(t(mat.smooth), method = "euclidean", threads = ncores) # parallel dist
-  }
-  else if(fraction_method == "Remove_NA"){
-    mat.smooth <- apply(mat.tot, 2, runmean, k=31)
-    mat.smooth[is.na(mat.smooth)] <- 0
-    
-    flog.info("Starting calculate distance ...")
-    d <- parDist(t(mat.smooth), method = "euclidean", threads = ncores) # parallel dist
-  }
-  else if(fraction_method == "HB"){
-    mat.smooth <- apply(mat.tot, 2, runmean, k=31)
-    flog.info("Starting calculate distance ...")
-    d <- dist(t(mat.smooth), method = "euclidean") # too slow
-    d[is.na(d)] <- 0
-    d[is.nan(d)] <- 0
-    d[is.infinite(d)] <- 0
-  }
-  
-  flog.info("Starting calculate Hierarchical Clustering ...")
-  hc <- hclust(d, method="ward.D2")
-  
-  flog.info('Starting iterative HMM ...')
-  heights <- 1:min(min.traverse, ncol(allele.lesser.data))
-  
-  boundsnps.pred <- lapply(heights, function(h) {
-    
-    ct <- cutree(hc, k = h)
-    cuts <- unique(ct)
-    
-    ## look at each group, if deletion present
-    boundsnps.pred <- lapply(cuts, function(group) {
-      
-      if(sum(ct == group)>1) {
-        mafl <- rowSums(allele.lesser.data[, ct == group]>0)
-        sizel <- rowSums(allele.coverage.data[, ct == group]>0)
-        
-        ## change point
-        delta <- c(0, 1)
-        z <- dthmm(mafl, matrix(c(1-t, t, t, 1-t), 
-                                byrow=TRUE, nrow=2), 
-                   delta, "binom", list(prob=c(pd, pn)), 
-                   list(size=sizel), discrete=TRUE)
-        results <- Viterbi(z)
-        
-        ## Get boundaries from states
-        boundsnps <- rownames(allele.lesser.data)[results == 1]
-        return(boundsnps)
-        
-      }
-    })
-  })
-  
-  boundsnps_res <- table(unlist(boundsnps.pred))
-  
-  ## vote
-  vote <- rep(0, nrow(allele.lesser.data))
-  names(vote) <- rownames(allele.lesser.data)
-  vote[names(boundsnps_res)] <- boundsnps_res
-  
-  if(max(vote) == 0) {
-    flog.info('Exiting; no new bound SNPs found ...')
-    return() ## exit iteration, no more bound SNPs found
-  }
-  
-  vote[vote > 0] <- 1
-  mv <- 1 ## at least 1 vote
-  cs <- 1
-  bound.snps.cont <- rep(0, length(vote))
-  names(bound.snps.cont) <- names(vote)
-  
-  for(i in 2:length(vote)) {
-    if(vote[i] >= mv & vote[i] == vote[i-1]) {
-      bound.snps.cont[i] <- cs
-    } else {
-      cs <- cs + 1
-    }
-  }
-  
-  tb <- table(bound.snps.cont)
-  tbv <- as.vector(tb)
-  names(tbv) <- names(tb)
-  tbv <- tbv[-1] # get rid of 0
-  
-  ## all detected deletions have fewer than 5 SNPs...reached the end
-  tbv <- tbv[tbv >= min.num.snps]
-  if(length(tbv)==0) {
-    flog.info(sprintf('Exiting; less than %s new bound SNPs found ...', min.num.snps))
-    return()
-  }
-  
-  HMM_info <- lapply(names(tbv), function(ti) {
-    
-    bound.snps.new <- names(bound.snps.cont)[bound.snps.cont == ti]
-    
-    ## trim
-    bound.snps.new <- bound.snps.new[1:round(length(bound.snps.new)-length(bound.snps.new)*trim)]
-    
-    return(bound.snps.new)
-    
-  })
-  HMM_region <- do.call("c", lapply(HMM_info, function(bs) range(infercnv_allele_obj@SNP_info[bs])))
-  
-  flog.info("Done extracting HMM regions ...")
-  
-  return(list("HMM_info" = HMM_info,
-              "HMM_region" = HMM_region))
-}
+## @title calAlleleBoundaries
+## 
+## @description Determines the LOHs/Deletions boundaries using HMM model
+## 
+## @param infercnv_allele_obj infercnv_allele object
+## 
+## @param distance_method A method used for pre-processing NA value
+## 
+## @param ncores Number of cores used for parallel task
+## 
+## @param min.traverse The max number of groups used for cutting tree, default 3
+## 
+## @param t Transition probability, default 1e-6
+## 
+## @param pd Emission probability for LOH/deletion
+## 
+## @param Pn Emission probability for neutral
+## 
+## @param min.num.snps A cutoff of minimal length of SNPs used for determining LOH/deletion
+## 
+## @param trim
+## 
+## @return A list containing putative LOH/deletion boundary
+## 
+## @importFrom parallelDist parDist
+## 
+## @keywords internal
+## 
+## @noRd
+# calAlleleBoundaries <- function(infercnv_allele_obj, mode = c("all", "tumor", "normal"),
+#                                 distance_method = c("Filter_threshold", "Remove_NA", "HB"), ncores = 20,
+#                                 min.traverse = 3, t = 1e-6, pd = 0.1, pn = 0.45, 
+#                                 min.num.snps = 5, trim = 0.1){
+#   
+#   if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)){
+#     flog.info("Initializing the lesser allele fraction ...")
+#     infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
+#   }
+#   
+#   ###
+#   analysis_mode <- match.arg(mode)
+#   flog.info(sprintf("Using %s mode ...", analysis_mode))
+#   
+#   fraction_method <- match.arg(distance_method)
+#   flog.info(sprintf("Using %s to process matrix ...", fraction_method))
+#   ###
+#   allele.lesser.data <- infercnv_allele_obj@count.data
+#   allele.data <- infercnv_allele_obj@allele.data
+#   allele.coverage.data <- infercnv_allele_obj@coverage.data
+#   
+#   ###
+#   if (analysis_mode == "tumor"){
+#     allele.lesser.data <- allele.lesser.data[, unlist(infercnv_allele_obj@observation_grouped_cell_indices)]
+#     allele.data <- allele.data[, unlist(infercnv_allele_obj@observation_grouped_cell_indices)]
+#     allele.coverage.data <- allele.coverage.data[, unlist(infercnv_allele_obj@observation_grouped_cell_indices)]
+#     
+#     mat.tot <- infercnv_allele_obj@expr.data[, unlist(infercnv_allele_obj@observation_grouped_cell_indices)]
+#   } else if (analysis_mode == "normal"){
+#     allele.lesser.data <- allele.lesser.data[, unlist(infercnv_allele_obj@reference_grouped_cell_indices)]
+#     allele.data <- allele.data[, unlist(infercnv_allele_obj@reference_grouped_cell_indices)]
+#     allele.coverage.data <- allele.coverage.data[, unlist(infercnv_allele_obj@reference_grouped_cell_indices)]
+#     
+#     mat.tot <- infercnv_allele_obj@expr.data[, unlist(infercnv_allele_obj@reference_grouped_cell_indices)]
+#   } else{
+#     mat.tot <- infercnv_allele_obj@expr.data
+#   }
+#   ###
+#   flog.info("Starting cluster cells from population ...")
+#   
+#   if(fraction_method == "Filter_threshold"){
+#     mat.tot[is.na(mat.tot)] <- 0 # omit no coverage
+#     mat.tot[allele.data == 0 & allele.coverage.data != 0] <- 0.001 # pseudo count for total coverage not 0
+#     mat.tot[allele.coverage.data <= 2] <- 0 # filter with the cutoff of 3 coverage
+#     
+#     mat.smooth <- apply(mat.tot, 2, runmean, k=31)
+#     
+#     flog.info("Starting calculate distance ...")
+#     d <- parDist(t(mat.smooth), method = "euclidean", threads = ncores) # parallel dist
+#   }
+#   else if(fraction_method == "Remove_NA"){
+#     mat.smooth <- apply(mat.tot, 2, runmean, k=31)
+#     mat.smooth[is.na(mat.smooth)] <- 0
+#     
+#     flog.info("Starting calculate distance ...")
+#     d <- parDist(t(mat.smooth), method = "euclidean", threads = ncores) # parallel dist
+#   }
+#   else if(fraction_method == "HB"){
+#     mat.smooth <- apply(mat.tot, 2, runmean, k=31)
+#     flog.info("Starting calculate distance ...")
+#     d <- dist(t(mat.smooth), method = "euclidean") # too slow
+#     d[is.na(d)] <- 0
+#     d[is.nan(d)] <- 0
+#     d[is.infinite(d)] <- 0
+#   }
+#   
+#   flog.info("Starting calculate Hierarchical Clustering ...")
+#   hc <- hclust(d, method="ward.D2")
+#   
+#   flog.info('Starting iterative HMM ...')
+#   heights <- 1:min(min.traverse, ncol(allele.lesser.data))
+#   
+#   boundsnps.pred <- lapply(heights, function(h) {
+#     
+#     ct <- cutree(hc, k = h)
+#     cuts <- unique(ct)
+#     
+#     ## look at each group, if deletion present
+#     boundsnps.pred <- lapply(cuts, function(group) {
+#       
+#       if(sum(ct == group)>1) {
+#         mafl <- rowSums(allele.lesser.data[, ct == group]>0)
+#         sizel <- rowSums(allele.coverage.data[, ct == group]>0)
+#         
+#         ## change point
+#         delta <- c(0, 1)
+#         z <- dthmm(mafl, matrix(c(1-t, t, t, 1-t), 
+#                                 byrow=TRUE, nrow=2), 
+#                    delta, "binom", list(prob=c(pd, pn)), 
+#                    list(size=sizel), discrete=TRUE)
+#         results <- Viterbi(z)
+#         
+#         ## Get boundaries from states
+#         boundsnps <- rownames(allele.lesser.data)[results == 1]
+#         return(boundsnps)
+#         
+#       }
+#     })
+#   })
+#   
+#   boundsnps_res <- table(unlist(boundsnps.pred))
+#   
+#   ## vote
+#   vote <- rep(0, nrow(allele.lesser.data))
+#   names(vote) <- rownames(allele.lesser.data)
+#   vote[names(boundsnps_res)] <- boundsnps_res
+#   
+#   if(max(vote) == 0) {
+#     flog.info('Exiting; no new bound SNPs found ...')
+#     return() ## exit iteration, no more bound SNPs found
+#   }
+#   
+#   vote[vote > 0] <- 1
+#   mv <- 1 ## at least 1 vote
+#   cs <- 1
+#   bound.snps.cont <- rep(0, length(vote))
+#   names(bound.snps.cont) <- names(vote)
+#   
+#   for(i in 2:length(vote)) {
+#     if(vote[i] >= mv & vote[i] == vote[i-1]) {
+#       bound.snps.cont[i] <- cs
+#     } else {
+#       cs <- cs + 1
+#     }
+#   }
+#   
+#   tb <- table(bound.snps.cont)
+#   tbv <- as.vector(tb)
+#   names(tbv) <- names(tb)
+#   tbv <- tbv[-1] # get rid of 0
+#   
+#   ## all detected deletions have fewer than 5 SNPs...reached the end
+#   tbv <- tbv[tbv >= min.num.snps]
+#   if(length(tbv)==0) {
+#     flog.info(sprintf('Exiting; less than %s new bound SNPs found ...', min.num.snps))
+#     return()
+#   }
+#   
+#   HMM_info <- lapply(names(tbv), function(ti) {
+#     
+#     bound.snps.new <- names(bound.snps.cont)[bound.snps.cont == ti]
+#     
+#     ## trim
+#     bound.snps.new <- bound.snps.new[1:round(length(bound.snps.new)-length(bound.snps.new)*trim)]
+#     
+#     return(bound.snps.new)
+#     
+#   })
+#   HMM_region <- do.call("c", lapply(HMM_info, function(bs) range(infercnv_allele_obj@SNP_info[bs])))
+#   
+#   flog.info("Done extracting HMM regions ...")
+#   
+#   return(list("HMM_info" = HMM_info,
+#               "HMM_region" = HMM_region))
+# }
 
 #' @title plot_allele
 #' 
 #' @description plot a summary figure containing allele frequency, HMM prediction 
-#' 
-#' @importFrom tidyr separate spread
-#' 
-#' @importFrom stringr str_replace
-#' 
-#' @importFrom dplyr mutate group_by summarise left_join arrange select n
-#' 
-#' @import ggplot2
-#' 
-#' @importFrom cowplot plot_grid
 #' 
 #' @keywords internal
 #' 

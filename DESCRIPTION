@@ -52,7 +52,12 @@ Imports:
     coda,
     gridExtra,
     argparse,
-    cowplot
+    cowplot,
+    GenomeInfoDb,
+    GenomicRanges,
+    IRanges,
+    S4Vectors,
+    stringr
 URL: https://github.com/broadinstitute/inferCNV/wiki
 Collate: 
     'SplatterScrape.R'
