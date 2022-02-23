@@ -562,6 +562,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
                                  coverage.data, 
                                  snp_split_by, 
                                  gene_annot){
+    #browser()
     ## Initialize SNP sites
     snps.df <- rownames(allele.data) 
     snps.df <- data.frame(do.call(rbind,strsplit(snps.df,snp_split_by)), stringsAsFactors=F)
@@ -574,11 +575,13 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     if(!grepl(C_CHR, snps.df[1,1])) {
         snps.df[,1] <- paste0(C_CHR, snps.df[,1])
     }
+    snps.df[[C_START]] <- as.integer(snps.df[[C_START]])
+    snps.df[[C_STOP]] <- as.integer(snps.df[[C_STOP]])
     
     ## create a Granges object for SNP
     snps <- GRanges(snps.df[[C_CHR]],
-                    IRanges(as.numeric(as.character(snps.df[[C_START]])), 
-                           as.numeric(as.character(snps.df[[C_STOP]]))))
+                    IRanges(snps.df[[C_START]], 
+                            snps.df[[C_STOP]]))
     
     names(snps) <- rownames(allele.data) <- 
         rownames(coverage.data)  <-
@@ -605,12 +608,18 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     }
     snps <- snps[queryHits(snp_map)]
     snps$gene_name <- gene_ref$gene_name[subjectHits(snp_map)]
+    snps.df <- snps.df[names(snps),]
+    
+    n_chr <- strsplit(snps.df[[C_CHR]],"chr") %>% 
+        unlist %>% as.numeric() %>% na.omit() %>% 
+        unique() %>% sort(decreasing = FALSE)
+    snps.df[[C_CHR]] <- factor(snps.df[[C_CHR]], levels = paste0("chr",n_chr))
     ##
     
     return(list("allele.data" = allele.data[names(snps),],
                 "coverage.data" = coverage.data[names(snps),],
                 "snps" = snps,
-                "gene_order" = snps.df[names(snps),]))
+                "gene_order" = snps.df))
 }
 
 
