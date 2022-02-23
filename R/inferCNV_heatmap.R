@@ -154,7 +154,7 @@ plot_cnv <- function(infercnv_obj,
 
             # examine distribution of data that's off-center, since much of the center could
             # correspond to a mass of data that has been wiped out during noise reduction
-            quantiles = quantile(plot_data[plot_data != x.center], c(0.01, 0.99))
+            quantiles = quantile(plot_data[plot_data != x.center], c(0.01, 0.99), na.rm = T)
 
             # determine max distance from the center.
             delta = max( abs( c(x.center - quantiles[1],  quantiles[2] - x.center) ) )
@@ -449,6 +449,8 @@ plot_cnv <- function(infercnv_obj,
                             layout_add=TRUE,
                             useRaster=useRaster)
     }
+    
+    ###if()
     if (! is.na(output_format)) {
         dev.off()
     }
@@ -2159,7 +2161,7 @@ heatmap.cnv <-
                   ...)
         }
         flog.info(paste("Colors for breaks: ", paste(colors, collapse=","), sep=" "))
-        flog.info(paste("Quantiles of plotted data range:", paste(quantile(x), collapse=","), sep=" "))
+        flog.info(paste("Quantiles of plotted data range:", paste(quantile(x, na.rm = T), collapse=","), sep=" "))
     
         ## plot/color NAs
         if(!.invalid(na.color) & any(is.na(x))) {
