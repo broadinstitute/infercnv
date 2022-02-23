@@ -1,0 +1,42 @@
+model {
+    ## Single cell
+    for( k in 1:K ) {
+        ## Gene level
+        for ( j in 1:J ) {
+            ## SNP level
+            for( i in 1:I.j[j] ) {
+                r[j,i,k] ~ dbin(p[j,i,k], n.sc[j,i,k])
+                ## if has deletion, then bias has no effect since only one allele to expression
+                ## the one allele expressed should be consistent with bulk
+                ## if no deletion, then there could be mono-allelic expression
+                ## which affects deviation away from expected 0.5 probability
+                ## b is imputed from our bias model
+                p[j,i,k] <- ( h[j,i,k]*(1-b[j,k]) + (pseudo*d[j,k] + (1-pseudo)*(1-d[j,k]))*b[j,k] )*(1-S[k]) + fma[j,i]*S[k]
+                h[j,i,k] ~ dnorm(0.5,0.1)T(pseudo, 1-pseudo) ## heterozygous snp prob
+            }
+            ## Need to fully define in order to pull out from model even if not used
+            for( i in I.j[j]+1:max(I.j) ) {
+                p[j,i,k] <- 0
+                h[j,i,k] <- 0
+            }
+            d[j,k] ~ dbern(0.5) ## random direction of bias
+            delta[j,k] ~ dunif(0,1) ## random degree of bias
+            b[j,k] ~ dbern(mono) ## probability of mono-allelic expression
+        }
+        S[k] ~ dbern(alpha[k])
+        alpha[k] ~ dunif(0,1) # cell specific hyper-parameter prior to allow for better mixing
+    }
+    ## Bulk
+    for ( j in 1:J ) {
+        for( i in 1:I.j[j] ) {
+            l[j,i] ~ dbin(fma[j,i], n.bulk[j,i]) # minor allele
+            fma[j,i] <- pseudo*(ma[j,i]) + (1-pseudo)*(1-ma[j,i]) # prob of observing minor allele
+            ma[j,i] ~ dbern(0.5) # whether minor allele is affected, each is independent
+        }
+        ## Need to fully define in order to pull out from model even if not used
+        for( i in I.j[j]+1:max(I.j) ) {
+           fma[j,i] <- 0
+           ma[j,i] <- 0
+        }
+    }
+}

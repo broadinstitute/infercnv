@@ -47,7 +47,7 @@ infercnv.env$GLOBAL_NUM_THREADS <- 1  # default is single-threaded.
 #' @importFrom SummarizedExperiment start colData rowData assays assays<- rowData<- colData<- 
 #' @importFrom SingleCellExperiment SingleCellExperiment
 #' @importFrom tidyr gather
-#' @importFrom parallel detectCores
+#' @importFrom parallel detectCores mclapply
 #' @importFrom gridExtra ttheme_default tableGrob gtable_combine marrangeGrob 
 #' @importFrom GenomicRanges GRanges findOverlaps
 #' @importFrom IRanges IRanges `%over%`
