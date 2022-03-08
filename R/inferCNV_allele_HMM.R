@@ -33,6 +33,7 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
   tumor_subclusters <- unlist(infercnv_allele_obj@tumor_subclusters[["subclusters"]], recursive=FALSE)
   
   HMM_output <- c()
+  cell_index <- c()
   ## add the normals, so they get predictions too:
   #tumor_subclusters <- c(tumor_subclusters, infercnv_allele_obj@reference_grouped_cell_indices)
   
@@ -111,6 +112,7 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
           
           ## trim
           bound.snps.new <- bound.snps.new[1:round(length(bound.snps.new)-length(bound.snps.new)*trim)]
+          cell_index <<- c(cell_index, list(tumor_subcluster_cells_idx))
           
           return(bound.snps.new)
           
@@ -131,7 +133,8 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
   })
   infercnv_allele_obj@expr.data <- hmm.allele.data
   return(list(infercnv_allele_obj = infercnv_allele_obj, 
-              HMM_output = HMM_output))
+              HMM_output = HMM_output,
+              cell_index = cell_index))
 }
 
 #' @title allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples
@@ -170,6 +173,7 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
   tumor_samples <- c(infercnv_allele_obj@observation_grouped_cell_indices, 
                      infercnv_allele_obj@reference_grouped_cell_indices)
   HMM_output <- c()
+  cell_index <- c()
   
   ## run HMM across chromosomes
   lapply(chrs, function(chr){
@@ -248,8 +252,8 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
           ## trim
           bound.snps.new <- bound.snps.new[1:round(length(bound.snps.new)-length(bound.snps.new)*trim)]
           
+          cell_index <<- c(cell_index, list(tumor_sample_cells_idx))
           return(bound.snps.new)
-          
         })
         HMM_output <<- c(HMM_output, HMM_info)
         HMM_region <- do.call("c", lapply(HMM_info, function(bs) range(infercnv_allele_obj@SNP_info[bs])))
@@ -267,7 +271,8 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
   })
   infercnv_allele_obj@expr.data <- hmm.allele.data
   return(list(infercnv_allele_obj = infercnv_allele_obj, 
-              HMM_output = HMM_output))
+              HMM_output = HMM_output,
+              cell_index = cell_index))
 }
 
 ## @title calAlleleBoundaries

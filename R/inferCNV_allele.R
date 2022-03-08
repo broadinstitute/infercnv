@@ -157,9 +157,12 @@ setAlleleMatrix <- function(infercnv_allele_obj,
   lesser.allele.fraction[infercnv_allele_obj@allele.data == 0 & infercnv_allele_obj@coverage.data != 0] <- 0.001 # pseudo count for total coverage not 0
   lesser.allele.fraction[infercnv_allele_obj@coverage.data <= 2] <- 0 # filter with the cutoff of 3 coverage
   
-  lesser.allele.fraction <- apply(lesser.allele.fraction, 2, 
-                                  runmean, k = smooth_window)
-  
+  # lesser.allele.fraction <- apply(lesser.allele.fraction, 2,
+  #                                 runmean, k = smooth_window)
+  lesser.allele.fraction <- allele_smooth_by_chr(lesser.allele.fraction,
+                                                 seqnames(infercnv_allele_obj@SNP_info),
+                                                 smooth_window)
+
   rownames(lesser.allele.data) <- rownames(lesser.allele.fraction) <-
     rownames(infercnv_allele_obj@allele.data)
   
@@ -169,4 +172,19 @@ setAlleleMatrix <- function(infercnv_allele_obj,
   validate_infercnv_allele_obj(infercnv_allele_obj)
   
   return(infercnv_allele_obj)
+}
+
+## internal function to smooth allele data by chromosomes 
+allele_smooth_by_chr <- function(allele_data, index, smooth_window){
+  
+  allele_smmoth <- sapply(seq_len(ncol(allele_data)),
+                          function(x){
+                            tmp <- tapply(allele_data[,x], 
+                                          as.character(index), 
+                                          caTools::runmean, k = smooth_window) %>% unlist()
+                                     })
+  rownames(allele_smmoth) <- rownames(allele_data)
+  colnames(allele_smmoth) <- colnames(allele_data)
+  
+  return(allele_smmoth)
 }
