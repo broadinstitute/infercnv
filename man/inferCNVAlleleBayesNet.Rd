@@ -4,7 +4,18 @@
 \alias{inferCNVAlleleBayesNet}
 \title{inferCNVAlleleBayesNet: Run Bayesian NetworkModel To Obtain Posterior Probabilities For HMM Predicted States}
 \usage{
-inferCNVAlleleBayesNet(infercnv_allele_obj, infercnv_allele_hmm)
+inferCNVAlleleBayesNet(
+  infercnv_allele_obj,
+  infercnv_allele_hmm,
+  infercnv_allele_cellindex
+)
+}
+\arguments{
+\item{infercnv_allele_obj}{an infercnv_allele obj}
+
+\item{infercnv_allele_hmm}{a list of index of HMM boundaries}
+
+\item{infercnv_allele_cellindex}{an index of cell annotation}
 }
 \description{
 Run MCMC method to get posterior probability of cells having Deletions/LOHs

@@ -355,7 +355,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
         order_ret_allele <- .order_reduce_allele(raw.allele.data,
                                                  raw.coverage.data,
                                                  snp_split_by,
-                                                 gene_order)
+                                                 input_gene_order)
         raw.allele.data <- order_ret_allele$allele.data
         raw.coverage.data <- order_ret_allele$coverage.data
         snps <- order_ret_allele$snps

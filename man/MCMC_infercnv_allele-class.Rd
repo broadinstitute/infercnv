@@ -4,7 +4,7 @@
 \name{MCMC_infercnv_allele-class}
 \alias{MCMC_infercnv_allele-class}
 \alias{MCMC_infercnv_allele}
-\title{MCMC infercnv_allele class}
+\title{MCMC infercnv_allele class -- under development}
 \description{
 This class extends the functionality of infercnv_allele class
 aiming to coorporate MCMC object leveraging Bayesian model
@@ -14,12 +14,12 @@ Slots in the MCMC_infercnv_allele object (besides infercnv) include:
 \section{Slots}{
 
 \describe{
-\item{\code{bugs_model}}{}
+\item{\code{bugs_model}}{a string path to where the bug file locates}
 
-\item{\code{n.array}}{}
+\item{\code{n.array}}{the list of arrays containing allele count/ ref count etc.}
 
-\item{\code{n.meta}}{}
+\item{\code{n.meta}}{metadata info}
 
-\item{\code{alpha_prob}}{}
+\item{\code{posterior_prob}}{the list obj containing posterior prob from bayesian model}
 }}
 
