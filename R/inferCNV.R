@@ -355,7 +355,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
         order_ret_allele <- .order_reduce_allele(raw.allele.data,
                                                  raw.coverage.data,
                                                  snp_split_by,
-                                                 input_gene_order)
+                                                 gene_order)
         raw.allele.data <- order_ret_allele$allele.data
         raw.coverage.data <- order_ret_allele$coverage.data
         snps <- order_ret_allele$snps
@@ -590,36 +590,39 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     
     snps <- snps %>% sortSeqlevels() %>% sort()
     
-    ## new changes: filter those snps that do not map onto gene
     gene_ref <- GRanges(gene_annot[[C_CHR]],
                         IRanges(as.numeric(as.character(gene_annot[[C_START]])),
                                 as.numeric(as.character(gene_annot[[C_STOP]]))))
     gene_ref$gene_name <- gene_annot %>% rownames()
     
-    flog.info(sprintf("%s%% snps filtered out due to inconsistent mapping with gene regions",
-                      round(mean(!snps %over% gene_ref)*100, 2)))
+    snps <- snps[seqnames(snps) %>% as.character() %in% unique(gene_annot[[C_CHR]])]
+    snp2gene_index <- nearest(snps, gene_ref)
+    snps$gene_name <- gene_ref$gene_name[snp2gene_index]
     
-    snp_map <- findOverlaps(snps, gene_ref)
-    if(mean(duplicated(queryHits(snp_map))) > 0){
-        
-        flog.info("snps mapping with multiple genes will be mapped with its first match")
-        snp_map <- snp_map[!duplicated(queryHits(snp_map))]
-        
-    }
-    snps <- snps[queryHits(snp_map)]
-    snps$gene_name <- gene_ref$gene_name[subjectHits(snp_map)]
-    snps.df <- snps.df[names(snps),]
-    
-    n_chr <- strsplit(snps.df[[C_CHR]],"chr") %>% 
-        unlist %>% as.numeric() %>% na.omit() %>% 
-        unique() %>% sort(decreasing = FALSE)
-    snps.df[[C_CHR]] <- factor(snps.df[[C_CHR]], levels = paste0("chr",n_chr))
-    ##
+    ## old changes: filter those snps that do not map onto gene
+    # flog.info(sprintf("%s%% snps filtered out due to inconsistent mapping with gene regions",
+    #                   round(mean(!snps %over% gene_ref)*100, 2)))
+    # 
+    # snp_map <- findOverlaps(snps, gene_ref)
+    # if(mean(duplicated(queryHits(snp_map))) > 0){
+    #     
+    #     flog.info("snps mapping with multiple genes will be mapped with its first match")
+    #     snp_map <- snp_map[!duplicated(queryHits(snp_map))]
+    #     
+    # }
+    # snps <- snps[queryHits(snp_map)]
+    # snps$gene_name <- gene_ref$gene_name[subjectHits(snp_map)]
+    # snps.df <- snps.df[names(snps),]
+    # 
+    # n_chr <- strsplit(snps.df[[C_CHR]],"chr") %>% 
+    #     unlist %>% as.numeric() %>% na.omit() %>% 
+    #     unique() %>% sort(decreasing = FALSE)
+    # snps.df[[C_CHR]] <- factor(snps.df[[C_CHR]], levels = paste0("chr",n_chr))
     
     return(list("allele.data" = allele.data[names(snps),],
                 "coverage.data" = coverage.data[names(snps),],
                 "snps" = snps,
-                "gene_order" = snps.df))
+                "gene_order" = snps.df[names(snps),]))
 }
 
 
