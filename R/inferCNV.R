@@ -355,7 +355,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
         order_ret_allele <- .order_reduce_allele(raw.allele.data,
                                                  raw.coverage.data,
                                                  snp_split_by,
-                                                 gene_order)
+                                                 input_gene_order)
         raw.allele.data <- order_ret_allele$allele.data
         raw.coverage.data <- order_ret_allele$coverage.data
         snps <- order_ret_allele$snps
@@ -586,7 +586,10 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     names(snps) <- rownames(allele.data) <- 
         rownames(coverage.data)  <-
         rownames(snps.df) <-
-        apply(snps.df, 1, paste0, collapse=":")
+        #apply(snps.df, 1, paste0, collapse=":")
+        paste0(snps.df[[C_CHR]], ":",
+               snps.df[[C_START]], ":",
+               snps.df[[C_STOP]])
     
     snps <- snps %>% sortSeqlevels() %>% sort()
     
