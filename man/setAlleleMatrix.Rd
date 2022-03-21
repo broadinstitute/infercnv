@@ -9,7 +9,8 @@ setAlleleMatrix(
   snp_filter = TRUE,
   snp_het.deviance.threshold = 0.1,
   snp_min.cell = 3,
-  smooth_window = 101
+  smooth_method = "runmeans",
+  window_length = 101
 )
 }
 \arguments{
@@ -23,7 +24,9 @@ out non-hetergozous snps. default = 0.1}
 \item{snp_min.cell}{a threshold used to filter out snps that express less than 
 the minimum number of cells. default = 3}
 
-\item{smooth_window}{a window size used for smoothing allele fraction. default = 101}
+\item{smooth_method}{a method used for smoothing allele fraction default = "runmeans"}
+
+\item{window_length}{smoothing window size. default = 101}
 }
 \description{
 This function aims to set lesser allele fraction in-silico way.
