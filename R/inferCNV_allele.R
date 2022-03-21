@@ -5,6 +5,10 @@
 #' 
 #' Slots in the infercnv_allele object (besides infercnv) include:
 #' 
+#' @slot expr.data <matrix> the lesser allele fraction matrix (infercnv_allele obj).
+#' 
+#' @slot count.data <matrix> the lesser allele count matrix (infercnv_allele obj).
+#'
 #' @slot allele.data <matrix> the alternate allele data matrix.
 #' 
 #' @slot coverage.data <matrix> the coverage allele data matrix.
@@ -15,6 +19,8 @@
 infercnv_allele <- methods::setClass(
   "infercnv_allele",
   slots = c(
+    expr.data = "ANY",
+    count.data = "ANY",
     allele.data = "ANY",
     coverage.data = "ANY",
     SNP_info = "GRanges"),
@@ -115,14 +121,15 @@ remove_snps <- function(infercnv_allele_obj, snps_indices_to_remove) {
 #' @param snp_min.cell a threshold used to filter out snps that express less than 
 #' the minimum number of cells. default = 3
 #' 
-#' @param smooth_window a window size used for smoothing allele fraction. default = 101
+#' @param smooth_method a method used for smoothing allele fraction default = "runmeans"
+#' 
+#' @param window_length smoothing window size. default = 101
 #' 
 #' @export
 setAlleleMatrix <- function(infercnv_allele_obj,
                             snp_filter = TRUE,
-                            snp_het.deviance.threshold = 0.1,
-                            snp_min.cell = 3,
-                            smooth_window = 101){
+                            snp_het.deviance.threshold = 0.1, snp_min.cell = 3,
+                            smooth_method = "runmeans", window_length = 101){
   flog.info("Creating in-silico bulk ...")
   allele_bulk <- rowSums(infercnv_allele_obj@allele.data > 0)
   coverage_bulk <- rowSums(infercnv_allele_obj@coverage.data > 0)
@@ -157,34 +164,27 @@ setAlleleMatrix <- function(infercnv_allele_obj,
   lesser.allele.fraction[infercnv_allele_obj@allele.data == 0 & infercnv_allele_obj@coverage.data != 0] <- 0.001 # pseudo count for total coverage not 0
   lesser.allele.fraction[infercnv_allele_obj@coverage.data <= 2] <- 0 # filter with the cutoff of 3 coverage
   
-  # lesser.allele.fraction <- apply(lesser.allele.fraction, 2,
-  #                                 runmean, k = smooth_window)
-  lesser.allele.fraction <- allele_smooth_by_chr(lesser.allele.fraction,
-                                                 seqnames(infercnv_allele_obj@SNP_info),
-                                                 smooth_window)
-
-  rownames(lesser.allele.data) <- rownames(lesser.allele.fraction) <-
-    rownames(infercnv_allele_obj@allele.data)
-  
   infercnv_allele_obj@expr.data <- lesser.allele.fraction
   infercnv_allele_obj@count.data <- lesser.allele.data
   
+  if (smooth_method == 'runmeans') {
+
+    infercnv_allele_obj <- smooth_by_chromosome_runmeans(infercnv_allele_obj,
+                                                         window_length)
+  } else if (smooth_method == 'pyramidinal') {
+
+    infercnv_allele_obj <- smooth_by_chromosome(infercnv_allele_obj,
+                                                window_length=window_length,
+                                                smooth_ends=TRUE)
+  } else if (smooth_method == 'coordinates') {
+    infercnv_allele_obj <- smooth_by_chromosome_coordinates(infercnv_allele_obj,
+                                                            window_length=window_length)
+  } else {
+    stop(sprintf("Error, don't recognize smoothing method: %s", smooth_method))
+  }
+
   validate_infercnv_allele_obj(infercnv_allele_obj)
   
   return(infercnv_allele_obj)
 }
 
-## internal function to smooth allele data by chromosomes 
-allele_smooth_by_chr <- function(allele_data, index, smooth_window){
-  
-  allele_smmoth <- sapply(seq_len(ncol(allele_data)),
-                          function(x){
-                            tmp <- tapply(allele_data[,x], 
-                                          as.character(index), 
-                                          caTools::runmean, k = smooth_window) %>% unlist()
-                                     })
-  rownames(allele_smmoth) <- rownames(allele_data)
-  colnames(allele_smmoth) <- colnames(allele_data)
-  
-  return(allele_smmoth)
-}

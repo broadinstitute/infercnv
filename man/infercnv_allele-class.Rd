@@ -14,6 +14,10 @@ Slots in the infercnv_allele object (besides infercnv) include:
 \section{Slots}{
 
 \describe{
+\item{\code{expr.data}}{<matrix> the lesser allele fraction matrix (infercnv_allele obj).}
+
+\item{\code{count.data}}{<matrix> the lesser allele count matrix (infercnv_allele obj).}
+
 \item{\code{allele.data}}{<matrix> the alternate allele data matrix.}
 
 \item{\code{coverage.data}}{<matrix> the coverage allele data matrix.}
