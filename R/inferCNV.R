@@ -593,14 +593,14 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     
     snps <- snps %>% sortSeqlevels() %>% sort()
     
-    gene_ref <- GRanges(gene_annot[[C_CHR]],
-                        IRanges(as.numeric(as.character(gene_annot[[C_START]])),
-                                as.numeric(as.character(gene_annot[[C_STOP]]))))
-    gene_ref$gene_name <- gene_annot %>% rownames()
+    # gene_ref <- GRanges(gene_annot[[C_CHR]],
+    #                     IRanges(as.numeric(as.character(gene_annot[[C_START]])),
+    #                             as.numeric(as.character(gene_annot[[C_STOP]]))))
+    # gene_ref$gene_name <- gene_annot %>% rownames()
     
     snps <- snps[seqnames(snps) %>% as.character() %in% unique(gene_annot[[C_CHR]])]
-    snp2gene_index <- nearest(snps, gene_ref)
-    snps$gene_name <- gene_ref$gene_name[snp2gene_index]
+    # snp2gene_index <- nearest(snps, gene_ref)
+    # snps$gene_name <- gene_ref$gene_name[snp2gene_index]
     
     ## old changes: filter those snps that do not map onto gene
     # flog.info(sprintf("%s%% snps filtered out due to inconsistent mapping with gene regions",

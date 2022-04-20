@@ -55,8 +55,11 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
           status <- "normal"
         }
         
-        mafl <- rowSums(lesser.data[chr_snp_idx, tumor_subcluster_cells_idx,drop=FALSE] > 0)
-        sizel <- rowSums(coverage.data[chr_snp_idx, tumor_subcluster_cells_idx,drop=FALSE] > 0)
+        lesser.data <- lesser.data[chr_snp_idx, tumor_subcluster_cells_idx,drop=FALSE]
+        coverage.data <- coverage.data[chr_snp_idx, tumor_subcluster_cells_idx,drop=FALSE]
+        
+        mafl <- rowSums(lesser.data > 0)
+        sizel <- rowSums(coverage.data > 0)
         
         ## change point
         delta <- c(0, 1)
@@ -65,12 +68,11 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
                    delta, "binom", list(prob=c(pd, pn)), 
                    list(size=sizel), discrete=TRUE)
         results <- Viterbi(z)
-        
-        boundsnps <- rownames(lesser.data[chr_snp_idx,tumor_subcluster_cells_idx,drop=FALSE])[results == 1]
+        boundsnps <- rownames(lesser.data)[results == 1]
         
         ## vote
-        vote <- rep(0, nrow(lesser.data[chr_snp_idx,tumor_subcluster_cells_idx,drop=FALSE]))
-        names(vote) <- rownames(lesser.data[chr_snp_idx,tumor_subcluster_cells_idx,drop=FALSE])
+        vote <- rep(0, nrow(lesser.data))
+        names(vote) <- rownames(lesser.data)
         vote[boundsnps] <- 1
         
         if(max(vote) == 0) {
@@ -132,9 +134,10 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
     })
   })
   infercnv_allele_obj@expr.data <- hmm.allele.data
-  return(list(infercnv_allele_obj = infercnv_allele_obj, 
-              HMM_output = HMM_output,
-              cell_index = cell_index))
+  # return(list(infercnv_allele_obj = infercnv_allele_obj, 
+  #             HMM_output = HMM_output,
+  #             cell_index = cell_index))
+  return(infercnv_allele_obj)
 }
 
 #' @title allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples
@@ -193,8 +196,11 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
           status <- "normal"
         }
         
-        mafl <- rowSums(lesser.data[chr_snp_idx, tumor_sample_cells_idx,drop=FALSE] > 0)
-        sizel <- rowSums(coverage.data[chr_snp_idx, tumor_sample_cells_idx,drop=FALSE] > 0)
+        lesser.data <- lesser.data[chr_snp_idx, tumor_sample_cells_idx,drop=FALSE]
+        coverage.data <- coverage.data[chr_snp_idx, tumor_sample_cells_idx,drop=FALSE]
+        
+        mafl <- rowSums(lesser.data > 0)
+        sizel <- rowSums(coverage.data > 0)
         
         ## change point
         delta <- c(0, 1)
@@ -203,12 +209,11 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
                    delta, "binom", list(prob=c(pd, pn)), 
                    list(size=sizel), discrete=TRUE)
         results <- Viterbi(z)
-        
-        boundsnps <- rownames(lesser.data[chr_snp_idx,tumor_sample_cells_idx,drop=FALSE])[results == 1]
+        boundsnps <- rownames(lesser.data)[results == 1]
         
         ## vote
-        vote <- rep(0, nrow(lesser.data[chr_snp_idx,tumor_sample_cells_idx,drop=FALSE]))
-        names(vote) <- rownames(lesser.data[chr_snp_idx,tumor_sample_cells_idx,drop=FALSE])
+        vote <- rep(0, nrow(lesser.data))
+        names(vote) <- rownames(lesser.data)
         
         vote[boundsnps] <- 1
         
@@ -270,9 +275,10 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
     })
   })
   infercnv_allele_obj@expr.data <- hmm.allele.data
-  return(list(infercnv_allele_obj = infercnv_allele_obj, 
-              HMM_output = HMM_output,
-              cell_index = cell_index))
+  # return(list(infercnv_allele_obj = infercnv_allele_obj, 
+  #             HMM_output = HMM_output,
+  #             cell_index = cell_index))
+  return(infercnv_allele_obj)
 }
 
 allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters_mod <- function(infercnv_allele_obj,
@@ -627,19 +633,19 @@ aggregate_gene <- function(infercnv_allele_obj, gene_annot,
   flog.info(sprintf("Using %s method to aggregrate snp-based HMM into gene-based HMM", 
                     state_agg_method))
   gene_state <- agg_method(infercnv_allele_obj@expr.data,
-                           infercnv_allele_obj@SNP_info$gene_name,
+                           infercnv_allele_obj@SNP_info$gene,
                            state_agg_method)
   
   flog.info(sprintf("Using %s method to aggregrate snp into gene level", 
                     snp_agg_method))
   gene_count.data <- agg_method(infercnv_allele_obj@count.data,
-                                infercnv_allele_obj@SNP_info$gene_name,
+                                infercnv_allele_obj@SNP_info$gene,
                                 snp_agg_method)
   gene_allele.data <- agg_method(infercnv_allele_obj@allele.data,
-                                 infercnv_allele_obj@SNP_info$gene_name,
+                                 infercnv_allele_obj@SNP_info$gene,
                                  snp_agg_method)
   gene_coverage.data <- agg_method(infercnv_allele_obj@coverage.data,
-                                   infercnv_allele_obj@SNP_info$gene_name,
+                                   infercnv_allele_obj@SNP_info$gene,
                                    snp_agg_method)
   
   gene_order <- gene_annot[rownames(gene_annot) %in% rownames(gene_state),]
