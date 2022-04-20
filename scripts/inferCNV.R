@@ -309,6 +309,20 @@ pargs <- optparse::add_option(pargs, c("--tumor_subcluster_pval"),
                               help=paste("Max p-value for defining a significant tumor subcluster. ",
                                          "[Default %default]"))
 
+
+pargs <- optparse::add_option(pargs, c("--tumor_subcluster_partition_method"),
+                              type="character",
+                              default="leiden",
+                              action="store",
+                              dest="tumor_subcluster_partition_method",
+                              metavar="Tumor Subcluster Partition Method",
+                              help=paste("c('leiden', 'random_trees', 'qnorm')",
+                                         "[Default %default]",
+                                         "method for defining tumor subclusters.",
+                                         "leiden: Runs a nearest neighbor search, where communities are then partitionned with the Leiden algorithm.",
+                                         "random_trees: Slow, uses permutation statistics w/ tree construction.",
+                                         "qnorm: defines tree height based on the quantile defined by the tumor_subcluster_pval"))
+
 pargs <- optparse::add_option(pargs, c("--HMM_report_by"),
                               type="character",
                               default="subcluster",

@@ -327,7 +327,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     
     ## rest of the cells are the 'observed' set.
     all_group_names <- unique(input_classifications[,1])
-    obs_group_names <- setdiff(all_group_names, ref_group_names)
+    obs_group_names <- sort(setdiff(all_group_names, ref_group_names))
 
     ## define groupings according to the observation annotation names
     

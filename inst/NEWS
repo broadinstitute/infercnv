@@ -1,3 +1,17 @@
++ Changes in 1.11.3 (2022-04-11)
++ Add tumor_subcluster_partition_method option to CLI script.
++ Add sd_amplifier option to example run.R to match wiki better.
++ Transfer denoise default parameter to reloading function when its not manually set.
++ Add handling of annotation groups with 1 or 2 cells when running Leiden subclustering.
++ Fix i3 HMM plotting color range in step 19.
++ Fixes to i3 HMM and tweak of some default settings for it.
+
+Changes in 1.11.2 (2022-02-03)
++ Sort observation groups names when storing the list of indices so they are plotted in order, making it easier to change the sorting on the final figure.
++ Fix plotting error on Windows by adding a check that bitmapType option is not null before checking what it is to prevent error in comparison.
++ Fix for some group labels being cut off in width at the bottom of the figure
++ Add conversion of expression data in sparse matrix format to dense matrix when splitting references in n groups as parallelDist does not handle them.
+
 Changes in 1.11.1 (2021-11-08)
 + Link "plot_chr_scale" and "chr_lengths" options from plot_cnv() to run().
 + Added parameter k_obs_group to plot_per_group so that it can be applied to each of the subsequent group plotting calls if desired.

@@ -245,8 +245,8 @@ run <- function(infercnv_obj,
                 HMM_transition_prob=1e-6,
                 HMM_report_by=c("subcluster","consensus","cell"),
                 HMM_type=c('i6', 'i3'),
-                HMM_i3_pval=0.05,
-                HMM_i3_use_KS=TRUE,
+                HMM_i3_pval=0.01,
+                HMM_i3_use_KS=FALSE,
                 BayesMaxPNormal=0.5,
 
                 ## some experimental params
@@ -364,11 +364,13 @@ run <- function(infercnv_obj,
     call_match$analysis_mode = analysis_mode
     call_match$tumor_subcluster_partition_method = tumor_subcluster_partition_method
     # add argument needed to get relevant args list
+    call_match$HMM = HMM
     call_match$max_centered_threshold = max_centered_threshold
     call_match$remove_genes_at_chr_ends = remove_genes_at_chr_ends
     call_match$prune_outliers = prune_outliers
     call_match$BayesMaxPNormal = BayesMaxPNormal
     call_match$mask_nonDE_genes = mask_nonDE_genes
+    call_match$denoise = denoise
     call_match$noise_filter = noise_filter
     call_match$sd_amplifier = sd_amplifier
     call_match$noise_logistic = noise_logistic
@@ -1314,8 +1316,8 @@ run <- function(infercnv_obj,
                          output_filename=sprintf("infercnv.%02d_HMM_pred.Bayes_Net.Pnorm_%g",step_count, BayesMaxPNormal),
                          output_format=output_format,
                          write_expr_matrix=TRUE,
-                         x.center=3,
-                         x.range=c(0,6),
+                         x.center=hmm_center,
+                         x.range=hmm_state_range,
                          png_res=png_res,
                          useRaster=useRaster
                          )
@@ -1794,6 +1796,10 @@ split_references <- function(infercnv_obj,
     
     flog.info(paste("::split_references:Start", sep=""))
     
+    if ("sparseMatrix" %in% is(infercnv_obj@expr.data)) {
+        infercnv_obj@expr.data = as.matrix(infercnv_obj@expr.data)
+    }
+
     ref_expr_matrix = infercnv_obj@expr.data[ , get_reference_grouped_cell_indices(infercnv_obj) ]
     
     hc <- hclust(parallelDist(t(ref_expr_matrix), threads=infercnv.env$GLOBAL_NUM_THREADS), method=hclust_method)

@@ -20,6 +20,7 @@ infercnv_obj = infercnv::run(infercnv_obj,
                              analysis_mode="subclusters",    
                              plot_steps=FALSE,
                              denoise=TRUE,
+                             sd_amplifier=2,
                              HMM=TRUE
                              )
 

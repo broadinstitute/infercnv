@@ -395,6 +395,12 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
     res = list()
     res$subclusters = list()
 
+    if (length(tumor_group_idx) < 3) {
+        flog.info(paste0("Too few cells in group ", tumor_group, " for any (sub)clustering. Keeping as is."))
+        res$hc = NULL # can't make hc with a single element, even manually, need to have workaround in plotting step
+        res$subclusters[[paste0(tumor_group, "_s1") ]] = tumor_group_idx
+        return(res)
+    }
     if (k_nn >= length(tumor_group_idx)) {
         flog.info(paste0("Less cells in group ", tumor_group, " than k_nn setting. Keeping as a single subcluster."))
         res$subclusters[[ tumor_group ]] = tumor_group_idx

@@ -20,7 +20,7 @@
 .i3HMM_get_sd_trend_by_num_cells_fit <- function(infercnv_obj, i3_p_val=0.05, plot=FALSE) {
 
     
-    tumor_samples = infercnv_obj@observation_grouped_cell_indices
+    tumor_samples = infercnv_obj@reference_grouped_cell_indices
     
     tumor_expr_vals <- infercnv_obj@expr.data[,unlist(tumor_samples)]
     
@@ -125,9 +125,8 @@
     } else {
         ## use the var vs. num cells trend
         sigma <- exp(predict(sd_trend$fit,
-                             newdata=data.frame(num_cells=num_cells))[[1]])  
+                             newdata=data.frame(num_cells=log(num_cells)))[[1]])
 
-        
         mean_delta = ifelse(use_KS,
                             get_HoneyBADGER_setGexpDev(gexp.sd=sd_trend$sigma, alpha=i3_p_val, k_cells=num_cells), 
                             determine_mean_delta_via_Z(sigma, p=i3_p_val) )
@@ -269,8 +268,8 @@ i3HMM_predict_CNV_via_HMM_on_tumor_subclusters  <- function(infercnv_obj,
 
     tumor_subclusters <- unlist(infercnv_obj@tumor_subclusters[["subclusters"]], recursive=FALSE)
     
-    ## add the normals, so they get predictions too:
-    tumor_subclusters <- c(tumor_subclusters, infercnv_obj@reference_grouped_cell_indices)
+    ## add the normals, so they get predictions too:  | already part of tumor_subclusters
+    # tumor_subclusters <- c(tumor_subclusters, infercnv_obj@reference_grouped_cell_indices)
     
     ## run through each chr separately
     lapply(chrs, function(chr) {
@@ -434,9 +433,7 @@ determine_mean_delta_via_Z <- function(sigma, p) {
 
     flog.info(sprintf("determine mean delta (sigma: %g, p=%g) -> %g", sigma, p, delta))
 
-    delta_for_alt_mean = 2 * delta
-    
-    return(delta_for_alt_mean)
+    return(delta)
     
 }
 
