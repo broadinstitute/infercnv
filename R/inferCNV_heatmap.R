@@ -259,7 +259,7 @@ plot_cnv <- function(infercnv_obj,
         dynamic_extension = dynamic_resize * 3.6 * (nobs - 200)/200 
     }
 
-    grouping_key_coln[1] <- floor(123/(max(nchar(obs_annotations_names)) + 4))  ## 123 is the max width in number of characters, 4 is the space taken by the color box itself and the spacing around it
+    grouping_key_coln[1] <- floor(123/(max(nchar(obs_annotations_names)) + 6))  ## 123 is the max width in number of characters, 4 is the space taken by the color box itself and the spacing around it
     if (grouping_key_coln[1] < 1) {
         grouping_key_coln[1] <- 1
     }
@@ -268,7 +268,7 @@ plot_cnv <- function(infercnv_obj,
     if (is.null(name_ref_groups)) {
         grouping_key_coln[2] = 1
     } else {
-        grouping_key_coln[2] <- floor(123/(max(nchar(name_ref_groups)) + 4))  ## 123 is the max width in number of characters, 4 is the space taken by the color box itself and the spacing around it
+        grouping_key_coln[2] <- floor(123/(max(nchar(name_ref_groups)) + 6))  ## 123 is the max width in number of characters, 4 is the space taken by the color box itself and the spacing around it
         if (grouping_key_coln[2] < 1) {
             grouping_key_coln[2] <- 1
         }
@@ -290,7 +290,7 @@ plot_cnv <- function(infercnv_obj,
                 paper="special")
         } else if (output_format == "png") {
             png_height = 8.22 + sum(grouping_key_height) + dynamic_extension
-            if ((getOption("bitmapType") == "cairo") & (png_height > 32768/png_res)) {  # 32768 is the pixel limit for cairo backend
+            if (!is.null(getOption("bitmapType")) && (getOption("bitmapType") == "cairo") & (png_height > 32768/png_res)) {  # 32768 is the pixel limit for cairo backend
                 png_height = round((32767/png_res) - 5*10^(-3), 2) # floor() with 2 decimals
                 flog.warn(paste0("Requested PNG output height too big at the current resolution, ",
                     "using the max height instead. (cairo seems to have a size limit of 32767 (2^15-1) pixels ",
