@@ -188,3 +188,30 @@ setAlleleMatrix <- function(infercnv_allele_obj,
   return(infercnv_allele_obj)
 }
 
+
+#' @title map2gene
+#' 
+#' @description This function aims to map snp data back to gene data given the annotation file
+#' 
+#' @param infercnv_allele_obj infercnv_allele based obj
+#' 
+#' @param gene_order gene annotation file
+#' 
+#' @export
+map2gene <- function(infercnv_allele_obj,
+                     gene_order){
+  
+  flog.info("Mapping snps back to genes ...")
+  
+  gene_order_gr <- GRanges(gene_order[[C_CHR]],
+                           IRanges(as.numeric(as.character(gene_order[[C_START]])),
+                                   as.numeric(as.character(gene_order[[C_STOP]]))))
+  gene_order_gr$gene <- gene_order %>% rownames()
+  
+  snp2gene_index <- nearest(infercnv_allele_obj@SNP_info, gene_order_gr)
+  infercnv_allele_obj@SNP_info$gene <- gene_order_gr$gene[snp2gene_index]
+  
+  validate_infercnv_allele_obj(infercnv_allele_obj)
+  
+  return(infercnv_allele_obj)
+}
