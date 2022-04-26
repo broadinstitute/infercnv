@@ -384,6 +384,11 @@ plot_cnv <- function(infercnv_obj,
                 col_sep_idx = col_sep_idx + 1
             }
         }
+
+        overlap_pos = which(gene_position_breaks[1:(length(gene_position_breaks)-1)] == gene_position_breaks[2:length(gene_position_breaks)])
+        if (any(overlap_pos)) {
+            gene_position_breaks[overlap_pos+1] = gene_position_breaks[overlap_pos] + 1
+        }
     }
 
 
