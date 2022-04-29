@@ -399,6 +399,7 @@ plot_cnv <- function(infercnv_obj,
                           obs_data=obs_data,
                           file_base_name=out_dir,
                           do_plot=!is.na(output_format),
+                          write_expr_matrix=write_expr_matrix,
                           output_filename_prefix=output_filename,
                           cluster_contig=ref_contig,
                           contigs=contigs,
@@ -437,6 +438,7 @@ plot_cnv <- function(infercnv_obj,
                             contig_seps=col_sep,
                             file_base_name=out_dir,
                             do_plot=!is.na(output_format),
+                            write_expr_matrix=write_expr_matrix,
                             output_filename_prefix=output_filename,
                             cnv_ref_title=ref_title,
                             breaksList=breaksList_t,
@@ -476,6 +478,7 @@ plot_cnv <- function(infercnv_obj,
 #' @param num_obs_groups Number of groups of observations to create.
 #' @param file_base_name Base of the file to used to make output file names.
 #' @param do_plot If FALSE, only write text files and does not run plotting.
+#' @param write_expr_matrix Whether to write the matrix of observation values to file.
 #' @param cnv_title Title of the plot.
 #' @param cnv_obs_title Title for the observation matrix.
 #' @param contig_lab_size Text size for contigs.
@@ -506,6 +509,7 @@ plot_cnv <- function(infercnv_obj,
                                   num_obs_groups,
                                   file_base_name,
                                   do_plot=TRUE,
+                                  write_expr_matrix,
                                   output_filename_prefix,
                                   cnv_title,
                                   cnv_obs_title,
@@ -857,7 +861,7 @@ plot_cnv <- function(infercnv_obj,
                         sep=" "))
         row.names(obs_data) <- orig_row_names
 
-        if (do_plot) {
+        if (do_plot && write_expr_matrix) {
             write.table(as.matrix(t(obs_data[data_observations$rowInd,data_observations$colInd])),
                     file=observation_file_base)
         }
@@ -929,6 +933,7 @@ plot_cnv <- function(infercnv_obj,
 #' contig_seps Indices for line seperators of contigs.
 #' file_base_name Base of the file to used to make output file names.
 #' do_plot If FALSE, only write text files and does not run plotting.
+#' write_expr_matrix Whether to write the matrix of reference values to file.
 #' cnv_ref_title Title for reference matrix.
 #' layout_lmat lmat values to use in the layout.
 #' layout_lwid lwid values to use in the layout.
@@ -953,6 +958,7 @@ plot_cnv <- function(infercnv_obj,
                                 contig_seps,
                                 file_base_name,
                                 do_plot=TRUE,
+                                write_expr_matrix,
                                 output_filename_prefix,
                                 cnv_ref_title,
                                 breaksList,
@@ -1152,7 +1158,7 @@ plot_cnv <- function(infercnv_obj,
 
         ## Rowv is FALSE, Colv is FALSE
 
-        if (do_plot) {
+        if (do_plot && write_expr_matrix) {
             write.table(as.matrix(t(ref_data[data_references$rowInd,data_references$colInd])),
                         file=reference_data_file)
         }
