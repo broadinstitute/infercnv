@@ -51,20 +51,37 @@ validate_infercnv_allele_obj <- function(infercnv_allele_obj){
                           names(infercnv_allele_obj@SNP_info)))){
         if(isTRUE(all.equal(rownames(infercnv_allele_obj@allele.data),
                             rownames(infercnv_allele_obj@gene_order)))){
-          return()
+          if(is.null(infercnv_allele_obj@expr.data) & is.null(infercnv_allele_obj@count.data)){
+            return()
+          } else{
+            if(isTRUE(all.equal(rownames(infercnv_allele_obj@allele.data),
+                                rownames(infercnv_allele_obj@expr.data)))){
+              if(isTRUE(all.equal(rownames(infercnv_allele_obj@allele.data),
+                                  rownames(infercnv_allele_obj@count.data)))){
+                return()
+              } else{
+                flog.error("hmm.... rownames(infercnv_allele_obj@allele.data != 
+                           rownames(infercnv_allele_obj@count.data))")
+              }
+            } else{
+              flog.error("hmm.... rownames(infercnv_allele_obj@allele.data != 
+                         rownames(infercnv_allele_obj@expr.data))")
+            }
+          }
+          #return()
         } else{
           flog.error("hmm.... rownames(infercnv_allele_obj@allele.data != 
-               rownames(infercnv_allele_obj@gene_order))")
+                     rownames(infercnv_allele_obj@gene_order))")
         }
         
       } else{
         flog.error("hmm.... rownames(infercnv_allele_obj@allele.data != 
-               rownames(infercnv_allele_obj@SNP_info))")
+                   rownames(infercnv_allele_obj@SNP_info))")
       }
       
     } else{
       flog.error("hmm.... rownames(infercnv_allele_obj@allele.data != 
-               rownames(infercnv_allele_obj@coverage.data))")
+                 rownames(infercnv_allele_obj@coverage.data))")
     }
   } else{
     flog.error("hmm.... colnames(infercnv_allele_obj@allele.data != 
@@ -90,6 +107,10 @@ validate_infercnv_allele_obj <- function(infercnv_allele_obj){
 #' @noRd
 #'
 remove_snps <- function(infercnv_allele_obj, snps_indices_to_remove) {
+  
+  infercnv_allele_obj@expr.data <- infercnv_allele_obj@expr.data[ -1 * snps_indices_to_remove, , drop=FALSE]
+  
+  infercnv_allele_obj@count.data <- infercnv_allele_obj@count.data[ -1 * snps_indices_to_remove, , drop=FALSE]
   
   infercnv_allele_obj@allele.data <- infercnv_allele_obj@allele.data[ -1 * snps_indices_to_remove, , drop=FALSE]
   
