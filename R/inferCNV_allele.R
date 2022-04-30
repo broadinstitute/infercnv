@@ -126,13 +126,15 @@ remove_snps <- function(infercnv_allele_obj, snps_indices_to_remove) {
 }
 
 
-#' @title setAlleleMatrix
+#' @title setAlleleMatrix_HB
 #' 
-#' @description This function aims to set lesser allele fraction in-silico way.
+#' @description This function mimics the way the HB does aiming to initialize the lesser allele fraction/count.
 #' lesser allele fraction will be stored in the slot @expr.data. lesser allele count 
 #' will be stored in the slot @count.data
 #' 
 #' @param infercnv_allele_obj infercnv_allele_object
+#' 
+#' @param snp_min_coverage the minimum number of counts that the snp express in coverage data. default = 2
 #' 
 #' @param snp_filter a boolean value whether to do pre-filtering for allele matrix. default = TRUE
 #' 
@@ -147,10 +149,17 @@ remove_snps <- function(infercnv_allele_obj, snps_indices_to_remove) {
 #' @param window_length smoothing window size. default = 101
 #' 
 #' @export
-setAlleleMatrix <- function(infercnv_allele_obj,
-                            snp_filter = TRUE,
-                            snp_het.deviance.threshold = 0.1, snp_min.cell = 3,
-                            smooth_method = "runmeans", window_length = 101){
+setAlleleMatrix_HB <- function(infercnv_allele_obj,
+                               snp_min_coverage = 2,
+                               snp_filter = TRUE,
+                               snp_het.deviance.threshold = 0.1, snp_min.cell = 3,
+                               smooth_method = "runmeans", window_length = 101){
+  
+  flog.info("Removing snps that have low coverage ...")
+  
+  infercnv_allele_obj@allele.data[infercnv_allele_obj@coverage.data <= snp_min_coverage] <- 0 
+  infercnv_allele_obj@coverage.data[infercnv_allele_obj@coverage.data <= snp_min_coverage] <- 0  
+  
   flog.info("Creating in-silico bulk ...")
   allele_bulk <- rowSums(infercnv_allele_obj@allele.data > 0)
   coverage_bulk <- rowSums(infercnv_allele_obj@coverage.data > 0)
@@ -172,8 +181,8 @@ setAlleleMatrix <- function(infercnv_allele_obj,
       coverage_bulk <- coverage_bulk[filter_index_het & filter_index_min]
     }
   }
-  flog.info("Setting composite lesser allele fraction ...")
   
+  flog.info("Setting composite lesser allele fraction ...")
   E <- allele_bulk/coverage_bulk
   thr_index <- E > 0.5
   
@@ -183,7 +192,7 @@ setAlleleMatrix <- function(infercnv_allele_obj,
   
   lesser.allele.fraction[is.na(lesser.allele.fraction)] <- 0 # omit no coverage
   lesser.allele.fraction[infercnv_allele_obj@allele.data == 0 & infercnv_allele_obj@coverage.data != 0] <- 0.001 # pseudo count for total coverage not 0
-  lesser.allele.fraction[infercnv_allele_obj@coverage.data <= 2] <- 0 # filter with the cutoff of 3 coverage
+  #lesser.allele.fraction[infercnv_allele_obj@coverage.data <= 2] <- 0 # filter with the cutoff of 3 coverage
   
   infercnv_allele_obj@expr.data <- lesser.allele.fraction
   infercnv_allele_obj@count.data <- lesser.allele.data
