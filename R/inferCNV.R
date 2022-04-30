@@ -593,25 +593,26 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     
     snps <- snps %>% sortSeqlevels() %>% sort()
     
-    # gene_ref <- GRanges(gene_annot[[C_CHR]],
-    #                     IRanges(as.numeric(as.character(gene_annot[[C_START]])),
-    #                             as.numeric(as.character(gene_annot[[C_STOP]]))))
+    gene_ref <- GRanges(gene_annot[[C_CHR]],
+                        IRanges(as.numeric(as.character(gene_annot[[C_START]])),
+                                as.numeric(as.character(gene_annot[[C_STOP]]))))
     # gene_ref$gene_name <- gene_annot %>% rownames()
     
     snps <- snps[seqnames(snps) %>% as.character() %in% unique(gene_annot[[C_CHR]])]
     # snp2gene_index <- nearest(snps, gene_ref)
     # snps$gene_name <- gene_ref$gene_name[snp2gene_index]
     
-    ## old changes: filter those snps that do not map onto gene
-    # flog.info(sprintf("%s%% snps filtered out due to inconsistent mapping with gene regions",
-    #                   round(mean(!snps %over% gene_ref)*100, 2)))
-    # 
+    ## old changes: filter those snps that do not map up with gene order
+    flog.info(sprintf("%s%% snps filtered out due to inconsistent mapping with gene regions",
+                      round(mean(!snps %over% gene_ref)*100, 2)))
+    snps <- snps[snps %over% gene_ref]
+    
     # snp_map <- findOverlaps(snps, gene_ref)
     # if(mean(duplicated(queryHits(snp_map))) > 0){
-    #     
+    # 
     #     flog.info("snps mapping with multiple genes will be mapped with its first match")
     #     snp_map <- snp_map[!duplicated(queryHits(snp_map))]
-    #     
+    # 
     # }
     # snps <- snps[queryHits(snp_map)]
     # snps$gene_name <- gene_ref$gene_name[subjectHits(snp_map)]
