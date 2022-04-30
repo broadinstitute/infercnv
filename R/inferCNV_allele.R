@@ -158,7 +158,12 @@ setAlleleMatrix_HB <- function(infercnv_allele_obj,
   flog.info("Removing snps that have low coverage ...")
   
   infercnv_allele_obj@allele.data[infercnv_allele_obj@coverage.data <= snp_min_coverage] <- 0 
-  infercnv_allele_obj@coverage.data[infercnv_allele_obj@coverage.data <= snp_min_coverage] <- 0  
+  infercnv_allele_obj@coverage.data[infercnv_allele_obj@coverage.data <= snp_min_coverage] <- 0
+  
+  if(mean(rowSums(infercnv_allele_obj@coverage.data) == 0) > 0){
+    infercnv_allele_obj <- remove_snps(infercnv_allele_obj, 
+                                       which(rowSums(infercnv_allele_obj@coverage.data) == 0))
+  }
   
   flog.info("Creating in-silico bulk ...")
   allele_bulk <- rowSums(infercnv_allele_obj@allele.data > 0)
@@ -197,21 +202,21 @@ setAlleleMatrix_HB <- function(infercnv_allele_obj,
   infercnv_allele_obj@expr.data <- lesser.allele.fraction
   infercnv_allele_obj@count.data <- lesser.allele.data
   
-  if (smooth_method == 'runmeans') {
-
-    infercnv_allele_obj <- smooth_by_chromosome_runmeans(infercnv_allele_obj,
-                                                         window_length)
-  } else if (smooth_method == 'pyramidinal') {
-
-    infercnv_allele_obj <- smooth_by_chromosome(infercnv_allele_obj,
-                                                window_length=window_length,
-                                                smooth_ends=TRUE)
-  } else if (smooth_method == 'coordinates') {
-    infercnv_allele_obj <- smooth_by_chromosome_coordinates(infercnv_allele_obj,
-                                                            window_length=window_length)
-  } else {
-    stop(sprintf("Error, don't recognize smoothing method: %s", smooth_method))
-  }
+  # if (smooth_method == 'runmeans') {
+  # 
+  #   infercnv_allele_obj <- smooth_by_chromosome_runmeans(infercnv_allele_obj,
+  #                                                        window_length)
+  # } else if (smooth_method == 'pyramidinal') {
+  # 
+  #   infercnv_allele_obj <- smooth_by_chromosome(infercnv_allele_obj,
+  #                                               window_length=window_length,
+  #                                               smooth_ends=TRUE)
+  # } else if (smooth_method == 'coordinates') {
+  #   infercnv_allele_obj <- smooth_by_chromosome_coordinates(infercnv_allele_obj,
+  #                                                           window_length=window_length)
+  # } else {
+  #   stop(sprintf("Error, don't recognize smoothing method: %s", smooth_method))
+  # }
 
   validate_infercnv_allele_obj(infercnv_allele_obj)
   
