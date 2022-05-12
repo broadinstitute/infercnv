@@ -251,6 +251,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     
     raw.data <- order_ret$expr
     input_gene_order <- order_ret$order
+    input_gene_order[["chr"]] = droplevels(input_gene_order[["chr"]])
     
     if(is.null(raw.data)) {
         error_message <- paste("None of the genes in the expression data",
@@ -651,7 +652,8 @@ remove_genes <- function(infercnv_obj, gene_indices_to_remove) {
     infercnv_obj@count.data <- infercnv_obj@count.data[ -1 * gene_indices_to_remove, , drop=FALSE]
 
     infercnv_obj@gene_order <- infercnv_obj@gene_order[ -1 * gene_indices_to_remove, , drop=FALSE] 
-
+    infercnv_obj@gene_order[["chr"]] = droplevels(infercnv_obj@gene_order[["chr"]])
+    
     validate_infercnv_obj(infercnv_obj)
     
     return(infercnv_obj)
