@@ -67,7 +67,8 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
                                 byrow=TRUE, nrow=2), 
                    delta, "binom", list(prob=c(pd, pn)), 
                    list(size=sizel), discrete=TRUE)
-        results <- Viterbi(z)
+        #results <- Viterbi(z)
+        results <- Viterbi.dthmm.allele.adj(z)
         boundsnps <- rownames(lesser.data)[results == 1]
         
         ## vote
@@ -208,7 +209,8 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
                                 byrow=TRUE, nrow=2), 
                    delta, "binom", list(prob=c(pd, pn)), 
                    list(size=sizel), discrete=TRUE)
-        results <- Viterbi(z)
+        #results <- Viterbi(z)
+        results <- Viterbi.dthmm.allele.adj(z)
         boundsnps <- rownames(lesser.data)[results == 1]
         
         ## vote
@@ -604,71 +606,138 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples_mod <- function(infercnv_a
   
 }
 
-## aggregrate into a higher level
-agg_method <- function(data, index, method = c("mean","median","sum")){
+Viterbi.dthmm.allele.adj <- function(object, ...){
+  #browser()
+  x <- object$x
+  size_l <- object$pn$size
   
-  method <- match.arg(method)
+  if (length(x) < 2) {
+    ## not enough run a trace on
+    return(2); # neutral state
+  }
   
-  tmp <- lapply(seq_len(ncol(data)), 
-                function(x){
-                  tapply(data[,x], 
-                         index, 
-                         method)
-                })
-  tmp <- do.call(cbind, tmp)
-  colnames(tmp) <- colnames(data)
-  tmp <- round(tmp)
+  n <- length(x)
+  m <- nrow(object$Pi) # transition matrix
+  nu <- matrix(NA, nrow = n, ncol = m)  # scoring matrix
+  y <- rep(NA, n) # final trace
   
-  return(tmp)
+  ##
+  emissions <- matrix(NA, nrow = n, ncol = m) 
+  ##
   
+  ## init first row
+  emission <- dbinom(x = x[1], size = size_l[1], prob = object$pm$prob)
+  emission[emission < object$Pi[1,2]] <- object$Pi[1,2]
+  ##
+  
+  ##
+  #emission <- 1 / (-1 * emission)
+  emission <- emission / sum(emission)
+  emissions[1,] <- log(emission)
+  #emissions[1,] <- emission
+  ##
+  
+  nu[1, ] <- log(object$delta) + # start probabilities
+    emissions[1,]
+  
+  logPi <- log(object$Pi) # convert transition matrix to log(p)
+  
+  for (i in 2:n) {
+    
+    matrixnu <- matrix(nu[i - 1, ], nrow = m, ncol = m)
+    
+    ##
+    emission <- dbinom(x = x[i], size = size_l[i], prob = object$pm$prob)
+    emission[emission < object$Pi[1,2]] <- object$Pi[1,2]
+    
+    #emission <- 1 / (-1 * emission)
+    emission <- emission / sum(emission)
+    emissions[i,] <- log(emission)
+    #emissions[i,] <- emission
+    ##
+    
+    nu[i, ] <- apply(matrixnu + logPi, 2, max) + emissions[i, ] 
+    
+  }
+  #return(nu)
+  
+  if (any(nu[n, ] == -Inf)) 
+    stop("Problems With Underflow")
+  
+  ## traceback
+  y[n] <- which.max(nu[n, ])
+  
+  for (i in seq(n - 1, 1, -1))
+    y[i] <- which.max(logPi[, y[i + 1]] + nu[i, ])
+  
+  return(y)
 }
 
+## aggregrate into a higher level
+# agg_method <- function(data, index, method = c("mean","median","sum")){
+#   
+#   method <- match.arg(method)
+#   
+#   tmp <- lapply(seq_len(ncol(data)), 
+#                 function(x){
+#                   tapply(data[,x], 
+#                          index, 
+#                          method)
+#                 })
+#   tmp <- do.call(cbind, tmp)
+#   colnames(tmp) <- colnames(data)
+#   tmp <- round(tmp)
+#   
+#   return(tmp)
+#   
+# }
+
 ## aggregate HMM-based obj (snp level) into HMM_based obj (gene level)
-aggregate_gene <- function(infercnv_allele_obj, gene_annot,
-                           state_agg_method = c("mean","median"),
-                           snp_agg_method = c("mean","median", "sum")){
-  state_agg_method <- match.arg(state_agg_method)
-  snp_agg_method <- match.arg(snp_agg_method)
-  
-  flog.info(sprintf("Using %s method to aggregrate snp-based HMM into gene-based HMM", 
-                    state_agg_method))
-  gene_state <- agg_method(infercnv_allele_obj@expr.data,
-                           infercnv_allele_obj@SNP_info$gene,
-                           state_agg_method)
-  
-  flog.info(sprintf("Using %s method to aggregrate snp into gene level", 
-                    snp_agg_method))
-  gene_count.data <- agg_method(infercnv_allele_obj@count.data,
-                                infercnv_allele_obj@SNP_info$gene,
-                                snp_agg_method)
-  gene_allele.data <- agg_method(infercnv_allele_obj@allele.data,
-                                 infercnv_allele_obj@SNP_info$gene,
-                                 snp_agg_method)
-  gene_coverage.data <- agg_method(infercnv_allele_obj@coverage.data,
-                                   infercnv_allele_obj@SNP_info$gene,
-                                   snp_agg_method)
-  
-  gene_order <- gene_annot[rownames(gene_annot) %in% rownames(gene_state),]
-  gene_state <- gene_state[rownames(gene_order), ]
-  gene_count.data <- gene_count.data[rownames(gene_order), ]
-  gene_allele.data <- gene_allele.data[rownames(gene_order), ]
-  gene_coverage.data <- gene_coverage.data[rownames(gene_order), ]
-  SNP_Gene <- GenomicRanges::GRanges(gene_order[[C_CHR]],
-                                     IRanges::IRanges(gene_order[[C_START]],
-                                                      gene_order[[C_STOP]]))
-  names(SNP_Gene) <- rownames(gene_order)
-  
-  infercnv_allele_obj@expr.data <- gene_state
-  infercnv_allele_obj@count.data <- gene_count.data
-  infercnv_allele_obj@allele.data <- gene_allele.data
-  infercnv_allele_obj@coverage.data <- gene_coverage.data
-  infercnv_allele_obj@SNP_info <- SNP_Gene
-  infercnv_allele_obj@gene_order <- gene_order
-  
-  validate_infercnv_allele_obj(infercnv_allele_obj)
-  
-  return(infercnv_allele_obj)
-}
+# aggregate_gene <- function(infercnv_allele_obj, gene_annot,
+#                            state_agg_method = c("mean","median"),
+#                            snp_agg_method = c("mean","median", "sum")){
+#   state_agg_method <- match.arg(state_agg_method)
+#   snp_agg_method <- match.arg(snp_agg_method)
+#   
+#   flog.info(sprintf("Using %s method to aggregrate snp-based HMM into gene-based HMM", 
+#                     state_agg_method))
+#   gene_state <- agg_method(infercnv_allele_obj@expr.data,
+#                            infercnv_allele_obj@SNP_info$gene,
+#                            state_agg_method)
+#   
+#   flog.info(sprintf("Using %s method to aggregrate snp into gene level", 
+#                     snp_agg_method))
+#   gene_count.data <- agg_method(infercnv_allele_obj@count.data,
+#                                 infercnv_allele_obj@SNP_info$gene,
+#                                 snp_agg_method)
+#   gene_allele.data <- agg_method(infercnv_allele_obj@allele.data,
+#                                  infercnv_allele_obj@SNP_info$gene,
+#                                  snp_agg_method)
+#   gene_coverage.data <- agg_method(infercnv_allele_obj@coverage.data,
+#                                    infercnv_allele_obj@SNP_info$gene,
+#                                    snp_agg_method)
+#   
+#   gene_order <- gene_annot[rownames(gene_annot) %in% rownames(gene_state),]
+#   gene_state <- gene_state[rownames(gene_order), ]
+#   gene_count.data <- gene_count.data[rownames(gene_order), ]
+#   gene_allele.data <- gene_allele.data[rownames(gene_order), ]
+#   gene_coverage.data <- gene_coverage.data[rownames(gene_order), ]
+#   SNP_Gene <- GenomicRanges::GRanges(gene_order[[C_CHR]],
+#                                      IRanges::IRanges(gene_order[[C_START]],
+#                                                       gene_order[[C_STOP]]))
+#   names(SNP_Gene) <- rownames(gene_order)
+#   
+#   infercnv_allele_obj@expr.data <- gene_state
+#   infercnv_allele_obj@count.data <- gene_count.data
+#   infercnv_allele_obj@allele.data <- gene_allele.data
+#   infercnv_allele_obj@coverage.data <- gene_coverage.data
+#   infercnv_allele_obj@SNP_info <- SNP_Gene
+#   infercnv_allele_obj@gene_order <- gene_order
+#   
+#   validate_infercnv_allele_obj(infercnv_allele_obj)
+#   
+#   return(infercnv_allele_obj)
+# }
 
 ## @title calAlleleBoundaries
 ## 
