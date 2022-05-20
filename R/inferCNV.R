@@ -604,9 +604,9 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     # snps$gene_name <- gene_ref$gene_name[snp2gene_index]
     
     ## old changes: filter those snps that do not map up with gene order
-    flog.info(sprintf("%s%% snps filtered out due to inconsistent mapping with gene regions",
-                      round(mean(!snps %over% gene_ref)*100, 2)))
-    snps <- snps[snps %over% gene_ref]
+    # flog.info(sprintf("%s%% snps filtered out due to inconsistent mapping with gene regions",
+    #                   round(mean(!snps %over% gene_ref)*100, 2)))
+    # snps <- snps[snps %over% gene_ref]
     
     # snp_map <- findOverlaps(snps, gene_ref)
     # if(mean(duplicated(queryHits(snp_map))) > 0){
