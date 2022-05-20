@@ -125,8 +125,132 @@ remove_snps <- function(infercnv_allele_obj, snps_indices_to_remove) {
   return(infercnv_allele_obj)
 }
 
+#' @title setAlleleMatrix
+#' 
+#' @description This function initializes the lesser allele fraction/count determined by at least the minimum
+#' number of snps having allele fraction less/more than 0.5 with the minimum of cells supported. 
+#' lesser allele fraction will be stored in the slot @expr.data. lesser allele count 
+#' will be stored in the slot @count.data
+#' 
+#' @param infercnv_allele_obj infercnv_allele_object
+#' 
+#' @param snp_min_coverage the minimum number of threshold that each instance should have in allele/coverage data. 
+#' Each instance that is less than this number will be replaced with 0. default = 0 (No action)
+#' 
+#' @param snp_filter a boolean value whether to do pre-filtering for allele matrix. default = TRUE
+#' 
+#' @param snp_min.cell a threshold used to filter out non-heterozygous snps. The minimum number of (normal) cells 
+#' having both alleles. default = 3
+#' 
+#' @export
+setAlleleMatrix <- function(infercnv_allele_obj,
+                            snp_min_coverage = 0,
+                            snp_filter = TRUE,
+                            snp_min.cell = 3){
+  
+  if(snp_min_coverage > 1){
+    flog.info(sprintf("Replacing allele/coverge instances that are less than %s with zero ...",
+                      snp_min_coverage))
+    
+    infercnv_allele_obj@allele.data[infercnv_allele_obj@coverage.data < snp_min_coverage] <- 0 
+    infercnv_allele_obj@coverage.data[infercnv_allele_obj@coverage.data < snp_min_coverage] <- 0
+    
+    if(mean(rowSums(infercnv_allele_obj@coverage.data) == 0) > 0){
+      infercnv_allele_obj <- infercnv:::remove_snps(infercnv_allele_obj, 
+                                                    which(rowSums(infercnv_allele_obj@coverage.data) == 0))
+    }
+  }
+  
+  flog.info("Estimating allele frequency profiles ...")
+  
+  allele_matrix <- infercnv_allele_obj@allele.data/infercnv_allele_obj@coverage.data
+  allele_matrix[is.na(allele_matrix)] <- 0 # omit no coverage
+  allele_matrix[infercnv_allele_obj@allele.data == 0 & infercnv_allele_obj@coverage.data != 0] <- 0.001 # pseudo count for total coverage not 0
+  
+  if (snp_filter){
+    
+    if(!is.null(unlist(infercnv_allele_obj@reference_grouped_cell_indices))){
+      
+      cells_w_ref_allele = rowSums(allele_matrix[,unlist(infercnv_allele_obj@reference_grouped_cell_indices)] != 0 & 
+                                     allele_matrix[,unlist(infercnv_allele_obj@reference_grouped_cell_indices)] < 0.5)
+      cells_w_alt_allele = rowSums(allele_matrix[,unlist(infercnv_allele_obj@reference_grouped_cell_indices)] != 0 & 
+                                     allele_matrix[,unlist(infercnv_allele_obj@reference_grouped_cell_indices)] > 0.5)
+      
+    } else{
+      
+      cells_w_ref_allele = rowSums(allele_matrix !=0 & 
+                                     allele_matrix < 0.5)
+      cells_w_alt_allele = rowSums(allele_matrix !=0 & 
+                                     allele_matrix > 0.5)
+      
+    }
+    
+    snp_index <- (cells_w_ref_allele >= snp_min.cell & cells_w_alt_allele >= snp_min.cell)
+    num_snps_all = sum(snp_index)
+    flog.info(sprintf("Number of heterozygous snps used for modeling: %s ...", num_snps_all))
+    
+    infercnv_allele_obj <- infercnv:::remove_snps(infercnv_allele_obj,which(!snp_index))
+    allele_matrix <- allele_matrix[snp_index,]
+  }
+  
+  flog.info("Setting composite lesser allele fraction ...")
+  
+  lesse_allele_index <- c()
+  mAF_allele_matrix = apply(allele_matrix, 1, function(x) {
+    
+    nonzero_val_idx = which(x>0)
+    nonzero_vals = x[nonzero_val_idx]
+    
+    frac_high = sum(nonzero_vals>0.5)/length(nonzero_vals)
+    
+    ## focus allele selection based on the tumor cells only.
+    tumor_vals = x[unlist(infercnv_allele_obj@observation_grouped_cell_indices)]
+    tumor_nonzero_vals = tumor_vals[tumor_vals>0]
+    if (length(tumor_nonzero_vals) > 0) {
+      frac_high = sum(tumor_nonzero_vals>0.5)/length(tumor_nonzero_vals)
+      
+    }
+    lesse_allele_index <<- c(lesse_allele_index,frac_high)
+    if ( frac_high > 0.5) {
+      x[x==1] = 0.999
+      x[nonzero_val_idx ] = 1 - x[nonzero_val_idx]
+    }
+    x
+  })
+  allele_matrix = t(mAF_allele_matrix)
+  
+  thr_index <- lesse_allele_index > 0.5
+  
+  lesser.allele.data <- infercnv_allele_obj@allele.data
+  lesser.allele.data[thr_index,] <- infercnv_allele_obj@coverage.data[thr_index,] - infercnv_allele_obj@allele.data[thr_index,]
+  
+  lesser.allele.fraction <- allele_matrix
+  infercnv_allele_obj@expr.data <- lesser.allele.fraction
+  infercnv_allele_obj@count.data <- lesser.allele.data
+  
+  # if (smooth_method == 'runmeans') {
+  #   
+  #   infercnv_allele_obj <- infercnv:::smooth_by_chromosome_runmeans(infercnv_allele_obj,
+  #                                                        window_length)
+  # } else if (smooth_method == 'pyramidinal') {
+  #   
+  #   infercnv_allele_obj <- infercnv:::smooth_by_chromosome(infercnv_allele_obj,
+  #                                               window_length=window_length,
+  #                                               smooth_ends=TRUE)
+  # } else if (smooth_method == 'coordinates') {
+  #   infercnv_allele_obj <- infercnv:::smooth_by_chromosome_coordinates(infercnv_allele_obj,
+  #                                                           window_length=window_length)
+  # } else {
+  #   stop(sprintf("Error, don't recognize smoothing method: %s", smooth_method))
+  # }
+  
+  infercnv:::validate_infercnv_allele_obj(infercnv_allele_obj)
+  
+  return(infercnv_allele_obj)
+}
 
-#' @title setAlleleMatrix_HB
+
+#' @title setAlleleMatrix_HB -- deprecated
 #' 
 #' @description This function mimics the way the HB does aiming to initialize the lesser allele fraction/count.
 #' lesser allele fraction will be stored in the slot @expr.data. lesser allele count 
@@ -134,7 +258,8 @@ remove_snps <- function(infercnv_allele_obj, snps_indices_to_remove) {
 #' 
 #' @param infercnv_allele_obj infercnv_allele_object
 #' 
-#' @param snp_min_coverage the minimum number of counts that the snp express in coverage data. default = 2
+#' @param @param snp_min_coverage the minimum number of threshold that each instance should have in allele/coverage data. 
+#' Each instance that is less than this number will be replaced with 0. default = 0 (No action)
 #' 
 #' @param snp_filter a boolean value whether to do pre-filtering for allele matrix. default = TRUE
 #' 
@@ -144,25 +269,24 @@ remove_snps <- function(infercnv_allele_obj, snps_indices_to_remove) {
 #' @param snp_min.cell a threshold used to filter out snps that express less than 
 #' the minimum number of cells. default = 3
 #' 
-#' @param smooth_method a method used for smoothing allele fraction default = "runmeans"
-#' 
-#' @param window_length smoothing window size. default = 101
-#' 
 #' @export
 setAlleleMatrix_HB <- function(infercnv_allele_obj,
-                               snp_min_coverage = 2,
+                               snp_min_coverage = 0,
                                snp_filter = TRUE,
-                               snp_het.deviance.threshold = 0.1, snp_min.cell = 3,
-                               smooth_method = "runmeans", window_length = 101){
+                               snp_het.deviance.threshold = 0.1, 
+                               snp_min.cell = 3){
   
-  flog.info("Removing snps that have low coverage ...")
-  
-  infercnv_allele_obj@allele.data[infercnv_allele_obj@coverage.data <= snp_min_coverage] <- 0 
-  infercnv_allele_obj@coverage.data[infercnv_allele_obj@coverage.data <= snp_min_coverage] <- 0
-  
-  if(mean(rowSums(infercnv_allele_obj@coverage.data) == 0) > 0){
-    infercnv_allele_obj <- remove_snps(infercnv_allele_obj, 
-                                       which(rowSums(infercnv_allele_obj@coverage.data) == 0))
+  if(snp_min_coverage > 1){
+    flog.info(sprintf("Replacing allele/coverge instances that are less than %s with zero ...",
+                      snp_min_coverage))
+    
+    infercnv_allele_obj@allele.data[infercnv_allele_obj@coverage.data < snp_min_coverage] <- 0 
+    infercnv_allele_obj@coverage.data[infercnv_allele_obj@coverage.data < snp_min_coverage] <- 0
+    
+    if(mean(rowSums(infercnv_allele_obj@coverage.data) == 0) > 0){
+      infercnv_allele_obj <- infercnv:::remove_snps(infercnv_allele_obj, 
+                                                    which(rowSums(infercnv_allele_obj@coverage.data) == 0))
+    }
   }
   
   flog.info("Creating in-silico bulk ...")
@@ -251,6 +375,106 @@ map2gene <- function(infercnv_allele_obj,
   return(infercnv_allele_obj)
 }
 
+## aggregrate into a higher level
+agg_method <- function(data, index, method = c("mean","median"),
+                       cores = 5){
+
+  method <- match.arg(method)
+  
+  tmp <- mclapply(seq_len(ncol(data)), 
+                  function(x){
+                    tapply(data[,x], 
+                           index, 
+                           method)
+                  },mc.cores = cores)
+  tmp <- do.call(cbind, tmp)
+  colnames(tmp) <- colnames(data)
+  #tmp <- round(tmp)
+  
+  return(tmp)
+  
+}
+
+#' @title collapse_snp2gene
+#' 
+#' @description This function aims to collapse infercnv_allele obj from snp level into gene level
+#' 
+#' @param infercnv_allele_obj infercnv_allele based obj
+#' 
+#' @param gene_annot a gene order annotation
+#' 
+#' @param collapse_method The method used to collapse snp into gene. default = median
+#' 
+#' @param cores A number of cores being used during parallel computing. default = 5
+#' 
+#' @export
+collapse_snp2gene <- function(infercnv_allele_obj,
+                              gene_annot,
+                              collapse_method = c("mean","median"),
+                              cores = 5){
+
+  collapse_method <- match.arg(collapse_method)
+  
+  flog.info(sprintf("Using %s method to aggregrate snp into gene level", 
+                    collapse_method))
+  
+  expr.data <- agg_method(data = infercnv_allele_obj@expr.data,
+                          index = infercnv_allele_obj@SNP_info$gene,
+                          method = collapse_method,
+                          cores = cores)
+  
+  count.data <- agg_method(data = infercnv_allele_obj@count.data,
+                           index = infercnv_allele_obj@SNP_info$gene,
+                           method = collapse_method,
+                           cores = cores) %>% round()
+  
+  allele.data <- agg_method(data = infercnv_allele_obj@allele.data,
+                            index = infercnv_allele_obj@SNP_info$gene,
+                            method = collapse_method,
+                            cores = cores) %>% round()
+  
+  coverage.data <- agg_method(data = infercnv_allele_obj@coverage.data,
+                              index = infercnv_allele_obj@SNP_info$gene,
+                              method = collapse_method,
+                              cores = cores) %>% round()
+  
+  gene_order <- gene_annot[rownames(gene_annot) %in% rownames(expr.data),]
+  gene_order_gr <- GenomicRanges::GRanges(gene_order[[C_CHR]],
+                                          IRanges::IRanges(gene_order[[C_START]],
+                                                           gene_order[[C_STOP]]))
+  names(gene_order_gr) <- rownames(gene_order)
+  gene_order_gr <- gene_order_gr %>% sortSeqlevels() %>% sort()
+  
+  expr.data <- expr.data[names(gene_order_gr), ]
+  count.data <- count.data[names(gene_order_gr), ]
+  allele.data <- allele.data[names(gene_order_gr), ]
+  coverage.data <- coverage.data[names(gene_order_gr), ]
+  gene_order <- gene_order[names(gene_order_gr),]
+  gene_order_gr$gene <- names(gene_order_gr)
+  
+  names(gene_order_gr) <- 
+    rownames(expr.data) <- 
+    rownames(count.data)  <-
+    rownames(allele.data) <-
+    rownames(coverage.data) <-
+    rownames(gene_order) <-
+    paste0(gene_order[[C_CHR]], ":",
+           gene_order[[C_START]], ":",
+           gene_order[[C_STOP]])
+  
+  infercnv_allele_obj@expr.data <- expr.data
+  infercnv_allele_obj@count.data <- count.data
+  infercnv_allele_obj@allele.data <- allele.data
+  infercnv_allele_obj@coverage.data <- coverage.data
+  infercnv_allele_obj@SNP_info <- gene_order_gr
+  infercnv_allele_obj@gene_order <- gene_order
+  
+  validate_infercnv_allele_obj(infercnv_allele_obj)
+  
+  return(infercnv_allele_obj)
+}
+
+
 #' @title plot_allele
 #' 
 #' @description plot a summary figure containing allele frequency, HMM prediction 
@@ -258,14 +482,17 @@ map2gene <- function(infercnv_allele_obj,
 #' @keywords internal
 #' 
 #' @noRd
-plot_allele <- function(infercnv_allele_obj, 
+plot_allele <- function(infercnv_allele_obj,
+                        initialzied_method = c("default","HB"),
                         #expression_mode = F,
-                        #allele_frequency_mode = F,
+                        allele_frequency_mode = F,
                         #HMM = NULL,
                         #use_common_gene = F, 
                         name_to_plot,
                         trend_smK = 31,
                         CELL_POINT_ALPHA = 0.6, dotsize=0.3, colorscheme = "BlueRed"){
+  
+  initialzied_method <- match.arg(initialzied_method)
   
   options(bitmapType = "cairo")
   ############# cell annotation
@@ -283,7 +510,15 @@ plot_allele <- function(infercnv_allele_obj,
   # allele_matrix <- infercnv_allele_obj@expr.data
   # #############
   if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)){
-    flog.error("Please set allele matrix before plotting!")
+    #flog.error("Please set allele matrix before plotting!")
+    flog.info(sprintf("Setting allele matrix using %s way", initialzied_method))
+    
+    if(initialzied_method == "default"){
+      infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
+    } else {
+      infercnv_allele_obj <- setAlleleMatrix_HB(infercnv_allele_obj)
+    }
+    
   }
   
   ############# allele data
@@ -333,7 +568,9 @@ plot_allele <- function(infercnv_allele_obj,
   if (!is.null(infercnv_allele_obj@tumor_subclusters)) {
     ## define cell ordering.
     flog.info("Exracting clustering info ...")
-    ordered_cells <- colnames(allele_matrix)[unlist(infercnv_allele_obj@tumor_subclusters$subclusters)]
+    #ordered_cells <- colnames(allele_matrix)[unlist(infercnv_allele_obj@tumor_subclusters$subclusters)]
+    tmp_sub <- lapply(infercnv_allele_obj@tumor_subclusters$subclusters, rev)
+    ordered_cells <- colnames(allele_matrix)[unlist(tmp_sub)]
   }
   
   flog.info("Melting matrix ...")
@@ -711,33 +948,33 @@ plot_allele <- function(infercnv_allele_obj,
     #                            aesthetics = "colour")
     # }
     
-    # if(allele_frequency_mode){
-    #   
-    #   cell_count <- alleledatamelt %>% select(chr, cell, sample_type) %>% unique() %>% 
-    #     group_by(chr, sample_type) %>% summarise(cell_count = n(), .groups = 'drop') %>% 
-    #     select(cell_count)
-    #   bar_data <- alleledatamelt %>% select(chrpos, chr, sample_type) %>% unique() %>% 
-    #     group_by(chr, sample_type) %>% summarise(snp_count = n(), .groups = 'drop') %>% 
-    #     mutate(cell_count, "SNPs coverage per cell" = snp_count/cell_count)
-    #   
-    #   bar_plot <- bar_data %>% ggplot(aes(x = sample_type, y = `SNPs coverage per cell`, fill = sample_type)) +
-    #     geom_bar(stat='identity') +
-    #     facet_grid (~chr, scales = 'free_x', space = 'fixed') +
-    #     
-    #     labs(title="Fraction of heterozygous snps used") +
-    #     theme_bw() +
-    #     theme(text = element_text(size = 12),
-    #           axis.ticks.x = element_blank(),
-    #           axis.text.x = element_blank(),
-    #           axis.title.x = element_blank(),
-    #           panel.grid.major.x = element_blank(),
-    #           panel.grid.minor.x = element_blank(),
-    #           panel.grid.major.y = element_blank(),
-    #           panel.grid.minor.y = element_blank()
-    #     ) +
-    #     scale_fill_manual(values = color_cell)
-    #   
-    # }
+    if(allele_frequency_mode){
+
+      cell_count <- alleledatamelt %>% select(chr, cell, sample_type) %>% unique() %>%
+        group_by(chr, sample_type) %>% summarise(cell_count = n(), .groups = 'drop') %>%
+        select(cell_count)
+      bar_data <- alleledatamelt %>% select(chrpos, chr, sample_type) %>% unique() %>%
+        group_by(chr, sample_type) %>% summarise(snp_count = n(), .groups = 'drop') %>%
+        mutate(cell_count, "SNPs coverage per cell" = snp_count/cell_count)
+
+      bar_plot <- bar_data %>% ggplot(aes(x = sample_type, y = `SNPs coverage per cell`, fill = sample_type)) +
+        geom_bar(stat='identity') +
+        facet_grid (~chr, scales = 'free_x', space = 'fixed') +
+
+        labs(title="Fraction of heterozygous snps used") +
+        theme_bw() +
+        theme(text = element_text(size = 12),
+              axis.ticks.x = element_blank(),
+              axis.text.x = element_blank(),
+              axis.title.x = element_blank(),
+              panel.grid.major.x = element_blank(),
+              panel.grid.minor.x = element_blank(),
+              panel.grid.major.y = element_blank(),
+              panel.grid.minor.y = element_blank()
+        ) +
+        scale_fill_manual(values = color_cell)
+
+    }
     #     
     #ratio_normal_cells = max(0.25, num_normal_cells/(num_normal_cells + num_malignant_cells))
     # if(is.null(expr_plot)){
@@ -768,12 +1005,29 @@ plot_allele <- function(infercnv_allele_obj,
     # }
     
     if (num_normal_cells > 0) {
-      ratio_normal_cells = max(0.25, num_normal_cells/(num_normal_cells + num_malignant_cells))
-      pg = plot_grid(normal_snps_plot, 
-                     allele_freq_plot_w_trendlines, 
-                     malignant_snps_plot, 
-                     ncol=1, align='v', 
-                     rel_heights=c(ratio_normal_cells, 0.25, 1-ratio_normal_cells))
+      
+      if(allele_frequency_mode){
+        
+        ratio_normal_cells = max(0.5, num_normal_cells/(num_normal_cells + num_malignant_cells))
+        pg = plot_grid(normal_snps_plot,
+                       bar_plot,
+                       allele_freq_plot_w_trendlines, 
+                       malignant_snps_plot, 
+                       ncol=1, align='v', 
+                       rel_heights=c(ratio_normal_cells, 
+                                     0.25,
+                                     0.25,
+                                     1-ratio_normal_cells))
+        
+      } else{
+        
+        ratio_normal_cells = max(0.25, num_normal_cells/(num_normal_cells + num_malignant_cells))
+        pg = plot_grid(normal_snps_plot, 
+                       allele_freq_plot_w_trendlines, 
+                       malignant_snps_plot, 
+                       ncol=1, align='v', 
+                       rel_heights=c(ratio_normal_cells, 0.25, 1-ratio_normal_cells)) 
+      }
     } else{
       pg = plot_grid(allele_freq_plot_w_trendlines, 
                      malignant_snps_plot,
