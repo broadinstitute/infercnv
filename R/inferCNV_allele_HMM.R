@@ -62,7 +62,7 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
         sizel <- rowSums(coverage.data > 0)
         
         ## change point
-        delta <- c(0, 1)
+        delta <- c(0.5, 0.5)
         z <- dthmm(mafl, matrix(c(1-t, t, t, 1-t), 
                                 byrow=TRUE, nrow=2), 
                    delta, "binom", list(prob=c(pd, pn)), 
@@ -204,7 +204,7 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
         sizel <- rowSums(coverage.data > 0)
         
         ## change point
-        delta <- c(0, 1)
+        delta <- c(0.5, 0.5)
         z <- dthmm(mafl, matrix(c(1-t, t, t, 1-t), 
                                 byrow=TRUE, nrow=2), 
                    delta, "binom", list(prob=c(pd, pn)), 
@@ -283,6 +283,8 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
   return(infercnv_allele_obj)
 }
 
+
+################## deprecated 
 allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters_mod <- function(infercnv_allele_obj,
                                                                     t = 1e-6, pd = 0.1, pn = 0.45,
                                                                     min.num.snps = 5, trim = 0.1,
@@ -605,6 +607,8 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples_mod <- function(infercnv_a
   return(infercnv_allele_obj)
   
 }
+##################
+
 
 Viterbi.dthmm.allele.adj <- function(object, ...){
   #browser()
