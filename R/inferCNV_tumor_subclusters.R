@@ -412,7 +412,8 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
 
     sparse_adjacency_matrix <- sparseMatrix(
         i = rep(seq_len(ncol(tumor_expr_data)), each=k_nn), 
-        j = unlist(t(snn)), 
+        j = t(snn),
+        x = rep(1, ncol(tumor_expr_data) * k_nn),
         dims = c(ncol(tumor_expr_data), ncol(tumor_expr_data)),
         dimnames = list(colnames(tumor_expr_data), colnames(tumor_expr_data))
     )
