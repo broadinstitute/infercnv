@@ -94,6 +94,7 @@ add_to_seurat <- function(seurat_obj = NULL,
     }
     else {
         flog.warn(sprintf("::Could not find any HMM predictions outputs at: %s", infercnv_output_path))
+        flog.warn("::add_to_seurat works by transcribing (and copying if a Seurat object is provided) the HMM results from infercnv, so it cannot be used without having run the HMM.")
         stop()
     }
     
