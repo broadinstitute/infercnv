@@ -370,10 +370,12 @@ plot_cnv <- function(infercnv_obj,
         for (chr_name in chr_name_list) {
             index_pos = which(infercnv_obj@gene_order$chr == chr_name)
             latest_position = 1
-            for (i in index_pos[2:length(index_pos)]) {
-                gene_position_breaks[current_idx] = sum_previous_contigs + ((latest_position + infercnv_obj@gene_order$start[i]) / 2)
-                latest_position = max(infercnv_obj@gene_order$stop[i], latest_position)
-                current_idx = current_idx + 1
+            if (length(index_pos) > 1) {
+                for (i in index_pos[2:length(index_pos)]) {
+                    gene_position_breaks[current_idx] = sum_previous_contigs + ((latest_position + infercnv_obj@gene_order$start[i]) / 2)
+                    latest_position = max(infercnv_obj@gene_order$stop[i], latest_position)
+                    current_idx = current_idx + 1
+                }
             }
             gene_position_breaks[current_idx] = sum_previous_contigs + chr_lengths[chr_name]
             current_idx = current_idx + 1
