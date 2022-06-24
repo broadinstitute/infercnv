@@ -18,11 +18,10 @@
 
 
 .i3HMM_get_sd_trend_by_num_cells_fit <- function(infercnv_obj, i3_p_val=0.05, plot=FALSE) {
-
     
-    tumor_samples = unlist(infercnv_obj@reference_grouped_cell_indices)
+    tumor_samples = infercnv_obj@reference_grouped_cell_indices
     
-    tumor_expr_vals <- infercnv_obj@expr.data[,tumor_samples]
+    tumor_expr_vals <- infercnv_obj@expr.data[,unlist(tumor_samples)]
     
     mu = mean(tumor_expr_vals)
     sigma = sd(tumor_expr_vals)
@@ -31,7 +30,7 @@
     ngenes = nrow(tumor_expr_vals)
 
     num_tumor_samples = length(tumor_samples)
-    flog.info(".i3HMM_get_sd_trend_by_num_cells_fit:: -got ", num_tumor_samples, " samples") 
+    flog.info(paste(".i3HMM_get_sd_trend_by_num_cells_fit:: -got", num_tumor_samples, "samples"))
     
     for (ncells in seq_len(100)) {
         means = c()
@@ -64,7 +63,7 @@
     message("mean_delta: ", mean_delta, ", at sigma: ", sigma, ", and pval: ", i3_p_val)
     
     ## do this HBadger style in case that option is to be used.
-    KS_delta = get_HoneyBADGER_setGexpDev(gexp.sd=sigma, alpha=i3_p_val, k_cells = num_tumor_samples)
+    KS_delta = get_HoneyBADGER_setGexpDev(gexp.sd=sigma, alpha=i3_p_val, k_cells = length(unlist(tumor_samples)))
     message("KS_delta: ", KS_delta, ", at sigma: ", sigma, ", and pval: ", i3_p_val)
     
     
