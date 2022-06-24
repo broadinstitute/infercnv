@@ -20,9 +20,9 @@
 .i3HMM_get_sd_trend_by_num_cells_fit <- function(infercnv_obj, i3_p_val=0.05, plot=FALSE) {
 
     
-    tumor_samples = infercnv_obj@reference_grouped_cell_indices
+    tumor_samples = unlist(infercnv_obj@reference_grouped_cell_indices)
     
-    tumor_expr_vals <- infercnv_obj@expr.data[,unlist(tumor_samples)]
+    tumor_expr_vals <- infercnv_obj@expr.data[,tumor_samples]
     
     mu = mean(tumor_expr_vals)
     sigma = sd(tumor_expr_vals)
@@ -64,7 +64,7 @@
     message("mean_delta: ", mean_delta, ", at sigma: ", sigma, ", and pval: ", i3_p_val)
     
     ## do this HBadger style in case that option is to be used.
-    KS_delta = get_HoneyBADGER_setGexpDev(gexp.sd=sigma, alpha=i3_p_val)
+    KS_delta = get_HoneyBADGER_setGexpDev(gexp.sd=sigma, alpha=i3_p_val, k_cells = num_tumor_samples)
     message("KS_delta: ", KS_delta, ", at sigma: ", sigma, ", and pval: ", i3_p_val)
     
     
@@ -119,19 +119,22 @@
     
     #flog.info(sprintf("-.i3HMM_get_HMM, mean_delta=%g, use_KS=%s", mean_delta, use_KS))
     
-    if (num_cells == 1) {
-        sigma = sd_trend$sigma
-        mean_delta = ifelse(use_KS, sd_trend$KS_delta, sd_trend$mean_delta)
-    } else {
-        ## use the var vs. num cells trend
-        sigma <- exp(predict(sd_trend$fit,
-                             newdata=data.frame(num_cells=log(num_cells)))[[1]])
-
-        mean_delta = ifelse(use_KS,
-                            get_HoneyBADGER_setGexpDev(gexp.sd=sd_trend$sigma, alpha=i3_p_val, k_cells=num_cells), 
-                            determine_mean_delta_via_Z(sigma, p=i3_p_val) )
-    }
+    # if (num_cells == 1) {
+    #     sigma = sd_trend$sigma
+    #     mean_delta = ifelse(use_KS, sd_trend$KS_delta, sd_trend$mean_delta)
+    # } else {
+    #     ## use the var vs. num cells trend
+    #     sigma <- exp(predict(sd_trend$fit,
+    #                          newdata=data.frame(num_cells=log(num_cells)))[[1]])
+    # 
+    #     mean_delta = ifelse(use_KS,
+    #                         get_HoneyBADGER_setGexpDev(gexp.sd=sd_trend$sigma, alpha=i3_p_val, k_cells=num_cells), 
+    #                         determine_mean_delta_via_Z(sigma, p=i3_p_val) )
+    # }
     
+    ## sigma/delta is based on normal cells only
+    sigma = sd_trend$sigma
+    mean_delta = ifelse(use_KS, sd_trend$KS_delta, sd_trend$mean_delta)
     
     state_emission_params = list(mean=c(
                                      mu - mean_delta, # state 0.5 = deletion
