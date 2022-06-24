@@ -13,7 +13,9 @@ model {
             p[j,k] <- fma[j] * 
                       (equals(epsilon[k], 1 )) + 
                       ( h[j,k]*(1-b[j,k]) + (pseudo*d[j,k] + (1-pseudo)*(1-d[j,k]))*b[j,k] ) * 
-                      (equals(epsilon[k], 2 ))
+                      (equals(epsilon[k], 2 )) +
+                      1 * (equals(epsilon[k], 3 ))
+                      
         
             h[j,k] ~ dnorm(0.5,0.1)T(pseudo, 1-pseudo) ## heterozygous snp prob
             d[j,k] ~ dbern(0.5) ## random direction of bias
@@ -22,16 +24,16 @@ model {
         epsilon[k] ~ dcat(theta[])
     }
     ## Bulk
-    ##for ( j in 1:J ) {
-    ##    l[j] ~ dbin(fma[j], n.bulk[j]) # minor allele
-    ##    fma[j] <- pseudo*(ma[j]) + (1-pseudo)*(1-ma[j]) # prob of observing minor allele
-    ##    ma[j] ~ dbern(0.5) # whether minor allele is affected, each is independent
-    ##}
+    for ( j in 1:J ) {
+        l[j] ~ dbin(fma[j], n.bulk[j]) # minor allele
+        fma[j] <- pseudo*(ma[j]) + (1-pseudo)*(1-ma[j]) # prob of observing minor allele
+        ma[j] ~ dbern(0.5) # whether minor allele is affected, each is independent
+    }
     
-    theta[1:2] ~ ddirich(alpha[])
+    theta[1:3] ~ ddirich(alpha[])
 
     # HYPERHYPERPARAMETER
-    for(i in 1:2){
+    for(i in 1:3){
         alpha[i] <- 1
     }
 }

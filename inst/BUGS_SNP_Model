@@ -11,7 +11,11 @@ model {
                 ## if no deletion, then there could be mono-allelic expression
                 ## which affects deviation away from expected 0.5 probability
                 ## b is imputed from our bias model
-                p[j,i,k] <- ( h[j,i,k]*(1-b[j,k]) + (pseudo*d[j,k] + (1-pseudo)*(1-d[j,k]))*b[j,k] )*(1-S[k]) + fma[j,i]*S[k]
+                p[j,i,k] <- fma[j,i] * (equals(epsilon[k], 1 ))
+                            + 
+                            ( h[j,i,k]*(1-b[j,k]) + (pseudo*d[j,k] + 
+                            (1-pseudo)*(1-d[j,k]))*b[j,k] ) * (equals(epsilon[k], 2 ))
+
                 h[j,i,k] ~ dnorm(0.5,0.1)T(pseudo, 1-pseudo) ## heterozygous snp prob
             }
             ## Need to fully define in order to pull out from model even if not used
@@ -22,9 +26,19 @@ model {
             d[j,k] ~ dbern(0.5) ## random direction of bias
             b[j,k] ~ dbern(mono) ## probability of mono-allelic expression
         }
-        S[k] ~ dbern(alpha[k])
-        alpha[k] ~ dunif(0,1) # cell specific hyper-parameter prior to allow for better mixing
+        
+        epsilon[k] ~ dcat(theta[])
+        
     }
+    
+    theta[1:2] ~ ddirich(alpha[])
+
+    # HYPERHYPERPARAMETER
+
+    for(i in 1:2){
+        alpha[i] <- 1
+    }
+    
     ## Bulk
     for ( j in 1:J ) {
         for( i in 1:I.j[j] ) {
