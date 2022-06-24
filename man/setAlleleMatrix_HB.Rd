@@ -2,22 +2,18 @@
 % Please edit documentation in R/inferCNV_allele.R
 \name{setAlleleMatrix_HB}
 \alias{setAlleleMatrix_HB}
-\title{setAlleleMatrix_HB}
+\title{setAlleleMatrix_HB -- deprecated}
 \usage{
 setAlleleMatrix_HB(
   infercnv_allele_obj,
-  snp_min_coverage = 2,
+  snp_min_coverage = 0,
   snp_filter = TRUE,
   snp_het.deviance.threshold = 0.1,
-  snp_min.cell = 3,
-  smooth_method = "runmeans",
-  window_length = 101
+  snp_min.cell = 3
 )
 }
 \arguments{
 \item{infercnv_allele_obj}{infercnv_allele_object}
-
-\item{snp_min_coverage}{the minimum number of counts that the snp express in coverage data. default = 2}
 
 \item{snp_filter}{a boolean value whether to do pre-filtering for allele matrix. default = TRUE}
 
@@ -27,9 +23,8 @@ out non-hetergozous snps. default = 0.1}
 \item{snp_min.cell}{a threshold used to filter out snps that express less than 
 the minimum number of cells. default = 3}
 
-\item{smooth_method}{a method used for smoothing allele fraction default = "runmeans"}
-
-\item{window_length}{smoothing window size. default = 101}
+\item{@param}{snp_min_coverage the minimum number of threshold that each instance should have in allele/coverage data. 
+Each instance that is less than this number will be replaced with 0. default = 0 (No action)}
 }
 \description{
 This function mimics the way the HB does aiming to initialize the lesser allele fraction/count.
