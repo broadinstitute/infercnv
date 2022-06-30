@@ -2,21 +2,34 @@
 % Please edit documentation in R/inferCNV_allele_BayesNet.R
 \name{inferCNVAlleleBayesNet}
 \alias{inferCNVAlleleBayesNet}
-\title{inferCNVAlleleBayesNet: Run Bayesian NetworkModel To Obtain Posterior Probabilities For HMM Predicted States}
+\title{inferCNVAlleleBayesNet: Run Bayesian Network Mixture Model Leveraging Allele Data 
+To Obtain Posterior Probabilities For HMM Predicted States}
 \usage{
 inferCNVAlleleBayesNet(
+  file_path,
+  file_token,
   infercnv_allele_obj,
-  infercnv_allele_hmm,
-  infercnv_allele_cellindex
+  allele_mode = c("snp_level", "gene_level"),
+  output_path,
+  cores = 5
 )
 }
 \arguments{
-\item{infercnv_allele_obj}{an infercnv_allele obj}
+\item{file_path}{Location of the directory of the inferCNV_allele outputs.}
 
-\item{infercnv_allele_hmm}{a list of index of HMM boundaries}
+\item{file_token}{(string) String token that contains some info on settings used to name allele-based files.}
 
-\item{infercnv_allele_cellindex}{an index of cell annotation}
+\item{infercnv_allele_obj}{InferCNV allele object.}
+
+\item{allele_mode}{The type of allele data provided. "snp_level" or "gene_level".}
+
+\item{output_path}{(string) Path to where the output file should be saved to.}
+
+\item{cores}{Option to run parallel by specifying the number of cores to be used. (Default: 5)}
 }
 \description{
-Run MCMC method to get posterior probability of cells having Deletions/LOHs
+Uses Markov Chain Monte Carlo (MCMC) and Gibbs sampling to estimate the posterior
+probability of being in one of two Copy Number Variation states 
+(i2 states: 1,Deletion; 2,Neutral) for CNV's identified by inferCNV's HMM. 
+Posterior probabilities are found for the entire CNV cluster and each individual cell line in the CNV.
 }
