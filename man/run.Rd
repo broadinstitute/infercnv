@@ -23,7 +23,7 @@ run(
   HMM_transition_prob = 1e-06,
   HMM_report_by = c("subcluster", "consensus", "cell"),
   HMM_type = c("i6", "i3"),
-  HMM_i3_pval = 0.01,
+  HMM_i3_pval = 0.05,
   HMM_i3_use_KS = FALSE,
   BayesMaxPNormal = 0.5,
   sim_method = "meanvar",
