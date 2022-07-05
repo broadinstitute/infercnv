@@ -5,11 +5,12 @@
 \title{fusion_HMM_report_two_methods}
 \usage{
 fusion_HMM_report_two_methods(
-  infercnv_hmm_obj,
+  expression_file_path,
+  expression_file_token,
   allele_file_path,
   allele_file_token,
+  infercnv_obj,
   infercnv_allele_obj,
-  allele_mode = c("snp_level", "gene_level"),
   method = c("union", "common"),
   type = c("i6", "i3"),
   output_path,
@@ -19,15 +20,17 @@ fusion_HMM_report_two_methods(
 )
 }
 \arguments{
-\item{infercnv_hmm_obj}{InferCNV HMM object.}
+\item{expression_file_path}{Location of the directory of the inferCNV outputs.}
+
+\item{expression_file_token}{(string) String token that contains some info on settings used to name expression-based files.}
 
 \item{allele_file_path}{Location of the directory of the inferCNV_allele outputs.}
 
 \item{allele_file_token}{(string) String token that contains some info on settings used to name allele-based files.}
 
-\item{infercnv_allele_obj}{InferCNV allele object.}
+\item{infercnv_obj}{InferCNV object.}
 
-\item{allele_mode}{The type of allele data provided. "snp_level" or "gene_level".}
+\item{infercnv_allele_obj}{InferCNV allele object.}
 
 \item{method}{The way integrating HMM boundaries from two methods: union/common.
 "union" keeps those expression-specific gene that are not found in allele data during modeling,
@@ -42,5 +45,5 @@ while "common" removes those ones.}
 \item{HMM_report_by}{cell, consensus, subcluster (default: subcluster)}
 }
 \description{
-
+This function aims to integrate HMM boundaries from expression/allele based methods.
 }
