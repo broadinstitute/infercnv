@@ -3,13 +3,19 @@
 #' @description This class extends the functionality of infercnv_allele class
 #' aiming to cooperate MCMC object leveraging Bayesian model
 #' 
-#' Slots in the MCMC_infercnv_allele object (besides infercnv) include:
+#' Slots in the MCMC_infercnv_allele object (besides infercnv_allele) include:
 #' 
-#' @slot bugs_model a string path to where the bug file locates.
+#' @slot bugs_model BUGS model.
 #' 
-#' @slot cell_gene cell_gene.
+#' @slot cell_gene List containing the Cells and Genes that make up each CNV.
 #' 
-#' @slot cnv_regions cnv_regions.
+#' @slot cnv_probabilities Probabilities of each CNV belonging to a particular state from 0 (least likely)to 1 (most likely).
+#' 
+#' @slot cell_probabilities Probabilities of each cell being in a particular state, from 0 (least likely)to 1 (most likely).
+#' 
+#' @slot cnv_regions ID for each CNV found by the HMM.
+#' 
+#' @slot States NOT defined yet.
 #' 
 #' @export
 #' 
@@ -17,10 +23,12 @@ MCMC_infercnv_allele <- methods::setClass(
   "MCMC_infercnv_allele", 
   slots = c(bugs_model = "character",
             cell_gene = "list",
-            cnv_regions = "factor"),
+            cnv_probabilities = "list",
+            cell_probabilities = "list",
+            cnv_regions = "factor",
+            States = "ANY"),
   contains = "infercnv_allele")
 
-# file_path the path to HMM reports
 # file_token file name
 # infercnv_allele_obj based obj
 # two modes: snp and gene
@@ -54,36 +62,6 @@ initialize_allele_mcmc <- function(file_path,
                                    cell_groups_df,
                                    mode = mode)
   return(mcmc_snp)
-  
-  # if(mode == "snp_level"){
-  #   
-  #   flog.info("Initializing MCMC_infercnv_allele_snp obj ...")
-  #   
-  #   mcmc_snp <- new("MCMC_infercnv_allele_snp",
-  #                   infercnv_allele_obj)
-  #   mcmc_snp@bugs_model <- system.file("BUGS_SNP_Model",package = "infercnv")
-  #   mcmc_snp@cnv_regions <- unique(pred_cnv_genes_df$gene_region_name)
-  #   
-  #   mcmc_snp <- getGenesCells_allele(mcmc_snp,
-  #                                    pred_cnv_genes_df, 
-  #                                    cell_groups_df,
-  #                                    mode = mode)
-  #   return(mcmc_snp)
-  #   
-  # } else if(mode == "gene_level"){
-  #   flog.info("Initializing MCMC_infercnv_allele_gene obj ...")
-  #   
-  #   mcmc_snp_gene <- new("MCMC_infercnv_allele_gene",
-  #                        infercnv_allele_obj)
-  #   mcmc_snp_gene@bugs_model <- system.file("BUGS_SNP2Gene_Model",package = "infercnv")
-  #   mcmc_snp_gene@cnv_regions <- unique(pred_cnv_genes_df$gene_region_name)
-  #   
-  #   mcmc_snp_gene <- getGenesCells_allele(mcmc_snp_gene,
-  #                                         pred_cnv_genes_df, 
-  #                                         cell_groups_df,
-  #                                         mode = mode)
-  #   return(mcmc_snp_gene)
-  # }
 }
 
 getGenesCells_allele <- function(obj, pred_cnv_genes_df, cell_groups_df, 
@@ -183,19 +161,145 @@ set_array <- function(r.maf, n.sc, genes2snps.dict, numCells){
               "I.j"=I.j))
 }
 
+# Function for each individule cell probabilities, marginalize over the EPSILONS -- my version
+my_cell_prob <- function(combined_samples) {
+  epsilons <- combined_samples[,grepl('epsilon', colnames(combined_samples))]
+  state <- combined_samples[,grepl('theta', colnames(combined_samples))]
+  #print(paste("Epsilons: ", dim(epsilons)))
+  epsilon_state_frequencies <- apply(as.data.frame(epsilons), 2, function(x) table(factor(x, levels = seq_len(ncol(state)))))
+  cell_probs <- epsilon_state_frequencies/colSums(epsilon_state_frequencies)
+  return(cell_probs)
+}
+
+get_posterior_prob <- function(obj, mcmc){
+  
+  cnv_probabilities <- list()
+  ## List for combining the chains in each simulation
+  combined_mcmc <- list()
+  ## list holding the frequency of epsilon values for each cell line
+  ##  for each cnv region and subgroup
+  cell_probabilities <- list()
+  
+  combinedMCMC <-
+    for(j in seq_along(mcmc)){
+      # combine the chains
+      combined_mcmc[[j]] <- do.call(rbind, mcmc[[j]])
+      # run function to get probabilities
+      ## Thetas
+      cnv_probabilities[[j]] <- cnv_prob(combined_mcmc[[j]])
+      ## Epsilons
+      cell_probabilities[[j]] <- my_cell_prob(combined_mcmc[[j]])
+    }
+  obj@cnv_probabilities <- cnv_probabilities
+  obj@cell_probabilities <- cell_probabilities
+  
+  return(obj)
+}
+
+plot_posterior_prob <- function(obj, output_path){
+  
+  pdf(file = file.path(output_path,"cnvProbs.pdf"), onefile = TRUE)
+  lapply(seq_along(obj@cnv_probabilities), function(i){
+    print(my_plot_cnv_prob(obj@cnv_probabilities[[i]], as.character(obj@cell_gene[[i]]$cnv_regions)))
+  })
+  dev.off()
+  
+  pdf(file = file.path(output_path,"cellProbs.pdf"), onefile = TRUE)
+  lapply(seq_along(obj@cell_probabilities), function(i){
+    print(my_plot_cell_prob(as.data.frame(obj@cell_probabilities[[i]]), as.character(obj@cell_gene[[i]]$cnv_regions)))
+  })
+  dev.off()
+  
+}
+
+## Fucntion to Plot the probability of each state for a CNV -- my version
+my_plot_cnv_prob <- function(df, title){
+  colnames(df) <- seq_len(ncol(df))
+  df <- melt(df)
+  colnames(df) <- c("row", "State", "Probability")
+  states <- as.factor(df$State)
+  ggplot2::ggplot(data = df, ggplot2::aes_string(y = 'Probability', x= 'State', fill = 'states')) +
+    ggplot2::geom_boxplot()+
+    ggplot2::labs(title = title) +
+    ggplot2::theme(plot.title = element_text(hjust = 0.5))
+}
+
+# Function to plot the probability for each cell line of being in a particular state -- my version
+my_plot_cell_prob <- function(df, title){
+  df$mag = seq_len(nrow(df))
+  long_data <- reshape::melt(df, id = "mag")
+  long_data$mag <- as.factor(long_data$mag)
+  ggplot2::ggplot(long_data, ggplot2::aes_string(x = 'variable', y = 'value', fill = 'mag'))+
+    ggplot2::geom_bar(stat="identity", width = 1) +
+    ggplot2::coord_flip() +
+    ggplot2::theme(
+      panel.grid = ggplot2::element_blank(), panel.background = ggplot2::element_blank(),panel.border = ggplot2::element_blank(),
+      axis.text=ggplot2::element_text(size=20),
+      plot.title = ggplot2::element_text(hjust = 0.5,size = 22),
+      #legend.position = "none",
+      legend.position="bottom",
+      axis.text.x = ggplot2::element_text(size = 16),
+      axis.text.y = ggplot2::element_text(size = 16),
+      axis.title.x = ggplot2::element_text(size = 18),
+      axis.title.y = ggplot2::element_text(size = 18))+
+    ggplot2::labs(title = title) +
+    #fill = "CNV States") +
+    ggplot2::xlab("Cell") +
+    ggplot2::ylab("Probability")+
+    ggplot2::labs(fill = "States")+
+    ggplot2::scale_x_discrete(breaks =seq(1, ncol(df), 9))
+}
+
+plot_Diagnostics <- function(mcmc, output_path){
+  
+  cnvMCMCList <- lapply(seq_along(mcmc), function(i){
+    lapply(mcmc[[i]], cnv_prob)
+  })
+  pdf(file = file.path(output_path,"CNVDiagnosticPlots.pdf"), onefile = TRUE)
+  lapply(seq_along(cnvMCMCList), function(i){
+    plot(coda::mcmc.list(cnvMCMCList[[i]]))
+  })
+  dev.off()
+  
+  cellProb <- function(samples) {
+    epsilons <- samples[,grepl('epsilon', colnames(samples))]
+  }
+  cellMCMCList <- lapply(seq_along(mcmc), function(i){
+    lapply(mcmc[[i]], cellProb)
+  })
+  pdf(file = file.path(output_path,"CellDiagnosticPlots.pdf"), onefile = TRUE)
+  lapply(seq_along(cellMCMCList), function(i){
+    plot(coda::mcmc.list(cellMCMCList[[i]]))
+  })
+  dev.off()
+  
+  pdf(file = file.path(output_path,"CNVautocorrelationPlots.pdf"), onefile = TRUE)
+  lapply(seq_along(cnvMCMCList), function(i){
+    coda::autocorr.plot(coda::mcmc.list(cnvMCMCList[[i]]))
+  })
+  dev.off()
+  
+  pdf(file = file.path(output_path,"CNVGelmanPlots.pdf"), onefile = TRUE)
+  lapply(seq_along(cnvMCMCList), function(i){
+    coda::gelman.plot(coda::mcmc.list(cnvMCMCList[[i]]))
+  })
+  dev.off()
+  
+}
+
 #' @title inferCNVAlleleBayesNet: Run Bayesian Network Mixture Model Leveraging Allele Data 
 #' To Obtain Posterior Probabilities For HMM Predicted States
 #'
 #' @description Uses Markov Chain Monte Carlo (MCMC) and Gibbs sampling to estimate the posterior
 #' probability of being in one of two Copy Number Variation states 
-#' (i2 states: 1,Deletion; 2,Neutral) for CNV's identified by inferCNV's HMM. 
+#' (i2 states: 1,Deletion; 2,Neutral) for CNV's identified by inferCNV_allele's HMM. 
 #' Posterior probabilities are found for the entire CNV cluster and each individual cell line in the CNV.
 #' 
 #' @param file_path Location of the directory of the inferCNV_allele outputs.
 #' 
 #' @param file_token (string) String token that contains some info on settings used to name allele-based files.
 #' 
-#' @param infercnv_allele_obj InferCNV allele object.
+#' @param infercnv_allele_obj InferCNV_allele object.
 #' 
 #' @param allele_mode The type of allele data provided. "snp_level" or "gene_level".
 #' 
@@ -230,7 +334,7 @@ inferCNVAlleleBayesNet <- function(file_path,
   start_time <- Sys.time()
   if(allele_mode == "snp_level"){
     
-    mclapply(mcmc_allele@cell_gene, function(x){
+    mcmc <- mclapply(mcmc_allele@cell_gene, function(x){
       #browser()
       samples <- run_allele_snp_mcmc(bugs = mcmc_allele@bugs_model,
                                      r.array = x$r.array,
@@ -242,12 +346,12 @@ inferCNVAlleleBayesNet <- function(file_path,
                                      I.j = x$I.j,
                                      pe = 0.1,
                                      mono = 0.7)
-      plot_mcmc(samples = samples,
-                region = x$cnv_regions,
-                output_path = output_path)
+      # plot_mcmc(samples = samples,
+      #           region = x$cnv_regions,
+      #           output_path = output_path)
     }, mc.cores = cores)
   } else{
-    mclapply(mcmc_allele@cell_gene, function(x){
+    mcmc <- mclapply(mcmc_allele@cell_gene, function(x){
       #browser()
       samples <- run_allele_gene_mcmc(bugs = mcmc_allele@bugs_model,
                                       r = mcmc_allele@count.data[x$Genes,
@@ -260,14 +364,27 @@ inferCNVAlleleBayesNet <- function(file_path,
                                       nCells = length(x$Cells),
                                       pe = 0.1,
                                       mono = 0.7)
-      plot_mcmc(samples = samples,
-                region = x$cnv_regions,
-                output_path = output_path)
+      # plot_mcmc(samples = samples,
+      #           region = x$cnv_regions,
+      #           output_path = output_path)
     }, mc.cores = cores)
   }
   end_time <- Sys.time()
   flog.info(paste0("MCMC running time: ",
                    difftime(end_time, start_time, units = "min")[[1]], " Minutes"))
+  
+  flog.info("Retrieving the posterior probabilities of CNVs ")
+  mcmc_allele <- get_posterior_prob(obj = mcmc_allele, mcmc = mcmc)
+  
+  saveRDS(mcmc_allele, file = file.path(output_path, "mcmc_allele.rds"))
+  
+  flog.info("Plotting the distribution of posterior probabilities")
+  plot_posterior_prob(obj = mcmc_allele, output_path)
+  
+  flog.info("Plotting diagnostic statistics")
+  plot_Diagnostics(mcmc = mcmc, output_path)
+  
+  return(mcmc_allele)
 }
 
 run_allele_snp_mcmc <- function(bugs,
