@@ -9,15 +9,21 @@
 This class extends the functionality of infercnv_allele class
 aiming to cooperate MCMC object leveraging Bayesian model
 
-Slots in the MCMC_infercnv_allele object (besides infercnv) include:
+Slots in the MCMC_infercnv_allele object (besides infercnv_allele) include:
 }
 \section{Slots}{
 
 \describe{
-\item{\code{bugs_model}}{a string path to where the bug file locates.}
+\item{\code{bugs_model}}{BUGS model.}
 
-\item{\code{cell_gene}}{cell_gene.}
+\item{\code{cell_gene}}{List containing the Cells and Genes that make up each CNV.}
 
-\item{\code{cnv_regions}}{cnv_regions.}
+\item{\code{cnv_probabilities}}{Probabilities of each CNV belonging to a particular state from 0 (least likely)to 1 (most likely).}
+
+\item{\code{cell_probabilities}}{Probabilities of each cell being in a particular state, from 0 (least likely)to 1 (most likely).}
+
+\item{\code{cnv_regions}}{ID for each CNV found by the HMM.}
+
+\item{\code{States}}{NOT defined yet.}
 }}
 
