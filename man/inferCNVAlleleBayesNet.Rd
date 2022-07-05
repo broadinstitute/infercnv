@@ -19,7 +19,7 @@ inferCNVAlleleBayesNet(
 
 \item{file_token}{(string) String token that contains some info on settings used to name allele-based files.}
 
-\item{infercnv_allele_obj}{InferCNV allele object.}
+\item{infercnv_allele_obj}{InferCNV_allele object.}
 
 \item{allele_mode}{The type of allele data provided. "snp_level" or "gene_level".}
 
@@ -30,6 +30,6 @@ inferCNVAlleleBayesNet(
 \description{
 Uses Markov Chain Monte Carlo (MCMC) and Gibbs sampling to estimate the posterior
 probability of being in one of two Copy Number Variation states 
-(i2 states: 1,Deletion; 2,Neutral) for CNV's identified by inferCNV's HMM. 
+(i2 states: 1,Deletion; 2,Neutral) for CNV's identified by inferCNV_allele's HMM. 
 Posterior probabilities are found for the entire CNV cluster and each individual cell line in the CNV.
 }
