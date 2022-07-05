@@ -9,23 +9,29 @@
 This class extends the functionality of infercnv/infercnv_allele class
 aiming to cooperate MCMC object leveraging Bayesian model
 
-Slots in the MCMC_infercnv_allele object (besides infercnv) include:
+Slots in the MCMC_infercnv_combined object include:
 }
 \section{Slots}{
 
 \describe{
-\item{\code{bugs_model}}{a string path to where the bug file locates.}
+\item{\code{bugs_model}}{BUGS model.}
 
-\item{\code{cell_gene}}{cell_gene.}
+\item{\code{cell_gene}}{List containing the Cells and Genes that make up each CNV.}
 
-\item{\code{cnv_regions}}{cnv_regions.}
+\item{\code{cnv_probabilities}}{Probabilities of each CNV belonging to a particular state from 0 (least likely)to 1 (most likely).}
 
-\item{\code{infercnv_obj}}{gene_obj.}
+\item{\code{cell_probabilities}}{Probabilities of each cell being in a particular state, from 0 (least likely)to 1 (most likely).}
 
-\item{\code{infercnv_obj_mu}}{infercnv_obj_mu.}
+\item{\code{cnv_regions}}{ID for each CNV found by the HMM.}
 
-\item{\code{infercnv_obj_sig}}{infercnv_obj_sig.}
+\item{\code{infercnv_obj}}{InferCNV obj.}
 
-\item{\code{infercnv_allele_obj}}{allele_obj.}
+\item{\code{infercnv_obj_mu}}{Mean values to be used for determining the distribution of each cell line.}
+
+\item{\code{infercnv_obj_sig}}{fitted values for cell lines, 1/standard deviation to be used for determining the distribution of each cell line.}
+
+\item{\code{infercnv_allele_obj}}{InferCNV_allele obj.}
+
+\item{\code{States}}{NOT defined yet.}
 }}
 

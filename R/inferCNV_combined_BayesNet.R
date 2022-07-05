@@ -3,21 +3,27 @@
 #' @description This class extends the functionality of infercnv/infercnv_allele class
 #' aiming to cooperate MCMC object leveraging Bayesian model
 #' 
-#' Slots in the MCMC_infercnv_allele object (besides infercnv) include:
+#' Slots in the MCMC_infercnv_combined object include:
 #' 
-#' @slot bugs_model a string path to where the bug file locates.
+#' @slot bugs_model BUGS model.
 #' 
-#' @slot cell_gene cell_gene.
+#' @slot cell_gene List containing the Cells and Genes that make up each CNV.
 #' 
-#' @slot cnv_regions cnv_regions.
+#' @slot cnv_probabilities Probabilities of each CNV belonging to a particular state from 0 (least likely)to 1 (most likely).
 #' 
-#' @slot infercnv_obj gene_obj.
+#' @slot cell_probabilities Probabilities of each cell being in a particular state, from 0 (least likely)to 1 (most likely).
 #' 
-#' @slot infercnv_obj_mu infercnv_obj_mu.
+#' @slot cnv_regions ID for each CNV found by the HMM.
 #' 
-#' @slot infercnv_obj_sig infercnv_obj_sig.
+#' @slot infercnv_obj InferCNV obj.
 #' 
-#' @slot infercnv_allele_obj allele_obj.
+#' @slot infercnv_obj_mu Mean values to be used for determining the distribution of each cell line.
+#' 
+#' @slot infercnv_obj_sig fitted values for cell lines, 1/standard deviation to be used for determining the distribution of each cell line.
+#' 
+#' @slot infercnv_allele_obj InferCNV_allele obj.
+#' 
+#' @slot States NOT defined yet.
 #' 
 #' @export
 #' 
@@ -25,11 +31,14 @@ MCMC_infercnv_combined <- methods::setClass(
   "MCMC_infercnv_combined", 
   slots = c(bugs_model = "character",
             cell_gene = "list",
+            cnv_probabilities = "list",
+            cell_probabilities = "list",
             cnv_regions = "factor",
             infercnv_obj = "infercnv",
             infercnv_obj_mu = "numeric",
             infercnv_obj_sig = "numeric",
-            infercnv_allele_obj = "infercnv_allele"))
+            infercnv_allele_obj = "infercnv_allele",
+            States = "ANY"))
 
 # file_path the path to HMM reports
 # file_token file name
@@ -296,7 +305,7 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
   }
   
   if(type == "i6"){
-    cnv_mean_sd = infercnv:::get_spike_dists(infercnv_obj@.hspike)
+    cnv_mean_sd <- get_spike_dists(infercnv_obj@.hspike)
     mean <- c(cnv_mean_sd[["cnv:0.01"]]$mean,
               cnv_mean_sd[["cnv:0.5"]]$mean,
               cnv_mean_sd[["cnv:1"]]$mean,
@@ -311,7 +320,7 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
             1/(cnv_mean_sd[["cnv:2"]]$sd^2),
             1/(cnv_mean_sd[["cnv:3"]]$sd^2))
   } else{
-    cnv_mean_sd = infercnv:::.i3HMM_get_sd_trend_by_num_cells_fit(infercnv_obj)
+    suppressMessages(invisible(capture.output(cnv_mean_sd <- .i3HMM_get_sd_trend_by_num_cells_fit(infercnv_obj))))
     mean <- c(cnv_mean_sd$mu - cnv_mean_sd$mean_delta,
               cnv_mean_sd$mu,
               cnv_mean_sd$mu + cnv_mean_sd$mean_delta)
@@ -334,11 +343,13 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
   
   flog.info(paste("The number of affected regions:", length(mcmc_combined@cell_gene)))
   
-  flog.info("Start running Gibbs sampling ")
+  flog.info(sprintf("Start running Gibbs sampling in %s mode", type))
+  
+  flog.info(sprintf("Enable identifing cnLOH event: %s", enable_cnLOH))
   
   start_time <- Sys.time()
   
-  mclapply(mcmc_combined@cell_gene, function(x){
+  mcmc <- mclapply(mcmc_combined@cell_gene, function(x){
     #browser()
     if(allele_mode == "snp_level"){
       # if(is.null(x$r.array)){
@@ -371,9 +382,9 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
                                        pe = 0.1,
                                        mono = 0.7)
       
-      plot_mcmc(samples = samples,
-                region = x$cnv_regions,
-                output_path = output_path)
+      # plot_mcmc(samples = samples,
+      #           region = x$cnv_regions,
+      #           output_path = output_path)
       
     } else{
       
@@ -408,15 +419,28 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
                                         pe = 0.1,
                                         mono = 0.7)
       
-      plot_mcmc(samples = samples,
-                region = x$cnv_regions,
-                output_path = output_path)
+      # plot_mcmc(samples = samples,
+      #           region = x$cnv_regions,
+      #           output_path = output_path)
     }
   }, mc.cores = cores)
   #})
   end_time <- Sys.time()
   flog.info(paste0("MCMC running time: ",
                    difftime(end_time, start_time, units = "min")[[1]], " Minutes"))
+  
+  flog.info("Retrieving the posterior probabilities of CNVs ")
+  mcmc_combined <- get_posterior_prob(obj = mcmc_combined, mcmc = mcmc)
+  
+  saveRDS(mcmc_combined, file = file.path(output_path, "mcmc_combined.rds"))
+  
+  flog.info("Plotting the distribution of posterior probabilities")
+  plot_posterior_prob(obj = mcmc_combined, output_path)
+  
+  flog.info("Plotting diagnostic statistics")
+  plot_Diagnostics(mcmc = mcmc, output_path)
+  
+  return(mcmc_combined)
 }
 
 run_combined_snp_mcmc <- function(bugs,
@@ -596,17 +620,19 @@ run_combined_gene_mcmc <- function(bugs,
 
 #' @title fusion_HMM_report_two_methods 
 #'
-#' @description 
+#' @description This function aims to integrate HMM boundaries from expression/allele based methods.
 #' 
-#' @param infercnv_hmm_obj InferCNV HMM object.
+#' @param expression_file_path Location of the directory of the inferCNV outputs.
+#' 
+#' @param expression_file_token (string) String token that contains some info on settings used to name expression-based files.
 #' 
 #' @param allele_file_path Location of the directory of the inferCNV_allele outputs.
 #' 
 #' @param allele_file_token (string) String token that contains some info on settings used to name allele-based files.
 #' 
-#' @param infercnv_allele_obj InferCNV allele object.
+#' @param infercnv_obj InferCNV object.
 #' 
-#' @param allele_mode The type of allele data provided. "snp_level" or "gene_level".
+#' @param infercnv_allele_obj InferCNV allele object.
 #' 
 #' @param method The way integrating HMM boundaries from two methods: union/common.
 #' "union" keeps those expression-specific gene that are not found in allele data during modeling,
@@ -622,11 +648,12 @@ run_combined_gene_mcmc <- function(bugs,
 #'
 #' @export
 
-fusion_HMM_report_two_methods <- function(infercnv_hmm_obj,
+fusion_HMM_report_two_methods <- function(expression_file_path,
+                                          expression_file_token,
                                           allele_file_path,
                                           allele_file_token,
+                                          infercnv_obj,
                                           infercnv_allele_obj,
-                                          allele_mode = c("snp_level","gene_level"),
                                           method = c("union", "common"),
                                           type = c("i6", "i3"),
                                           output_path,
@@ -634,44 +661,172 @@ fusion_HMM_report_two_methods <- function(infercnv_hmm_obj,
                                           HMM_report_by = 'subcluster',
                                           ...){
   
-  allele_mode <- match.arg(allele_mode)
+  #allele_mode <- match.arg(allele_mode)
   method <- match.arg(method)
   type <- match.arg(type)
   
-  mcmc_allele <- initialize_allele_mcmc(file_path = allele_file_path,
-                                        file_token = allele_file_token,
-                                        infercnv_allele_obj = infercnv_allele_obj,
-                                        mode = allele_mode)
+  flog.info("Loading candidate boundaries inferred from HMM ...")
+  
+  allele_cnv_regions_df <- read.table(file.path(allele_file_path, 
+                                            paste0(allele_file_token,".pred_cnv_regions.dat")),
+                                  header = T, check.names = FALSE, sep="\t", stringsAsFactors = TRUE)
+  expression_cnv_regions_df <- read.table(file.path(expression_file_path, 
+                                                paste0(expression_file_token,".pred_cnv_regions.dat")),
+                                      header = T, check.names = FALSE, sep="\t", stringsAsFactors = TRUE)
+  
+  allele_region_gr <- GRanges(seqnames = allele_cnv_regions_df[["chr"]],
+                              IRanges(as.numeric(as.character(allele_cnv_regions_df[["start"]])),
+                                      as.numeric(as.character(allele_cnv_regions_df[["end"]]))))
+  allele_region_gr$state <- allele_cnv_regions_df$state
+  
+  if(type == "i6"){
+    allele_region_gr$state <- 2
+  } else{
+    allele_region_gr$state <- 1
+  }
+  
+  allele_region_gr <- allele_region_gr %>% split(allele_cnv_regions_df$cell_group_name) %>% 
+    GRangesList()
+    
+  expression_region_gr <- GRanges(seqnames = expression_cnv_regions_df[["chr"]],
+                                  IRanges(as.numeric(as.character(expression_cnv_regions_df[["start"]])),
+                                          as.numeric(as.character(expression_cnv_regions_df[["end"]]))))
+  expression_region_gr$state <- expression_cnv_regions_df$state
+  expression_region_gr <- expression_region_gr %>% split(expression_cnv_regions_df$cell_group_name) %>% 
+    GRangesList()
+  
+  union_gr <- union(names(allele_region_gr), names(expression_region_gr))
+  
+  if(mean(union_gr %in% names(allele_region_gr)) != 1){
+    add_gr <- setdiff(union_gr, names(allele_region_gr))
+    for(i in add_gr){
+      tmp <- GRangesList(GRanges())
+      names(tmp) <- i
+      allele_region_gr <- c(allele_region_gr, tmp)
+    }
+  }
+  
+  if(mean(union_gr %in% names(expression_region_gr)) != 1){
+    add_gr <- setdiff(union_gr, names(expression_region_gr))
+    for(i in add_gr){
+      tmp <- GRangesList(GRanges())
+      names(tmp) <- i
+      expression_region_gr <- c(expression_region_gr, tmp)
+    }
+  }
+  
+  flog.info("Integrating boundaries from two methods ...")
+  
+  combined_gr <- lapply(union_gr, function(x){
+    #browser()
+    tmp_gr <- suppressWarnings(c(expression_region_gr[[x]], allele_region_gr[[x]])) %>% disjoin()
+    
+    tmp_gr$allele_state <- ifelse(type == "i6",
+                                  3,
+                                  2)
+    allele_idx <- findOverlaps(tmp_gr, allele_region_gr[[x]])
+    tmp_gr$allele_state[queryHits(allele_idx)] <- allele_region_gr[[x]]$state[subjectHits(allele_idx)]
+    
+    tmp_gr$expression_state <- ifelse(type == "i6",
+                                      3,
+                                      2)
+    expression_idx <- findOverlaps(tmp_gr, expression_region_gr[[x]])
+    tmp_gr$expression_state[queryHits(expression_idx)] <- expression_region_gr[[x]]$state[subjectHits(expression_idx)]
+    
+    if(type == "i6"){
+      
+      tmp_gr$state <- ifelse(tmp_gr$allele_state == tmp_gr$expression_state,
+                             tmp_gr$allele_state,
+                             ifelse(tmp_gr$allele_state == 2,
+                                    ifelse(tmp_gr$expression_state == 3,
+                                           7,
+                                           8),
+                                    tmp_gr$expression_state))
+      
+    } else{
+      tmp_gr$state <- ifelse(tmp_gr$allele_state == tmp_gr$expression_state,
+                             tmp_gr$allele_state,
+                             ifelse(tmp_gr$allele_state == 1,
+                                    ifelse(tmp_gr$expression_state == 2,
+                                           4,
+                                           5),
+                                    tmp_gr$expression_state))
+    }
+    return(tmp_gr)
+                                  
+  }) %>% GRangesList()
+  names(combined_gr) <- union_gr
+  
+  # mcmc_allele <- initialize_allele_mcmc(file_path = allele_file_path,
+  #                                       file_token = allele_file_token,
+  #                                       infercnv_allele_obj = infercnv_allele_obj,
+  #                                       mode = allele_mode)
   
   if(method == "common"){
-    infercnv_hmm_obj <- remove_genes(infercnv_hmm_obj,
-                                      which(! rownames(infercnv_hmm_obj@gene_order) %in% 
-                                              mcmc_allele@SNP_info$gene))
+    infercnv_obj <- remove_genes(infercnv_obj,
+                                      which(! rownames(infercnv_obj@gene_order) %in% 
+                                              infercnv_allele_obj@SNP_info$gene))
   }
   
-  infercnv_hmm_gene_GR <- GRanges(seqnames = infercnv_hmm_obj@gene_order[[C_CHR]],
-                                  IRanges(as.numeric(as.character(infercnv_hmm_obj@gene_order[[C_START]])),
-                                          as.numeric(as.character(infercnv_hmm_obj@gene_order[[C_STOP]]))))
+  infercnv_gene_GR <- GRanges(seqnames = infercnv_obj@gene_order[[C_CHR]],
+                              IRanges(as.numeric(as.character(infercnv_obj@gene_order[[C_START]])),
+                              as.numeric(as.character(infercnv_obj@gene_order[[C_STOP]]))))
   
-  for(i in seq_along(mcmc_allele@cell_gene)){
-    #browser()
-    cell_list <- mcmc_allele@cell_gene[[i]]$Cells
-    gene_list <- infercnv_hmm_gene_GR %over% range(mcmc_allele@SNP_info[mcmc_allele@cell_gene[[i]]$Genes])
+  flog.info("Reassigning states estimated from combined boundaries ...")
+  
+  infercnv_obj@expr.data[,] <- ifelse(type == "i6",
+                                      3,
+                                      2)
+  
+  for(i in names(combined_gr)){
     
-    infercnv_hmm_obj@expr.data[gene_list,cell_list] <- ifelse(type == "i6", 2, 1)
+    cell_list <- infercnv_obj@tumor_subclusters$subclusters %>% unlist(recursive = F)
+    cell_idx <- cell_list[[i]]
     
+    map_idx <- findOverlaps(infercnv_gene_GR, combined_gr[[i]])
+    duplicated_idx <- which(!duplicated(queryHits(map_idx)))
+    
+    gene_idx <- queryHits(map_idx)[duplicated_idx]
+    state_idx <- subjectHits(map_idx)[duplicated_idx]
+    state_value <- combined_gr[[i]]$state[state_idx]
+    
+    infercnv_obj@expr.data[gene_idx,cell_idx] <- matrix(state_value, 
+                                                        nrow = length(state_value),
+                                                        ncol = length(cell_idx))
   }
   
-  infercnv::plot_cnv(infercnv_hmm_obj, 
+  # infercnv_hmm_gene_GR <- GRanges(seqnames = infercnv_hmm_obj@gene_order[[C_CHR]],
+  #                                 IRanges(as.numeric(as.character(infercnv_hmm_obj@gene_order[[C_START]])),
+  #                                         as.numeric(as.character(infercnv_hmm_obj@gene_order[[C_STOP]]))))
+  # 
+  # for(i in seq_along(mcmc_allele@cell_gene)){
+  #   #browser()
+  #   cell_list <- mcmc_allele@cell_gene[[i]]$Cells
+  #   gene_list <- infercnv_hmm_gene_GR %over% range(mcmc_allele@SNP_info[mcmc_allele@cell_gene[[i]]$Genes])
+  #   
+  #   infercnv_hmm_obj@expr.data[gene_list,cell_list] <- ifelse(type == "i6", 2, 1)
+  #   
+  # }
+  
+  infercnv::plot_cnv(infercnv_obj, 
                      out_dir=output_path,
+                     x.center = ifelse(type == "i6",
+                                       3,
+                                       2),
+                     x.range=c(1,ifelse(type == "i6",
+                                        8,
+                                        5)),
+                     output_format="png",
+                     png_res=300,
+                     custom_color_pal = color.palette(c("DarkBlue", "white","DarkRed")),
                      ...)
   
-  infercnv:::generate_cnv_region_reports(infercnv_hmm_obj,
+  infercnv:::generate_cnv_region_reports(infercnv_obj,
                                          output_filename_prefix=output_prefix,
                                          out_dir=output_path,
                                          ignore_neutral_state = ifelse(type == "i6", 3, 2),
                                          by=HMM_report_by)
   
-  return(infercnv_hmm_obj)
+  return(infercnv_obj)
   
 }
