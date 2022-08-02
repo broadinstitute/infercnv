@@ -474,6 +474,115 @@ collapse_snp2gene <- function(infercnv_allele_obj,
   return(infercnv_allele_obj)
 }
 
+#' @title collapse_snp2gene_highest
+#' 
+#' @description This function aims to collapse infercnv_allele obj from snp level into gene level
+#' by only leveraging the highest coverage snp with each gene
+#' 
+#' @param infercnv_allele_obj infercnv_allele based obj
+#' 
+#' @param gene_annot a gene order annotation
+#' 
+#' @export
+collapse_snp2gene_highest <- function(infercnv_allele_obj,
+                                      gene_annot){
+  
+  flog.info("Using highest coverage method to aggregrate snp into gene level")
+  
+  melt_data <- melt(infercnv_allele_obj@coverage.data)
+  colnames(melt_data) <- c("chrpos","cell","COV")
+  
+  melt_data$ALT <- melt(infercnv_allele_obj@count.data)[,3]
+  melt_data$AF <- melt(infercnv_allele_obj@expr.data)[,3]
+  melt_data$allele <- melt(infercnv_allele_obj@allele.data)[,3]
+  
+  melt_data <- melt_data %>%
+    dplyr::filter(COV > 0)
+  melt_data$gene <- infercnv_allele_obj@SNP_info[melt_data$chrpos]$gene
+  
+  subset_melt_data <- melt_data %>% 
+    group_by(cell, gene) %>% 
+    arrange(desc(COV)) %>%
+    dplyr::filter(row_number() == 1) %>%
+    ungroup()
+  
+  expr.data <- subset_melt_data %>% select(cell, gene, AF) %>% 
+    pivot_wider(names_from = cell,
+                values_from = AF,
+                values_fill = 0) %>% data.frame()
+  rownames(expr.data) <- expr.data$gene
+  expr.data[,"gene"] <- NULL
+  expr.data <- as.matrix(expr.data)
+  
+  count.data <- subset_melt_data %>% select(cell, gene, ALT) %>% 
+    pivot_wider(names_from = cell,
+                values_from = ALT,
+                values_fill = 0) %>% data.frame()
+  rownames(count.data) <- count.data$gene
+  count.data[,"gene"] <- NULL
+  count.data <- as.matrix(count.data)
+  
+  allele.data <- subset_melt_data %>% select(cell, gene, allele) %>% 
+    pivot_wider(names_from = cell,
+                values_from = allele,
+                values_fill = 0) %>% data.frame()
+  rownames(allele.data) <- allele.data$gene
+  allele.data[,"gene"] <- NULL
+  allele.data <- as.matrix(allele.data)
+  
+  coverage.data <- subset_melt_data %>% select(cell, gene, COV) %>% 
+    pivot_wider(names_from = cell,
+                values_from = COV,
+                values_fill = 0) %>% data.frame()
+  rownames(coverage.data) <- coverage.data$gene
+  coverage.data[,"gene"] <- NULL
+  coverage.data <- as.matrix(coverage.data)
+  
+  expr.data <- expr.data[unique(infercnv_allele_obj@SNP_info$gene),
+                         colnames(infercnv_allele_obj@expr.data)]
+  count.data <- count.data[unique(infercnv_allele_obj@SNP_info$gene),
+                           colnames(infercnv_allele_obj@expr.data)]
+  allele.data <- allele.data[unique(infercnv_allele_obj@SNP_info$gene),
+                             colnames(infercnv_allele_obj@expr.data)]
+  coverage.data <- coverage.data[unique(infercnv_allele_obj@SNP_info$gene),
+                                 colnames(infercnv_allele_obj@expr.data)]
+  
+  gene_order <- gene_annot[rownames(gene_annot) %in% rownames(expr.data),]
+  gene_order_gr <- GenomicRanges::GRanges(gene_order[[C_CHR]],
+                                          IRanges::IRanges(gene_order[[C_START]],
+                                                           gene_order[[C_STOP]]))
+  names(gene_order_gr) <- rownames(gene_order)
+  gene_order_gr <- gene_order_gr %>% sortSeqlevels() %>% sort()
+  
+  expr.data <- expr.data[names(gene_order_gr), ]
+  count.data <- count.data[names(gene_order_gr), ]
+  allele.data <- allele.data[names(gene_order_gr), ]
+  coverage.data <- coverage.data[names(gene_order_gr), ]
+  gene_order <- gene_order[names(gene_order_gr),]
+  gene_order_gr$gene <- names(gene_order_gr)
+  
+  names(gene_order_gr) <- 
+    rownames(expr.data) <- 
+    rownames(count.data)  <-
+    rownames(allele.data) <-
+    rownames(coverage.data) <-
+    rownames(gene_order) <-
+    paste0(gene_order[[C_CHR]], ":",
+           gene_order[[C_START]], ":",
+           gene_order[[C_STOP]])
+  
+  infercnv_allele_obj@expr.data <- expr.data
+  infercnv_allele_obj@count.data <- count.data
+  infercnv_allele_obj@allele.data <- allele.data
+  infercnv_allele_obj@coverage.data <- coverage.data
+  infercnv_allele_obj@SNP_info <- gene_order_gr
+  infercnv_allele_obj@gene_order <- gene_order
+  
+  validate_infercnv_allele_obj(infercnv_allele_obj)
+  
+  return(infercnv_allele_obj)
+}
+
 
 #' @title plot_allele
 #' 

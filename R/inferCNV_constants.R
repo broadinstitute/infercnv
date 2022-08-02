@@ -54,9 +54,9 @@ infercnv.env$GLOBAL_NUM_THREADS <- 1  # default is single-threaded.
 #' @importFrom GenomeInfoDb sortSeqlevels seqnames
 #' @importFrom S4Vectors queryHits subjectHits
 #' @importFrom HiddenMarkov dthmm Viterbi
-#' @importFrom tidyr separate spread
+#' @importFrom tidyr separate spread pivot_wider 
 #' @importFrom stringr str_replace
-#' @importFrom dplyr mutate group_by summarise left_join arrange select n
+#' @importFrom dplyr mutate group_by summarise left_join arrange select n ungroup
 #' @import ggplot2
 #' @importFrom cowplot plot_grid 
 
