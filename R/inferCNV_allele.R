@@ -965,7 +965,7 @@ plot_allele <- function(infercnv_allele_obj,
     allele_freq_plot_w_trendlines = allele_freq_plot +
       geom_line(data=allele_freq_means,
                 aes(x=pos, y=grp_pos_mean_AF_sm, color=sample_type), size=0.5, alpha=1) +
-      scale_color_manual(values = color_cell)
+      scale_color_manual(values = color_cell) + ylim(c(0,1))
     
     # # HMM prediction if existed
     # if(!is.null(HMM)){
