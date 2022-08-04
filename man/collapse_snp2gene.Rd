@@ -7,8 +7,7 @@
 collapse_snp2gene(
   infercnv_allele_obj,
   gene_annot,
-  collapse_method = c("mean", "median"),
-  cores = 5
+  collapse_method = c("highest", "median", "mean")
 )
 }
 \arguments{
@@ -16,10 +15,10 @@ collapse_snp2gene(
 
 \item{gene_annot}{a gene order annotation}
 
-\item{collapse_method}{The method used to collapse snp into gene. default = median}
-
-\item{cores}{A number of cores being used during parallel computing. default = 5}
+\item{collapse_method}{The method used to collapse snp into gene. Take the highest coverage/median/mean
+value within each gene as its representative. default = "highest"}
 }
 \description{
 This function aims to collapse infercnv_allele obj from snp level into gene level
+by only leveraging different characteristics
 }

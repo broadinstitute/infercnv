@@ -376,137 +376,165 @@ map2gene <- function(infercnv_allele_obj,
 }
 
 ## aggregrate into a higher level
-agg_method <- function(data, index, method = c("mean","median"),
-                       cores = 5){
+# agg_method <- function(data, index, method = c("mean","median"),
+#                        cores = 5){
+# 
+#   method <- match.arg(method)
+#   
+#   tmp <- mclapply(seq_len(ncol(data)), 
+#                   function(x){
+#                     tapply(data[,x], 
+#                            index, 
+#                            method)
+#                   },mc.cores = cores)
+#   tmp <- do.call(cbind, tmp)
+#   colnames(tmp) <- colnames(data)
+#   #tmp <- round(tmp)
+#   
+#   return(tmp)
+#   
+# }
 
-  method <- match.arg(method)
-  
-  tmp <- mclapply(seq_len(ncol(data)), 
-                  function(x){
-                    tapply(data[,x], 
-                           index, 
-                           method)
-                  },mc.cores = cores)
-  tmp <- do.call(cbind, tmp)
-  colnames(tmp) <- colnames(data)
-  #tmp <- round(tmp)
-  
-  return(tmp)
-  
-}
+# collapse_snp2gene
+# This function aims to collapse infercnv_allele obj from snp level into gene level
+# infercnv_allele_obj infercnv_allele based obj
+# gene_annot a gene order annotation
+# collapse_method The method used to collapse snp into gene. default = median
+# cores A number of cores being used during parallel computing. default = 5
+# collapse_snp2gene <- function(infercnv_allele_obj,
+#                               gene_annot,
+#                               collapse_method = c("mean","median"),
+#                               cores = 5){
+# 
+#   collapse_method <- match.arg(collapse_method)
+#   
+#   flog.info(sprintf("Using %s method to aggregrate snp into gene level", 
+#                     collapse_method))
+#   
+#   expr.data <- agg_method(data = infercnv_allele_obj@expr.data,
+#                           index = infercnv_allele_obj@SNP_info$gene,
+#                           method = collapse_method,
+#                           cores = cores)
+#   
+#   count.data <- agg_method(data = infercnv_allele_obj@count.data,
+#                            index = infercnv_allele_obj@SNP_info$gene,
+#                            method = collapse_method,
+#                            cores = cores) %>% round()
+#   
+#   allele.data <- agg_method(data = infercnv_allele_obj@allele.data,
+#                             index = infercnv_allele_obj@SNP_info$gene,
+#                             method = collapse_method,
+#                             cores = cores) %>% round()
+#   
+#   coverage.data <- agg_method(data = infercnv_allele_obj@coverage.data,
+#                               index = infercnv_allele_obj@SNP_info$gene,
+#                               method = collapse_method,
+#                               cores = cores) %>% round()
+#   
+#   gene_order <- gene_annot[rownames(gene_annot) %in% rownames(expr.data),]
+#   gene_order_gr <- GenomicRanges::GRanges(gene_order[[C_CHR]],
+#                                           IRanges::IRanges(gene_order[[C_START]],
+#                                                            gene_order[[C_STOP]]))
+#   names(gene_order_gr) <- rownames(gene_order)
+#   gene_order_gr <- gene_order_gr %>% sortSeqlevels() %>% sort()
+#   
+#   expr.data <- expr.data[names(gene_order_gr), ]
+#   count.data <- count.data[names(gene_order_gr), ]
+#   allele.data <- allele.data[names(gene_order_gr), ]
+#   coverage.data <- coverage.data[names(gene_order_gr), ]
+#   gene_order <- gene_order[names(gene_order_gr),]
+#   gene_order_gr$gene <- names(gene_order_gr)
+#   
+#   names(gene_order_gr) <- 
+#     rownames(expr.data) <- 
+#     rownames(count.data)  <-
+#     rownames(allele.data) <-
+#     rownames(coverage.data) <-
+#     rownames(gene_order) <-
+#     paste0(gene_order[[C_CHR]], ":",
+#            gene_order[[C_START]], ":",
+#            gene_order[[C_STOP]])
+#   
+#   infercnv_allele_obj@expr.data <- expr.data
+#   infercnv_allele_obj@count.data <- count.data
+#   infercnv_allele_obj@allele.data <- allele.data
+#   infercnv_allele_obj@coverage.data <- coverage.data
+#   infercnv_allele_obj@SNP_info <- gene_order_gr
+#   infercnv_allele_obj@gene_order <- gene_order
+#   
+#   validate_infercnv_allele_obj(infercnv_allele_obj)
+#   
+#   return(infercnv_allele_obj)
+# }
 
 #' @title collapse_snp2gene
 #' 
 #' @description This function aims to collapse infercnv_allele obj from snp level into gene level
+#' by only leveraging different characteristics
 #' 
 #' @param infercnv_allele_obj infercnv_allele based obj
 #' 
 #' @param gene_annot a gene order annotation
 #' 
-#' @param collapse_method The method used to collapse snp into gene. default = median
-#' 
-#' @param cores A number of cores being used during parallel computing. default = 5
+#' @param collapse_method The method used to collapse snp into gene. Take the highest coverage/median/mean
+#' value within each gene as its representative. default = "highest"
 #' 
 #' @export
 collapse_snp2gene <- function(infercnv_allele_obj,
                               gene_annot,
-                              collapse_method = c("mean","median"),
-                              cores = 5){
-
+                              collapse_method = c("highest","median","mean")){
+  
   collapse_method <- match.arg(collapse_method)
   
   flog.info(sprintf("Using %s method to aggregrate snp into gene level", 
                     collapse_method))
   
-  expr.data <- agg_method(data = infercnv_allele_obj@expr.data,
-                          index = infercnv_allele_obj@SNP_info$gene,
-                          method = collapse_method,
-                          cores = cores)
-  
-  count.data <- agg_method(data = infercnv_allele_obj@count.data,
-                           index = infercnv_allele_obj@SNP_info$gene,
-                           method = collapse_method,
-                           cores = cores) %>% round()
-  
-  allele.data <- agg_method(data = infercnv_allele_obj@allele.data,
-                            index = infercnv_allele_obj@SNP_info$gene,
-                            method = collapse_method,
-                            cores = cores) %>% round()
-  
-  coverage.data <- agg_method(data = infercnv_allele_obj@coverage.data,
-                              index = infercnv_allele_obj@SNP_info$gene,
-                              method = collapse_method,
-                              cores = cores) %>% round()
-  
-  gene_order <- gene_annot[rownames(gene_annot) %in% rownames(expr.data),]
-  gene_order_gr <- GenomicRanges::GRanges(gene_order[[C_CHR]],
-                                          IRanges::IRanges(gene_order[[C_START]],
-                                                           gene_order[[C_STOP]]))
-  names(gene_order_gr) <- rownames(gene_order)
-  gene_order_gr <- gene_order_gr %>% sortSeqlevels() %>% sort()
-  
-  expr.data <- expr.data[names(gene_order_gr), ]
-  count.data <- count.data[names(gene_order_gr), ]
-  allele.data <- allele.data[names(gene_order_gr), ]
-  coverage.data <- coverage.data[names(gene_order_gr), ]
-  gene_order <- gene_order[names(gene_order_gr),]
-  gene_order_gr$gene <- names(gene_order_gr)
-  
-  names(gene_order_gr) <- 
-    rownames(expr.data) <- 
-    rownames(count.data)  <-
-    rownames(allele.data) <-
-    rownames(coverage.data) <-
-    rownames(gene_order) <-
-    paste0(gene_order[[C_CHR]], ":",
-           gene_order[[C_START]], ":",
-           gene_order[[C_STOP]])
-  
-  infercnv_allele_obj@expr.data <- expr.data
-  infercnv_allele_obj@count.data <- count.data
-  infercnv_allele_obj@allele.data <- allele.data
-  infercnv_allele_obj@coverage.data <- coverage.data
-  infercnv_allele_obj@SNP_info <- gene_order_gr
-  infercnv_allele_obj@gene_order <- gene_order
-  
-  validate_infercnv_allele_obj(infercnv_allele_obj)
-  
-  return(infercnv_allele_obj)
-}
-
-#' @title collapse_snp2gene_highest
-#' 
-#' @description This function aims to collapse infercnv_allele obj from snp level into gene level
-#' by only leveraging the highest coverage snp with each gene
-#' 
-#' @param infercnv_allele_obj infercnv_allele based obj
-#' 
-#' @param gene_annot a gene order annotation
-#' 
-#' @export
-collapse_snp2gene_highest <- function(infercnv_allele_obj,
-                                      gene_annot){
-  
-  flog.info("Using highest coverage method to aggregrate snp into gene level")
-  
   melt_data <- melt(infercnv_allele_obj@coverage.data)
   colnames(melt_data) <- c("chrpos","cell","COV")
   
   melt_data$ALT <- melt(infercnv_allele_obj@count.data)[,3]
-  melt_data$AF <- melt(infercnv_allele_obj@expr.data)[,3]
   melt_data$allele <- melt(infercnv_allele_obj@allele.data)[,3]
+  melt_data$AF <- melt(infercnv_allele_obj@expr.data)[,3]
   
   melt_data <- melt_data %>%
     dplyr::filter(COV > 0)
   melt_data$gene <- infercnv_allele_obj@SNP_info[melt_data$chrpos]$gene
   
-  subset_melt_data <- melt_data %>% 
-    group_by(cell, gene) %>% 
-    arrange(desc(COV)) %>%
-    dplyr::filter(row_number() == 1) %>%
-    ungroup()
+  if(collapse_method == "median"){
+    
+    subset_melt_data <- melt_data %>% 
+      group_by(cell, gene) %>% 
+      mutate(AF = median(AF),
+             ALT = median(ALT),
+             allele = median(allele),
+             COV = median(COV)) %>% 
+      ungroup()
+    
+  } 
   
-  expr.data <- subset_melt_data %>% select(cell, gene, AF) %>% 
+  if(collapse_method == "mean"){
+    
+    subset_melt_data <- melt_data %>% 
+      group_by(cell, gene) %>% 
+      mutate(AF = mean(AF),
+             ALT = mean(ALT),
+             allele = mean(allele),
+             COV = mean(COV)) %>% 
+      ungroup()
+    
+  }
+  
+  if(collapse_method == "highest"){
+    
+    subset_melt_data <- melt_data %>% 
+      group_by(cell, gene) %>% 
+      arrange(desc(COV)) %>%
+      dplyr::filter(dplyr::row_number() == 1) %>%
+      ungroup()
+    
+  }
+  
+  expr.data <- subset_melt_data %>% select(cell, gene, AF) %>% unique() %>% 
     pivot_wider(names_from = cell,
                 values_from = AF,
                 values_fill = 0) %>% data.frame()
@@ -514,29 +542,29 @@ collapse_snp2gene_highest <- function(infercnv_allele_obj,
   expr.data[,"gene"] <- NULL
   expr.data <- as.matrix(expr.data)
   
-  count.data <- subset_melt_data %>% select(cell, gene, ALT) %>% 
+  count.data <- subset_melt_data %>% select(cell, gene, ALT) %>% unique() %>% 
     pivot_wider(names_from = cell,
                 values_from = ALT,
                 values_fill = 0) %>% data.frame()
   rownames(count.data) <- count.data$gene
   count.data[,"gene"] <- NULL
-  count.data <- as.matrix(count.data)
+  count.data <- as.matrix(count.data) %>% round()
   
-  allele.data <- subset_melt_data %>% select(cell, gene, allele) %>% 
+  allele.data <- subset_melt_data %>% select(cell, gene, allele) %>% unique() %>% 
     pivot_wider(names_from = cell,
                 values_from = allele,
                 values_fill = 0) %>% data.frame()
   rownames(allele.data) <- allele.data$gene
   allele.data[,"gene"] <- NULL
-  allele.data <- as.matrix(allele.data)
+  allele.data <- as.matrix(allele.data) %>% round()
   
-  coverage.data <- subset_melt_data %>% select(cell, gene, COV) %>% 
+  coverage.data <- subset_melt_data %>% select(cell, gene, COV) %>% unique() %>% 
     pivot_wider(names_from = cell,
                 values_from = COV,
                 values_fill = 0) %>% data.frame()
   rownames(coverage.data) <- coverage.data$gene
   coverage.data[,"gene"] <- NULL
-  coverage.data <- as.matrix(coverage.data)
+  coverage.data <- as.matrix(coverage.data) %>% round()
   
   expr.data <- expr.data[unique(infercnv_allele_obj@SNP_info$gene),
                          colnames(infercnv_allele_obj@expr.data)]
