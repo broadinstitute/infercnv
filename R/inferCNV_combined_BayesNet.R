@@ -154,14 +154,15 @@ getGenesCells_combined <- function(obj, pred_cnv_genes_df, cell_groups_df,
     
     infercnv_gene_idx <- which(row.names(obj@infercnv_obj@expr.data) %in% genes)
     
-    if(mode == "snp_level"){
-      infercnv_allele_gene <- names(obj@infercnv_allele_obj@SNP_info)[obj@infercnv_allele_obj@SNP_info$gene %in% genes]
-      infercnv_allele_gene_idx <- which(obj@infercnv_allele_obj@SNP_info$gene %in% 
-                                          infercnv_allele_gene)
-    } else{
-      infercnv_allele_gene_idx <- which(obj@infercnv_allele_obj@SNP_info$gene %in% genes)
-    }
+    # if(mode == "snp_level"){
+    #   infercnv_allele_gene <- obj@infercnv_allele_obj@SNP_info$gene[obj@infercnv_allele_obj@SNP_info$gene %in% genes]
+    #   infercnv_allele_gene_idx <- which(obj@infercnv_allele_obj@SNP_info$gene %in% 
+    #                                       infercnv_allele_gene)
+    # } else{
+    #   infercnv_allele_gene_idx <- which(obj@infercnv_allele_obj@SNP_info$gene %in% genes)
+    # }
     
+    infercnv_allele_gene_idx <- which(obj@infercnv_allele_obj@SNP_info$gene %in% genes)
     
     sub_cells <- unique(current_cnv$cell_group_name)
     infercnv_cells_idx <- which(colnames(obj@infercnv_obj@expr.data) %in% 
