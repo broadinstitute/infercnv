@@ -96,10 +96,20 @@
 #'
 #' @param tumor_subcluster_pval max p-value for defining a significant tumor subcluster (default: 0.1)
 #'
-#' @param k_nn number k of nearest neighbors to search for when using the Leiden partition method for subclustering (default: 30)
+#' @param k_nn number k of nearest neighbors to search for when using the Leiden partition method for subclustering (default: 20)
 #'
-#' @param leiden_resolution resolution parameter for the Leiden algorithm
+#' @param leiden_resolution resolution parameter for the Leiden algorithm using the CPM quality score (default: 0.05)
 #'
+#' @param leiden_method Method used to generate the graph on which the Leiden algorithm is applied (default: "seurat")
+#'
+#' @param leiden_function Whether to use the Constant Potts Model (CPM) or modularity in igraph. Must be either "CPM" or "modularity". (default: "CPM")
+#'
+#' @param per_chr_hmm_subclusters Run subclustering per chromosome over all cells combined to run the HMM on those subclusters instead. Only applicable when using Leiden subclustering.
+#'                                This should provide enough definition in the predictions while avoiding subclusters that are too small thus providing less evidence to work with. (default: TRUE)
+#'
+#'
+#' @param z_score_filter Z-score used as a treshold to filter genes used for subclustering. 
+#'                       Applied based on reference genes to automatically ignore genes with high expression variability such as MHC genes. (default: 0.8)
 #'
 #'
 #' #############################
@@ -146,6 +156,8 @@
 #' @param no_plot   don't make any of the images. Instead, generate all non-image outputs as part of the run. (default: FALSE)
 #'
 #' @param no_prelim_plot  don't make the preliminary infercnv image (default: FALSE)
+#'
+#' @param write_expr_matrix Whether to write text files with the content of matrices when generating plots (default: FALSE)
 #'
 #' @param output_format Output format for the figure. Choose between "png", "pdf" and NA. NA means to only write the text outputs without generating the figure itself. (default: "png")
 #'
@@ -257,11 +269,16 @@ run <- function(infercnv_obj,
 
 
                 ## tumor subclustering options
-                analysis_mode=c('samples', 'subclusters', 'cells'), # for filtering and HMM
+                analysis_mode=c('subclusters', 'samples', 'cells'), # for filtering and HMM
                 tumor_subcluster_partition_method=c('leiden', 'random_trees', 'qnorm', 'pheight', 'qgamma', 'shc'),
                 tumor_subcluster_pval=0.1,
-                k_nn=30,
-                leiden_resolution=1,
+                k_nn=20,
+                leiden_resolution=0.05,
+                leiden_method=c("default", "seurat"),
+                leiden_function = c("CPM", "modularity"),
+                per_chr_hmm_subclusters=TRUE,
+                z_score_filter = 0.8,
+
 
                 ## noise settings
                 denoise=FALSE,
@@ -301,6 +318,7 @@ run <- function(infercnv_obj,
 
                 no_plot = FALSE,
                 no_prelim_plot = FALSE,
+                write_expr_matrix = FALSE,
                 output_format = "png",
                 plot_chr_scale = FALSE,
                 chr_lengths = NULL,
@@ -324,6 +342,7 @@ run <- function(infercnv_obj,
                          "set a different value > 10.000 if this default does not seem suitable."))
     }
 
+    leiden_function = match.arg(leiden_function)
     HMM_report_by = match.arg(HMM_report_by)
     analysis_mode = match.arg(analysis_mode)
     if(analysis_mode == "cells" && HMM_report_by != "cell") {
@@ -332,6 +351,10 @@ run <- function(infercnv_obj,
         HMM_report_by = "cell"
     }
     tumor_subcluster_partition_method = match.arg(tumor_subcluster_partition_method)
+    leiden_method = match.arg(leiden_method)
+    if (tumor_subcluster_partition_method != "leiden") {
+        per_chr_hmm_subclusters = FALSE
+    }
     
     if (debug) {
         flog.threshold(DEBUG)
@@ -363,8 +386,16 @@ run <- function(infercnv_obj,
     call_match$HMM_report_by = HMM_report_by
     call_match$analysis_mode = analysis_mode
     call_match$tumor_subcluster_partition_method = tumor_subcluster_partition_method
+    call_match$hclust_method = hclust_method
+    call_match$leiden_function = leiden_function
     # add argument needed to get relevant args list
     call_match$HMM = HMM
+    call_match$z_score_filter = z_score_filter
+    call_match$tumor_subcluster_pval = tumor_subcluster_pval
+    call_match$k_nn = k_nn
+    call_match$leiden_method = leiden_method
+    call_match$per_chr_hmm_subclusters = per_chr_hmm_subclusters
+    call_match$cluster_by_groups = cluster_by_groups
     call_match$max_centered_threshold = max_centered_threshold
     call_match$remove_genes_at_chr_ends = remove_genes_at_chr_ends
     call_match$prune_outliers = prune_outliers
@@ -447,6 +478,16 @@ run <- function(infercnv_obj,
                         }
                     }
                     if (.compare_args(infercnv_obj@options, unlist(reload_info$relevant_args[1:i]), reloaded_infercnv_obj@options)) {
+                        if (i ==  15 && per_chr_hmm_subclusters) {
+                            tmp = nchar(reload_info$expected_file_names[[i]])
+                            tmp = paste0(substr(reload_info$expected_file_names[[i]], 1, tmp-13), ".per_chr_subclusters", substr(reload_info$expected_file_names[[i]], tmp-12, tmp))
+                            if (file.exists(tmp)) {
+                                subclusters_per_chr = readRDS(tmp)
+                            }
+                            else {
+                                next
+                            }
+                        }
                         options_backup = infercnv_obj@options
                         infercnv_obj = reloaded_infercnv_obj # replace input infercnv_obj
                         rm(reloaded_infercnv_obj) # remove first (temporary) reference so there's no duplication when they would diverge
@@ -568,7 +609,7 @@ run <- function(infercnv_obj,
                      title=sprintf("%02d_log_transformed_data",step_count),
                      output_filename=sprintf("infercnv.%02d_log_transformed",step_count),
                      output_format=output_format,
-                     write_expr_matrix=TRUE,
+                     write_expr_matrix=write_expr_matrix,
                      png_res=png_res,
                      useRaster=useRaster
                      )
@@ -606,7 +647,7 @@ run <- function(infercnv_obj,
                          title=sprintf("%02d_scaled",step_count),
                          output_filename=sprintf("infercnv.%02d_scaled",step_count),
                          output_format=output_format,
-                         write_expr_matrix=TRUE,
+                         write_expr_matrix=write_expr_matrix,
                          png_res=png_res,
                          useRaster=useRaster)
                 
@@ -676,7 +717,7 @@ run <- function(infercnv_obj,
                          title=sprintf("%02d_tumor_subclusters.%s", step_count, tumor_subcluster_partition_method),
                          output_filename=sprintf("infercnv.%02d_tumor_subclusters.%s", step_count, tumor_subcluster_partition_method),
                          output_format=output_format,
-                         write_expr_matrix=TRUE,
+                         write_expr_matrix=write_expr_matrix,
                          png_res=png_res,
                          useRaster=useRaster)
                 
@@ -715,7 +756,7 @@ run <- function(infercnv_obj,
                      title=sprintf("%02d_remove_average",step_count),
                      output_filename=sprintf("infercnv.%02d_remove_average", step_count),
                      output_format=output_format,
-                     write_expr_matrix=TRUE,
+                     write_expr_matrix=write_expr_matrix,
                      png_res=png_res,
                      useRaster=useRaster)
         }
@@ -762,7 +803,7 @@ run <- function(infercnv_obj,
                          title=sprintf("%02d_apply_max_centered_expr_threshold",step_count),
                          output_filename=sprintf("infercnv.%02d_apply_max_centred_expr_threshold",step_count),
                          output_format=output_format,
-                         write_expr_matrix=TRUE,
+                         write_expr_matrix=write_expr_matrix,
                          png_res=png_res,
                          useRaster=useRaster)
                 
@@ -814,7 +855,7 @@ run <- function(infercnv_obj,
                      title=sprintf("%02d_smoothed_by_chr",step_count),
                      output_filename=sprintf("infercnv.%02d_smoothed_by_chr", step_count),
                      output_format=output_format,
-                     write_expr_matrix=TRUE,
+                     write_expr_matrix=write_expr_matrix,
                      png_res=png_res,
                      useRaster=useRaster)
         }
@@ -854,7 +895,7 @@ run <- function(infercnv_obj,
                      title=sprintf("%02d_centering_of_smoothed",step_count),
                      output_filename=sprintf("infercnv.%02d_centering_of_smoothed", step_count),
                      output_format=output_format,
-                     write_expr_matrix=TRUE,
+                     write_expr_matrix=write_expr_matrix,
                      png_res=png_res,
                      useRaster=useRaster)
             
@@ -892,7 +933,7 @@ run <- function(infercnv_obj,
                      title=sprintf("%02d_remove_average",step_count),
                      output_filename=sprintf("infercnv.%02d_remove_average", step_count),
                      output_format=output_format,
-                     write_expr_matrix=TRUE,
+                     write_expr_matrix=write_expr_matrix,
                      png_res=png_res,
                      useRaster=useRaster)
         }
@@ -931,7 +972,7 @@ run <- function(infercnv_obj,
                          title=sprintf("%02d_remove_genes_at_chr_ends",step_count),
                          output_filename=sprintf("infercnv.%02d_remove_genes_at_chr_ends",step_count),
                          output_format=output_format,
-                         write_expr_matrix=TRUE,
+                         write_expr_matrix=write_expr_matrix,
                          png_res=png_res)
                 
             }
@@ -969,7 +1010,7 @@ run <- function(infercnv_obj,
                      title=sprintf("%02d_invert_log_transform log(FC)->FC",step_count),
                      output_filename=sprintf("infercnv.%02d_invert_log_FC",step_count),
                      output_format=output_format,
-                     write_expr_matrix=TRUE,
+                     write_expr_matrix=write_expr_matrix,
                      png_res=png_res,
                      useRaster=useRaster)
             
@@ -980,7 +1021,7 @@ run <- function(infercnv_obj,
     ## ###################################################################
     ## Done restoring infercnv_obj's from files now under resume_mode
     ## ###################################################################
-    
+
     if (up_to_step == step_count) {
         flog.info("Reached up_to_step")
         return(infercnv_obj)
@@ -989,20 +1030,34 @@ run <- function(infercnv_obj,
     if (analysis_mode == 'subclusters' & tumor_subcluster_partition_method != 'random_trees') {
         
         resume_file_token = paste0(resume_file_token, '.', tumor_subcluster_partition_method)
-        
+
         flog.info(sprintf("\n\n\tSTEP %02d: computing tumor subclusters via %s\n", step_count, tumor_subcluster_partition_method))
         
         if (skip_past < step_count) {
-            infercnv_obj <- define_signif_tumor_subclusters(infercnv_obj,
-                                                            p_val=tumor_subcluster_pval,
-                                                            k_nn=k_nn,
-                                                            leiden_resolution=leiden_resolution,
-                                                            hclust_method=hclust_method,
-                                                            cluster_by_groups=cluster_by_groups,
-                                                            partition_method=tumor_subcluster_partition_method)
-            
+            res <- define_signif_tumor_subclusters(infercnv_obj = infercnv_obj,
+                                                   p_val = tumor_subcluster_pval,
+                                                   k_nn = k_nn,
+                                                   leiden_resolution = leiden_resolution,
+                                                   leiden_method = leiden_method,
+                                                   leiden_function=leiden_function,
+                                                   hclust_method = hclust_method,
+                                                   cluster_by_groups = cluster_by_groups,
+                                                   partition_method = tumor_subcluster_partition_method,
+                                                   per_chr_hmm_subclusters = per_chr_hmm_subclusters,
+                                                   z_score_filter=z_score_filter
+                                                   )
+            browser()
+            infercnv_obj = res[[1]]
+            subclusters_per_chr = res[[2]]
+            rm(res)
+
             if (save_rds) {
                 saveRDS(infercnv_obj, reload_info$expected_file_names[[step_count]])
+                if(per_chr_hmm_subclusters) {
+                    tmp = length(reload_info$expected_file_names[[step_count]])
+                    tmp = paste0(reload_info$expected_file_names[[step_count]][1:(tmp-13)], ".per_chr_subclusts", reload_info$expected_file_names[[step_count]][(tmp-13):tmp])
+                    saveRDS(subclusters_per_chr, tmp)
+                }
             }
             invisible(gc())
             
@@ -1018,7 +1073,7 @@ run <- function(infercnv_obj,
                          title=sprintf("%02d_tumor_subclusters",step_count),
                          output_filename=sprintf("infercnv.%02d_tumor_subclusters",step_count),
                          output_format=output_format,
-                         write_expr_matrix=TRUE,
+                         write_expr_matrix=write_expr_matrix,
                          png_res=png_res,
                          useRaster=useRaster)
             }
@@ -1036,7 +1091,9 @@ run <- function(infercnv_obj,
                                                             p_val=tumor_subcluster_pval,
                                                             hclust_method=hclust_method,
                                                             cluster_by_groups=cluster_by_groups,
-                                                            partition_method='none')
+                                                            partition_method='none',
+                                                            z_score_filter=z_score_filter
+                                                            )
             
             if (save_rds) {
                 saveRDS(infercnv_obj, reload_info$expected_file_names[[step_count]])
@@ -1056,23 +1113,23 @@ run <- function(infercnv_obj,
     
         if (! (no_prelim_plot | no_plot) ) {
             
-            prelim_heatmap_png = "infercnv.preliminary.png"
+            #prelim_heatmap_png = "infercnv.preliminary.png"
             
-            if (! file.exists(file.path(out_dir, prelim_heatmap_png))) {
-                plot_cnv(infercnv_obj,
-                         k_obs_groups=k_obs_groups,
-                         cluster_by_groups=cluster_by_groups,
-                         cluster_references=cluster_references,
-                         plot_chr_scale=plot_chr_scale,
-                         chr_lengths=chr_lengths,
-                         out_dir=out_dir,
-                         title="Preliminary infercnv (pre-noise filtering)",
-                         output_filename="infercnv.preliminary", # png ext auto added
-                         output_format=output_format,
-                         write_expr_matrix=TRUE,
-                         png_res=png_res,
-                         useRaster=useRaster)
-            }
+            #if (! file.exists(file.path(out_dir, prelim_heatmap_png))) {
+            plot_cnv(infercnv_obj,
+                     k_obs_groups=k_obs_groups,
+                     cluster_by_groups=cluster_by_groups,
+                     cluster_references=cluster_references,
+                     plot_chr_scale=plot_chr_scale,
+                     chr_lengths=chr_lengths,
+                     out_dir=out_dir,
+                     title="Preliminary infercnv (pre-noise filtering)",
+                     output_filename="infercnv.preliminary", # png ext auto added
+                     output_format=output_format,
+                     write_expr_matrix=write_expr_matrix,
+                     png_res=png_res,
+                     useRaster=useRaster)
+            #}
         }
     }
     
@@ -1115,7 +1172,7 @@ run <- function(infercnv_obj,
                          title=sprintf("%02d_removed_outliers",step_count),
                          output_filename=sprintf("infercnv.%02d_removed_outliers", step_count),
                          output_format=output_format,
-                         write_expr_matrix=TRUE,
+                         write_expr_matrix=write_expr_matrix,
                          png_res=png_res,
                          useRaster=useRaster)
             }
@@ -1128,24 +1185,32 @@ run <- function(infercnv_obj,
     }
     step_count = step_count + 1 # 17
     hmm_resume_file_token = paste0(resume_file_token, ".hmm_mode-", analysis_mode)
-    if (skip_hmm < 1) {
-        if (HMM) {
+    if (HMM) {
+
+        if (HMM_type == 'i6') {
+            hmm_center = 3
+            hmm_state_range = c(0,6)
+        } else {
+            ## i3
+            hmm_center = 2
+            hmm_state_range = c(1,3)
+        }
+        
+        if (skip_hmm < 1) {
             flog.info(sprintf("\n\n\tSTEP %02d: HMM-based CNV prediction\n", step_count))
-            
-            if (HMM_type == 'i6') {
-                hmm_center = 3
-                hmm_state_range = c(0,6)
-            } else {
-                ## i3
-                hmm_center = 2
-                hmm_state_range = c(1,3)
-            }
             
             if (analysis_mode == 'subclusters') {
                 
                 if (HMM_type == 'i6') {
-                    hmm.infercnv_obj <- predict_CNV_via_HMM_on_tumor_subclusters(infercnv_obj,
-                                                                                 t=HMM_transition_prob)
+                    if (tumor_subcluster_partition_method == "leiden" && per_chr_hmm_subclusters) {
+                        hmm.infercnv_obj <- predict_CNV_via_HMM_on_tumor_subclusters_per_chr(infercnv_obj = infercnv_obj, 
+                                                                                             subclusters_per_chr = subclusters_per_chr,
+                                                                                             t=HMM_transition_prob)
+                    }
+                    else {
+                        hmm.infercnv_obj <- predict_CNV_via_HMM_on_tumor_subclusters(infercnv_obj = infercnv_obj,
+                                                                                     t=HMM_transition_prob)
+                    }
                 } else if (HMM_type == 'i3') {
                     hmm.infercnv_obj <- i3HMM_predict_CNV_via_HMM_on_tumor_subclusters(infercnv_obj,
                                                                                        i3_p_val=HMM_i3_pval,
@@ -1223,7 +1288,7 @@ run <- function(infercnv_obj,
                          title=sprintf("%02d_HMM_preds",step_count),
                          output_filename=sprintf("infercnv.%02d_HMM_pred%s", step_count, hmm_resume_file_token),
                          output_format=output_format,
-                         write_expr_matrix=TRUE,
+                         write_expr_matrix=write_expr_matrix,
                          x.center=hmm_center,
                          x.range=hmm_state_range,
                          png_res=png_res,
@@ -1315,7 +1380,7 @@ run <- function(infercnv_obj,
                          title=sprintf("%02d_HMM_preds_Bayes_Net",step_count),
                          output_filename=sprintf("infercnv.%02d_HMM_pred.Bayes_Net.Pnorm_%g",step_count, BayesMaxPNormal),
                          output_format=output_format,
-                         write_expr_matrix=TRUE,
+                         write_expr_matrix=write_expr_matrix,
                          x.center=hmm_center,
                          x.range=hmm_state_range,
                          png_res=png_res,
@@ -1367,7 +1432,7 @@ run <- function(infercnv_obj,
                          title=sprintf("%02d_HMM_preds.repr_intensities",step_count),
                          output_filename=sprintf("infercnv.%02d_HMM_pred%s.Pnorm_%g.repr_intensities", step_count, hmm_resume_file_token, BayesMaxPNormal),
                          output_format=output_format,
-                         write_expr_matrix=TRUE,
+                         write_expr_matrix=write_expr_matrix,
                          x.center=1,
                          x.range=c(-1,3),
                          png_res=png_res,
@@ -1420,7 +1485,7 @@ run <- function(infercnv_obj,
                          title=sprintf("%02d_mask_nonDE",step_count),
                          output_filename=sprintf("infercnv.%02d_mask_nonDE", step_count),
                          output_format=output_format,
-                         write_expr_matrix=TRUE,
+                         write_expr_matrix=write_expr_matrix,
                          png_res=png_res,
                          useRaster=useRaster)
                 
@@ -1482,7 +1547,7 @@ run <- function(infercnv_obj,
                          title=sprintf("%02d_denoised", step_count),
                          output_filename=sprintf("infercnv.%02d_denoised", step_count),
                          output_format=output_format,
-                         write_expr_matrix=TRUE,
+                         write_expr_matrix=write_expr_matrix,
                          png_res=png_res,
                          useRaster=useRaster)
             }
@@ -1517,7 +1582,7 @@ run <- function(infercnv_obj,
                  title="inferCNV",
                  output_filename="infercnv",
                  output_format=output_format,
-                 write_expr_matrix=TRUE,
+                 write_expr_matrix=write_expr_matrix,
                  png_res=png_res,
                  useRaster=useRaster)
     }
@@ -3280,10 +3345,10 @@ compareNA <- function(v1,v2) {
     step_i = step_i + 1
 
     # 15 _tumor_subclusters%s.infercnv_obj
-    relevant_args[[step_i]] = c("analysis_mode", "tumor_subcluster_partition_method")
+    relevant_args[[step_i]] = c("analysis_mode", "tumor_subcluster_partition_method", "z_score_filter")
     if (run_arguments$analysis_mode == 'subclusters' & run_arguments$tumor_subcluster_partition_method != 'random_trees') {
         resume_file_token = paste0(resume_file_token, '.', run_arguments$tumor_subcluster_partition_method)
-        relevant_args[[step_i]] = c(relevant_args[[step_i]], "k_nn", "leiden_resolution", "tumor_subcluster_pval", "hclust_method", "cluster_by_groups")
+        relevant_args[[step_i]] = c(relevant_args[[step_i]], "k_nn", "leiden_resolution", "tumor_subcluster_pval", "leiden_method", "leiden_function", "per_chr_hmm_subclusters", "hclust_method", "cluster_by_groups")
         expected_file_names[[step_i]] = file.path(run_arguments$out_dir, sprintf("%02d_tumor_subclusters%s.infercnv_obj", step_i, resume_file_token))
     }
     else if (run_arguments$analysis_mode != 'subclusters') {

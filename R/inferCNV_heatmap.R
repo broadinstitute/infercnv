@@ -675,7 +675,7 @@ plot_cnv <- function(infercnv_obj,
 
                 # when only 1 cell in the group, we need an artificial dendrogram for it
                 obs_dendrogram[[length(obs_dendrogram) + 1]] = .single_element_dendrogram(unique_label=row.names(obs_data[which(obs_annotations_groups == i),, drop=FALSE]))
-                hcl_obs_annotations_groups <- c(hcl_obs_annotations_groups, i)
+                # hcl_obs_annotations_groups <- c(hcl_obs_annotations_groups, i)
 
                 if (isfirst) {
                     write(row.names(obs_data[which(obs_annotations_groups == i), ]),
@@ -692,6 +692,8 @@ plot_cnv <- function(infercnv_obj,
                 flog.info(paste("group size being clustered: ", paste(dim(data_to_cluster), collapse=","), sep=" "))
                 group_obs_hcl <- hclust(parallelDist(data_to_cluster, threads=infercnv.env$GLOBAL_NUM_THREADS), method=hclust_method)
                 ordered_names <- c(ordered_names, group_obs_hcl$labels[group_obs_hcl$order])
+                group_obs_dend <- as.dendrogram(group_obs_hcl)
+                obs_dendrogram[[length(obs_dendrogram) + 1]] <- group_obs_dend
 
                 if (isfirst) {
                     write.tree(as.phylo(group_obs_hcl),
@@ -704,8 +706,6 @@ plot_cnv <- function(infercnv_obj,
                 }
             }
 
-            group_obs_dend <- as.dendrogram(group_obs_hcl)
-            obs_dendrogram[[length(obs_dendrogram) + 1]] <- group_obs_dend
             hcl_obs_annotations_groups <- c(hcl_obs_annotations_groups, rep(i, num_cells_in_group))
             obs_seps <- c(obs_seps, length(ordered_names))
         }
@@ -858,20 +858,16 @@ plot_cnv <- function(infercnv_obj,
     }
     # Write data to file.
     if ("matrix" %in% is(obs_data)) {
-        flog.info(paste("plot_cnv_observations:Writing observation data to",
-                        observation_file_base,
-                        sep=" "))
-        row.names(obs_data) <- orig_row_names
-
-        if (do_plot && write_expr_matrix) {
-            write.table(as.matrix(t(obs_data[data_observations$rowInd,data_observations$colInd])),
-                    file=observation_file_base)
-        }
-        else {
+        if (write_expr_matrix) {
+            flog.info(paste("plot_cnv_observations:Writing observation data to",
+                            observation_file_base,
+                            sep=" "))
+            row.names(obs_data) <- orig_row_names
             # Rowv inherits dendrogram, Colv is FALSE
             # rowInd = seq_len(nrow(ref_data)) == everything in normal order
             # colInd = seq_len(ncol(ref_data)) == everything in normal order
-            write.table(as.matrix(t(obs_data)), file=observation_file_base)
+            write.table(as.matrix(t(obs_data[data_observations$rowInd,data_observations$colInd])),
+                    file=observation_file_base)
         }
     }
 }
@@ -1152,21 +1148,16 @@ plot_cnv <- function(infercnv_obj,
     # Write data to file
     if ("matrix" %in% is(ref_data)) {
 
-        ## TODO: write files for dgcMatrix too.
-        row.names(ref_data) <- ref_orig_names
-        flog.info(paste("plot_cnv_references:Writing reference data to",
-                        reference_data_file,
-                        sep=" "))
+        if (write_expr_matrix) {
+            ## TODO: write files for dgcMatrix too.
+            row.names(ref_data) <- ref_orig_names
+            flog.info(paste("plot_cnv_references:Writing reference data to",
+                            reference_data_file,
+                            sep=" "))
 
-        ## Rowv is FALSE, Colv is FALSE
-
-        if (do_plot && write_expr_matrix) {
-            write.table(as.matrix(t(ref_data[data_references$rowInd,data_references$colInd])),
-                        file=reference_data_file)
-        }
-        else {
+            ## Rowv is FALSE, Colv is FALSE
             # colInd = seq_len(ncol(ref_data)) == everything in normal order
-            write.table(as.matrix(t(ref_data[rev(seq_len(nrow(ref_data))), ])),
+            write.table(as.matrix(t(ref_data[data_references$rowInd,data_references$colInd])),
                         file=reference_data_file)
         }
     }

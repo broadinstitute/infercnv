@@ -1,6 +1,18 @@
 
-define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, leiden_resolution=1, hclust_method="ward.D2", cluster_by_groups=TRUE, partition_method="leiden", restrict_to_DE_genes=FALSE) {
-    
+define_signif_tumor_subclusters <- function(infercnv_obj,
+                                            p_val=0.1,
+                                            k_nn=20,
+                                            leiden_resolution=0.05,
+                                            leiden_method=c("default", "seurat"),
+                                            leiden_function = "CPM",
+                                            hclust_method="ward.D2",
+                                            cluster_by_groups=TRUE,
+                                            partition_method="leiden",
+                                            per_chr_hmm_subclusters=TRUE,
+                                            z_score_filter=0.8,
+                                            restrict_to_DE_genes=FALSE) 
+{
+    # leiden_method=c("default", "per_chr", "intersect_chr", "per_select_chr", "seurat", "seurat2")
     flog.info(sprintf("define_signif_tumor_subclusters(p_val=%g", p_val))
     
     # tumor_groups <- infercnv_obj@observation_grouped_cell_indices
@@ -25,6 +37,24 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
         # }
     }
 
+    outliers = NULL
+    # if (partition_method == "leiden" && grepl("filter", leiden_method, fixed=TRUE)) {
+    if (z_score_filter > 0) {
+        ref_matrix = infercnv_obj@expr.data[, unlist(infercnv_obj@reference_grouped_cell_indices), drop=FALSE]
+        z_score = (ref_matrix - mean(ref_matrix))/sd(ref_matrix)
+        outliers =  which(apply(abs(z_score), 1, mean) >= 0.8)
+
+        if (!is.null(outliers)) {
+            chrs = infercnv_obj@gene_order$chr[-outliers]
+        }
+        # leiden_method = "seurat" leiden_method[1:(length(leiden_method) - 7)]
+        rm(ref_matrix)
+        rm(z_score)
+    }
+    else {
+        chrs = infercnv_obj@gene_order$chr
+    }
+
     for (tumor_group in names(tumor_groups)) {
 
         flog.info(sprintf("define_signif_tumor_subclusters(), tumor: %s", tumor_group))
@@ -42,27 +72,69 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
         }
         
         if (partition_method == "leiden") {
-            tumor_subcluster_info <- .single_tumor_leiden_subclustering(tumor_group=tumor_group, tumor_group_idx=tumor_group_idx, tumor_expr_data=tumor_expr_data, k_nn=k_nn, leiden_resolution=leiden_resolution, hclust_method=hclust_method)
+
+            if (!is.null(outliers)) {
+                tumor_expr_data = tumor_expr_data[-outliers, , drop=FALSE]
+            }
+
+            #tumor_subcluster_info <- .single_tumor_leiden_subclustering(tumor_group=tumor_group, tumor_group_idx=tumor_group_idx, tumor_expr_data=tumor_expr_data, chrs=infercnv_obj@gene_order$chr, k_nn=k_nn, leiden_resolution=leiden_resolution, leiden_method=leiden_method, select_chr=select_chr, hclust_method=hclust_method)
+            tumor_subcluster_info <- .single_tumor_leiden_subclustering(tumor_group=tumor_group,
+                                                                        tumor_group_idx=tumor_group_idx,
+                                                                        tumor_expr_data=tumor_expr_data,
+                                                                        chrs=chrs,
+                                                                        k_nn=k_nn,
+                                                                        leiden_resolution=leiden_resolution,
+                                                                        leiden_method=leiden_method,
+                                                                        leiden_function=leiden_function,
+                                                                        hclust_method=hclust_method
+                                                                        )
         }
         else {
-            tumor_subcluster_info <- .single_tumor_subclustering(tumor_name=tumor_group, tumor_group_idx=tumor_group_idx, tumor_expr_data=tumor_expr_data, p_val=p_val, hclust_method=hclust_method, partition_method=partition_method)
+            tumor_subcluster_info <- .single_tumor_subclustering(tumor_name=tumor_group,
+                                                                 tumor_group_idx=tumor_group_idx,
+                                                                 tumor_expr_data=tumor_expr_data,
+                                                                 p_val=p_val,
+                                                                 hclust_method=hclust_method,
+                                                                 partition_method=partition_method
+                                                                 )
         }
 
         res$hc[[tumor_group]] <- tumor_subcluster_info$hc
         res$subclusters[[tumor_group]] <- tumor_subcluster_info$subclusters
 
     }
-         
+
     infercnv_obj@tumor_subclusters <- res
 
+    if (per_chr_hmm_subclusters && partition_method == "leiden") {
+        subclusters_per_chr <- .whole_dataset_leiden_subclustering_per_chr(expr_data = infercnv_obj@expr.data,
+                                                                           chrs = chrs,
+                                                                           k_nn = k_nn,
+                                                                           leiden_resolution = (leiden_resolution/10),
+                                                                           leiden_function = leiden_function
+                                                                           )         
+    }
+    else {
+        subclusters_per_chr = NULL
+    }
 
     if (! is.null(infercnv_obj@.hspike)) {
         flog.info("-mirroring for hspike")
-        infercnv_obj@.hspike <- define_signif_tumor_subclusters(infercnv_obj@.hspike, p_val=p_val, k_nn=k_nn, leiden_resolution=leiden_resolution, hclust_method=hclust_method, cluster_by_groups=cluster_by_groups, partition_method=partition_method, restrict_to_DE_genes=restrict_to_DE_genes)
+        infercnv_obj@.hspike = define_signif_tumor_subclusters(infercnv_obj@.hspike,
+                                                               p_val=p_val,
+                                                               k_nn=k_nn,
+                                                               leiden_resolution=leiden_resolution,
+                                                               leiden_method="default",
+                                                               hclust_method=hclust_method,
+                                                               cluster_by_groups=cluster_by_groups,
+                                                               partition_method=partition_method,
+                                                               per_chr_hmm_subclusters=FALSE,
+                                                               restrict_to_DE_genes=restrict_to_DE_genes)[[1]]
     }
         
-    
-    return(infercnv_obj)
+    #browser()
+    # return(infercnv_obj)
+    return(list(infercnv_obj, subclusters_per_chr))
 }
 
 
@@ -391,7 +463,7 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
 }
 
 
-.single_tumor_leiden_subclustering <- function(tumor_group, tumor_group_idx, tumor_expr_data, k_nn, leiden_resolution, hclust_method) {
+.single_tumor_leiden_subclustering <- function(tumor_group, tumor_group_idx, tumor_expr_data, chrs, k_nn, leiden_resolution, leiden_method, leiden_function, hclust_method) {
     res = list()
     res$subclusters = list()
 
@@ -408,30 +480,182 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
         return(res)
     }
 
-    snn <- nn2(t(tumor_expr_data), k=k_nn)$nn.idx
+    # if (leiden_method == "intersect_chr") {
+    #     partition = NULL
+    #     for (c in unique(chrs)) {
+    #         c_data = tumor_expr_data[which(chrs == c), , drop=FALSE]
+    #         c_snn = nn2(t(c_data), k=k_nn)$nn.idx
+    #         c_sparse_adjacency_matrix <- sparseMatrix(
+    #             i = rep(seq_len(ncol(tumor_expr_data)), each=k_nn), 
+    #             j = t(c_snn),
+    #             x = rep(1, ncol(tumor_expr_data) * k_nn),
+    #             dims = c(ncol(tumor_expr_data), ncol(tumor_expr_data)),
+    #             dimnames = list(colnames(tumor_expr_data), colnames(tumor_expr_data))
+    #         )
+    #         c_graph_obj = graph_from_adjacency_matrix(c_sparse_adjacency_matrix, mode="undirected")
+    #         c_partition_obj = cluster_leiden(c_graph_obj, resolution_parameter=leiden_resolution)
+    #         partition = paste(partition, c_partition_obj$membership)
+    #     }
 
-    sparse_adjacency_matrix <- sparseMatrix(
-        i = rep(seq_len(ncol(tumor_expr_data)), each=k_nn), 
-        j = t(snn),
-        x = rep(1, ncol(tumor_expr_data) * k_nn),
-        dims = c(ncol(tumor_expr_data), ncol(tumor_expr_data)),
-        dimnames = list(colnames(tumor_expr_data), colnames(tumor_expr_data))
-    )
-    
-    graph_obj = graph_from_adjacency_matrix(sparse_adjacency_matrix, mode="undirected")
-    partition_obj = cluster_leiden(graph_obj, resolution_parameter=leiden_resolution)
+    #     flog.info(paste0("Group ", tumor_group, " was subdivided into ", length(unique(partition)), " clusters."))
+    # }
+    # else if (leiden_method == "per_chr") {
+    #     combined_snn = NULL
+    #     for (c in unique(chrs)) {
+    #         c_data = tumor_expr_data[which(chrs == c), , drop=FALSE]
+    #         c_snn = nn2(t(c_data), k=k_nn)$nn.idx
+    #         combined_snn = cbind(combined_snn, c_snn)
+    #     }
 
-    flog.info(paste0("Group ", tumor_group, " was subdivided into ", partition_obj$nb_clusters, 
-        " clusters with a partition quality score of ", partition_obj$quality))
+    #     snn_table = apply(combined_snn, 1, table, simplify=FALSE)
+    #     snn_table_lengths = lapply(snn_table, length)
+    #     snn_neighbors = as.integer(names(unlist(snn_table)))
+    #     snn_weights = unlist(snn_table)
+    #     # rep(seq_len(ncol(tumor_expr_data)), times=snn_table_lengths)
 
-    flog.info("If this score is too low and you observe too much fragmentation, try decreasing the leiden resolution parameter")
-    flog.info("If this score is too low and you observe clusters that are still too diverse, try increasing the leiden resolution parameter")
+    #     sparse_adjacency_matrix <- sparseMatrix(
+    #         i = rep(seq_len(ncol(tumor_expr_data)), times=snn_table_lengths),
+    #         j = snn_neighbors,
+    #         x = snn_weights,
+    #         dims = c(ncol(tumor_expr_data), ncol(tumor_expr_data)),
+    #         dimnames = list(colnames(tumor_expr_data), colnames(tumor_expr_data))
+    #     )
 
-    #subcluster_graph = igraph::graph_from_adj_list(snn, mode="all")
-    #tst2 =igraph::cluster_leiden(subcluster_graph)
+    #     graph_obj = graph_from_adjacency_matrix(sparse_adjacency_matrix, mode="min", weighted=TRUE)
+    #     partition_obj = cluster_leiden(graph_obj, resolution_parameter=leiden_resolution)
+    #     partition = partition_obj$membership
 
-    #partition = leiden(sparse_adjacency_matrix, resolution_parameter=leiden_resolution)
-    partition = partition_obj$membership
+    #     flog.info(paste0("Group ", tumor_group, " was subdivided into ", partition_obj$nb_clusters, 
+    #        " clusters with a partition quality score of ", partition_obj$quality))
+    # }
+    # else if (leiden_method == "per_chr_dist") {
+    #     combined_snn_idx = NULL
+    #     combined_snn_dist = NULL
+    #     for (c in unique(chrs)) {
+    #         c_data = tumor_expr_data[which(chrs == c), , drop=FALSE]
+    #         c_snn = nn2(t(c_data), k=k_nn)
+    #         combined_snn_idx = cbind(combined_snn_idx, c_snn$nn.idx[, 2:ncol(c_snn$nn.idx)])
+    #         combined_snn_dist = cbind(combined_snn_dist, c_snn$nn.dists[, 2:ncol(c_snn$nn.dist)])
+    #     }
+        
+    #     #combined_snn_dist = ceiling(max(combined_snn_dist)) - combined_snn_dist
+    #     combined_snn_dist = 2 - combined_snn_dist
+    #     combined_snn_dist[which(combined_snn_dist < 0)] = 0
+
+
+    #     snn_table = apply(combined_snn_idx, 1, table, simplify=FALSE)
+    #     snn_order = apply(combined_snn_dist, 1, order, simplify=FALSE)
+    #     snn_table_lengths = lapply(snn_table, length)
+    #     snn_neighbors = as.integer(names(unlist(snn_table)))
+
+    #     snn_weights = vector(mode="double", length=length(snn_neighbors))
+
+    #     # apply(combined_snn_idx, order, simplify=FALSE)
+
+    #     k = 1
+    #     for (cell in seq_len(nrow(combined_snn_dist))) {
+    #         j = 1
+    #         for (i in seq_len(length(snn_table[[cell]]))) {
+    #             #which(snn_order == names(snn_table)[i])
+    #             snn_weights[k] = sum(combined_snn_dist[cell , snn_order[[cell]][j:(j + snn_table[[cell]][i] - 1 )]])
+    #             k = k + 1
+    #             j = j + snn_table[[cell]][i]
+    #         }
+    #     }
+
+    #     sparse_adjacency_matrix <- sparseMatrix(
+    #         i = rep(seq_len(ncol(tumor_expr_data)), times=snn_table_lengths),
+    #         j = snn_neighbors,
+    #         x = snn_weights,
+    #         dims = c(ncol(tumor_expr_data), ncol(tumor_expr_data)),
+    #         dimnames = list(colnames(tumor_expr_data), colnames(tumor_expr_data))
+    #     )
+
+    #     graph_obj = graph_from_adjacency_matrix(sparse_adjacency_matrix, mode="min", weighted=TRUE)
+    #     partition_obj = cluster_leiden(graph_obj, resolution_parameter=NULL)#leiden_resolution)
+    #     partition = partition_obj$membership
+
+    #     flog.info(paste0("Group ", tumor_group, " was subdivided into ", partition_obj$nb_clusters, 
+    #        " clusters with a partition quality score of ", partition_obj$quality))
+    # }
+    # else if (leiden_method == "per_select_chr") {
+    #     combined_snn = NULL
+    #     for (c in select_chr) {
+    #         c_data = tumor_expr_data[which(chrs == c), , drop=FALSE]
+    #         c_snn = nn2(t(c_data), k=k_nn)$nn.idx
+    #         combined_snn = cbind(combined_snn, c_snn)#[, 2:ncol(c_snn)])
+    #     }
+
+    #     snn_table = apply(combined_snn, 1, table, simplify=FALSE)
+    #     snn_table_lengths = lapply(snn_table, length)
+    #     snn_weights = unlist(snn_table)
+    #     snn_neighbors = as.integer(names(snn_weights))
+        
+    #     # rep(seq_len(ncol(tumor_expr_data)), times=snn_table_lengths)
+
+    #     sparse_adjacency_matrix <- sparseMatrix(
+    #         i = rep(seq_len(ncol(tumor_expr_data)), times=snn_table_lengths),
+    #         j = snn_neighbors,
+    #         x = snn_weights,
+    #         dims = c(ncol(tumor_expr_data), ncol(tumor_expr_data)),
+    #         dimnames = list(colnames(tumor_expr_data), colnames(tumor_expr_data))
+    #     )
+
+    #     graph_obj = graph_from_adjacency_matrix(sparse_adjacency_matrix, mode="min", weighted=TRUE)
+    #     partition_obj = cluster_leiden(graph_obj, resolution_parameter=NULL)#leiden_resolution)
+    #     partition = partition_obj$membership
+
+    #     flog.info(paste0("Group ", tumor_group, " was subdivided into ", partition_obj$nb_clusters, 
+    #        " clusters with a partition quality score of ", partition_obj$quality))
+    # }
+    # else if (leiden_method == "seurat") {
+    #     snn_seurat = Seurat::FindNeighbors(t(tumor_expr_data), k.param=k_nn)
+    #     graph_obj = graph_from_adjacency_matrix(snn_seurat$snn, mode="min", weighted=TRUE)
+    #     # igraph::plot.igraph(graph_obj)
+    #     partition_obj = cluster_leiden(graph_obj, resolution_parameter=leiden_resolution)
+    #     partition = partition_obj$membership
+    # }
+    if (leiden_method == "seurat") {
+        # seurat_obs = CreateSeuratObject(tumor_expr_data, "assay" = "infercnv", project = "infercnv", names.field = 1)
+        # seurat_obs = FindVariableFeatures(seurat_obs) # , selection.method = "vst", nfeatures = 2000
+
+        # all.genes <- rownames(seurat_obs)
+        # seurat_obs <- ScaleData(seurat_obs, features = all.genes)
+
+        # seurat_obs = RunPCA(seurat_obs)
+        # seurat_obs = FindNeighbors(seurat_obs, k.param=k_nn)
+
+        # graph_obj = graph_from_adjacency_matrix(seurat_obs@graphs$infercnv_snn, mode="min", weighted=TRUE)
+        # partition_obj = cluster_leiden(graph_obj, resolution_parameter=leiden_resolution, objective_function=leiden_function)
+        # partition = partition_obj$membership
+        partition = .leiden_seurat_preprocess_routine(expr_data=tumor_expr_data, k_nn=k_nn, resolution_parameter=leiden_resolution, objective_function=leiden_function)
+    }
+    else { # "default"
+        snn <- nn2(t(tumor_expr_data), k=k_nn)$nn.idx
+
+        sparse_adjacency_matrix <- sparseMatrix(
+           i = rep(seq_len(ncol(tumor_expr_data)), each=k_nn), 
+           j = t(snn),
+           x = rep(1, ncol(tumor_expr_data) * k_nn),
+           dims = c(ncol(tumor_expr_data), ncol(tumor_expr_data)),
+           dimnames = list(colnames(tumor_expr_data), colnames(tumor_expr_data))
+        )
+        
+        graph_obj = graph_from_adjacency_matrix(sparse_adjacency_matrix, mode="undirected")
+        partition_obj = cluster_leiden(graph_obj, resolution_parameter=leiden_resolution, objective_function=leiden_function)
+        partition = partition_obj$membership
+
+        #flog.info(paste0("Group ", tumor_group, " was subdivided into ", partition_obj$nb_clusters, 
+        #   " clusters with a partition quality score of ", partition_obj$quality))
+
+        #flog.info("If this score is too low and you observe too much fragmentation, try decreasing the leiden resolution parameter")
+        #flog.info("If this score is too low and you observe clusters that are still too diverse, try increasing the leiden resolution parameter")
+
+        #subcluster_graph = igraph::graph_from_adj_list(snn, mode="all")
+        #tst2 =igraph::cluster_leiden(subcluster_graph)
+
+        #partition = leiden(sparse_adjacency_matrix, resolution_parameter=leiden_resolution)    
+    }
 
     # adjacency_matrix <- matrix(0L, ncol(tumor_expr_data), ncol(tumor_expr_data))
     # rownames(adjacency_matrix) <- colnames(adjacency_matrix) <- colnames(tumor_expr_data)
@@ -449,7 +673,7 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
     # find a way to sort partition by size to make sure not to start with a single cell partition
     for (i in unique(partition[grouping(partition)])) {  # grouping() is there to make sure we do not start looking at a one cell cluster since it cannot be added to a phylo object
         res$subclusters[[ paste(tumor_group, i, sep="_s") ]] = tumor_group_idx[which(partition == i)]
-        # names(res$subclusters[[ paste(tumor_group, i, sep="_s") ]]) = tumor_group_idx[which(partition == i)]
+        names(res$subclusters[[ paste(tumor_group, i, sep="_s") ]]) = tumor_group_idx[which(partition == i)]
 
         if (length(which(partition == i)) >= 2) {
             tmp_phylo = as.phylo(hclust(parallelDist(t(tumor_expr_data[, which(partition == i), drop=FALSE]), threads=infercnv.env$GLOBAL_NUM_THREADS), method=hclust_method))
@@ -488,6 +712,60 @@ define_signif_tumor_subclusters <- function(infercnv_obj, p_val=0.1, k_nn=30, le
     return(res)
 }
 
+
+.whole_dataset_leiden_subclustering_per_chr <- function(expr_data, chrs, k_nn, leiden_resolution, leiden_function) {
+    # z score filtering over all the data based on refs, done in calling method
+
+    # subclusters_per_chr = vector(mode="list", length=length(unique(chrs)))
+    subclusters_per_chr = list()
+    
+    # per_chr_partition = vector(mode="list", length=length(unique(chrs)))
+
+    for (c in unique(chrs)) {
+
+        c_data = expr_data[which(chrs == c), , drop=FALSE]
+
+        partition = .leiden_seurat_preprocess_routine(expr_data=c_data, k_nn=k_nn, resolution_parameter=leiden_resolution, objective_function=leiden_function)
+
+        # seurat_obs = CreateSeuratObject(c_data, "assay" = "infercnv", project = "infercnv", names.field = 1)
+        # seurat_obs = FindVariableFeatures(seurat_obs) # , selection.method = "vst", nfeatures = 2000
+
+        # all.genes <- rownames(seurat_obs)
+        # seurat_obs <- ScaleData(seurat_obs, features = all.genes)
+
+        # seurat_obs = RunPCA(seurat_obs)
+        # seurat_obs = FindNeighbors(seurat_obs, k.param=k_nn)
+
+        # graph_obj = graph_from_adjacency_matrix(seurat_obs@graphs$infercnv_snn, mode="min", weighted=TRUE)
+        # partition_obj = cluster_leiden(graph_obj, resolution_parameter=(leiden_resolution/10))
+        # partition = partition_obj$membership
+
+        subclusters_per_chr[[c]] = list()
+        # no HClust on these subclusters as they may mix both ref and obs cells
+        for (i in unique(partition[grouping(partition)])) {  # grouping() is there to make sure we do not start looking at a one cell cluster since it cannot be added to a phylo object
+            subclusters_per_chr[[c]][[ paste("all_cells", i, sep="_s") ]] = which(partition == i)
+        }
+    }
+
+    return(subclusters_per_chr)
+}
+
+.leiden_seurat_preprocess_routine <- function(expr_data, k_nn, resolution_parameter, objective_function) {
+    seurat_obs = CreateSeuratObject(expr_data, "assay" = "infercnv", project = "infercnv", names.field = 1)
+    seurat_obs = FindVariableFeatures(seurat_obs) # , selection.method = "vst", nfeatures = 2000
+
+    all.genes <- rownames(seurat_obs)
+    seurat_obs <- ScaleData(seurat_obs, features = all.genes)
+
+    seurat_obs = RunPCA(seurat_obs)
+    seurat_obs = FindNeighbors(seurat_obs, k.param=k_nn)
+
+    graph_obj = graph_from_adjacency_matrix(seurat_obs@graphs$infercnv_snn, mode="min", weighted=TRUE)
+    partition_obj = cluster_leiden(graph_obj, resolution_parameter=resolution_parameter, objective_function=objective_function)
+    partition = partition_obj$membership
+
+    return(partition)
+}
 
 add_single_branch_to_phylo = function(in_tree, label) {
     in_root_height = get.rooted.tree.height(in_tree)

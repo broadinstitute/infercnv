@@ -14,16 +14,17 @@ RUN apt-get update && apt-get -y install curl libssl-dev libcurl4-openssl-dev \
 # Install R and Bioconductor packages
 RUN echo "options(repos = c(CRAN = 'https://cran.rstudio.com'))" >.Rprofile
 RUN R -e "BiocManager::install('infercnv')"
-RUN R -e "install.packages(c('cluster', 'Seurat', 'parallelDist', 'optparse'), repos = 'http://cran.us.r-project.org')"
-RUN R -e "install.packages('phyclust', repos = 'http://cran.us.r-project.org')"
+#RUN R -e "install.packages(c('cluster', 'Seurat', 'parallelDist', 'optparse'), repos = 'http://cran.us.r-project.org')"
+RUN R -e "install.packages(c('cluster', 'Seurat', 'optparse', 'igraph', 'reshape2'), repos = 'http://cran.us.r-project.org')"
+#RUN R -e "install.packages('phyclust', repos = 'http://cran.us.r-project.org')"
 
-RUN pip3 install numpy igraph pandas leidenalg
-ENV RETICULATE_PYTHON=/usr/bin/python3
+# RUN pip3 install numpy igraph pandas leidenalg
+# ENV RETICULATE_PYTHON=/usr/bin/python3
 
 # Checkout and install infercnv
 # update to version bump commit
 RUN git clone https://github.com/broadinstitute/infercnv && cd infercnv && \
-      git checkout master && git checkout f8616bcb848c75fb1bd9d206f4cfd2795e1d4925 && \
+      git checkout master && git checkout 1b46b48303bac4a882bcb758e78fcf7f832fdefb && \
       R CMD INSTALL . 
 
 ENV PATH=${PATH}:/infercnv/scripts

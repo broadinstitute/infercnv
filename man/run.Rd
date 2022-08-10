@@ -33,8 +33,12 @@ run(
   tumor_subcluster_partition_method = c("leiden", "random_trees", "qnorm", "pheight",
     "qgamma", "shc"),
   tumor_subcluster_pval = 0.1,
-  k_nn = 30,
-  leiden_resolution = 1,
+  k_nn = 20,
+  leiden_resolution = 0.05,
+  leiden_method = c("default", "seurat"),
+  leiden_function = c("CPM", "modularity"),
+  per_chr_hmm_subclusters = TRUE,
+  z_score_filter = 0.8,
   denoise = FALSE,
   noise_filter = NA,
   sd_amplifier = 1.5,
@@ -62,6 +66,7 @@ run(
   hspike_aggregate_normals = FALSE,
   no_plot = FALSE,
   no_prelim_plot = FALSE,
+  write_expr_matrix = FALSE,
   output_format = "png",
   plot_chr_scale = FALSE,
   chr_lengths = NULL,
@@ -162,10 +167,19 @@ qnorm: defines tree height based on the quantile defined by the tumor_subcluster
 
 \item{tumor_subcluster_pval}{max p-value for defining a significant tumor subcluster (default: 0.1)}
 
-\item{k_nn}{number k of nearest neighbors to search for when using the Leiden partition method for subclustering (default: 30)}
+\item{k_nn}{number k of nearest neighbors to search for when using the Leiden partition method for subclustering (default: 20)}
 
-\item{leiden_resolution}{resolution parameter for the Leiden algorithm
+\item{leiden_resolution}{resolution parameter for the Leiden algorithm using the CPM quality score (default: 0.05)}
 
+\item{leiden_method}{Method used to generate the graph on which the Leiden algorithm is applied (default: "seurat")}
+
+\item{leiden_function}{Whether to use the Constant Potts Model (CPM) or modularity in igraph. Must be either "CPM" or "modularity". (default: "CPM")}
+
+\item{per_chr_hmm_subclusters}{Run subclustering per chromosome over all cells combined to run the HMM on those subclusters instead. Only applicable when using Leiden subclustering.
+This should provide enough definition in the predictions while avoiding subclusters that are too small thus providing less evidence to work with. (default: TRUE)}
+
+\item{z_score_filter}{Z-score used as a treshold to filter genes used for subclustering. 
+                      Applied based on reference genes to automatically ignore genes with high expression variability such as MHC genes. (default: 0.8)
 
 
 #############################
@@ -244,6 +258,8 @@ other experimental opts}
 \item{no_plot}{don't make any of the images. Instead, generate all non-image outputs as part of the run. (default: FALSE)}
 
 \item{no_prelim_plot}{don't make the preliminary infercnv image (default: FALSE)}
+
+\item{write_expr_matrix}{Whether to write text files with the content of matrices when generating plots (default: FALSE)}
 
 \item{output_format}{Output format for the figure. Choose between "png", "pdf" and NA. NA means to only write the text outputs without generating the figure itself. (default: "png")}
 

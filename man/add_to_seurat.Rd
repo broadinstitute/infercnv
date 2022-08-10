@@ -8,7 +8,8 @@ add_to_seurat(
   seurat_obj = NULL,
   infercnv_output_path,
   top_n = 10,
-  bp_tolerance = 2e+06
+  bp_tolerance = 2e+06,
+  column_prefix = NULL
 )
 }
 \arguments{
@@ -19,6 +20,8 @@ add_to_seurat(
 \item{top_n}{How many of the largest CNA (in number of genes) to get.}
 
 \item{bp_tolerance}{How many bp of tolerance to have around feature start/end positions for top_n largest CNVs.}
+
+\item{column_prefix}{String to add as a prefix to the Seurat metadata columns. Only applied to the seurat_obj, if supplied. Default is NULL}
 }
 \value{
 seurat_obj

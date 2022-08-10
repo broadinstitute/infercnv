@@ -10,6 +10,8 @@
 #' @param top_n How many of the largest CNA (in number of genes) to get.
 #'
 #' @param bp_tolerance How many bp of tolerance to have around feature start/end positions for top_n largest CNVs.
+#' 
+#' @param column_prefix String to add as a prefix to the Seurat metadata columns. Only applied to the seurat_obj, if supplied. Default is NULL
 #'
 #' @return seurat_obj
 #'
@@ -19,7 +21,8 @@
 add_to_seurat <- function(seurat_obj = NULL,
                           infercnv_output_path,
                           top_n = 10,
-                          bp_tolerance = 2000000) {
+                          bp_tolerance = 2000000,
+                          column_prefix = NULL) {
     lfiles <- list.files(infercnv_output_path, full.names = FALSE)
     
     if (!file.exists(paste(infercnv_output_path, "run.final.infercnv_obj", sep=.Platform$file.sep))) {
@@ -61,9 +64,11 @@ add_to_seurat <- function(seurat_obj = NULL,
         ###### states used to be 0/0.5/1/1.5/2, they are now 1/2/3/4/5/6
         # scaling_factor = 1
         if (any(grep(lfiles, pattern=paste0("HMM_CNV_predictions.HMMi6.*", analysis_mode_pattern, ".Pnorm_0.[0-9]+")))) {
+            mode = "i6"
             center_state = 3
         }
         else if (any(grep(lfiles, pattern=paste0("HMM_CNV_predictions.HMMi3.*", analysis_mode_pattern, ".Pnorm_0.[0-9]+")))) {
+            mode = "i3"
             center_state = 2
         }
         else {
@@ -79,9 +84,11 @@ add_to_seurat <- function(seurat_obj = NULL,
         ###### states are 1/2/3/4/5/6
         # scaling_factor = 2
         if (any(grep(lfiles, pattern = paste0("17_HMM_predHMMi6.*", analysis_mode_pattern)))) {
+            mode = "i6"
             center_state = 3
         }
         else if (any(grep(lfiles, pattern = paste0("17_HMM_predHMMi3.*", analysis_mode_pattern)))) {
+            mode = "i3"
             center_state = 2
         }
         else {
@@ -104,29 +111,48 @@ add_to_seurat <- function(seurat_obj = NULL,
                                      hmm_genes = hmm_genes, 
                                      center_state = center_state, 
                                      scaling_factor = scaling_factor,
+                                     mode = mode,
                                      by_cells = by_cells,
                                      top_n = top_n,
                                      bp_tolerance = bp_tolerance)
     if (!is.null(seurat_obj)) {
-        for (lv in levels(infercnv_obj@gene_order$chr)) {
-            seurat_obj@meta.data[[paste0("has_cnv_", lv)]] = features_to_add$feature_vector_chrs_has_cnv[[lv]][cell_ordering_match]
-            seurat_obj@meta.data[[paste0("has_loss_", lv)]] = features_to_add$feature_vector_chrs_has_loss[[lv]][cell_ordering_match]
-            seurat_obj@meta.data[[paste0("has_dupli_", lv)]] = features_to_add$feature_vector_chrs_has_dupli[[lv]][cell_ordering_match]
-            seurat_obj@meta.data[[paste0("proportion_cnv_", lv)]] = features_to_add$feature_vector_chrs_gene_cnv_proportion[[lv]][cell_ordering_match]
-            seurat_obj@meta.data[[paste0("proportion_loss_", lv)]] = features_to_add$feature_vector_chrs_gene_loss_proportion[[lv]][cell_ordering_match]
-            seurat_obj@meta.data[[paste0("proportion_dupli_", lv)]] = features_to_add$feature_vector_chrs_gene_dupli_proportion[[lv]][cell_ordering_match]
-            seurat_obj@meta.data[[paste0("proportion_scaled_cnv_", lv)]] = features_to_add$feature_vector_chrs_gene_cnv_proportion_scaled[[lv]][cell_ordering_match]
-            seurat_obj@meta.data[[paste0("proportion_scaled_loss_", lv)]] = features_to_add$feature_vector_chrs_gene_loss_proportion_scaled[[lv]][cell_ordering_match][cell_ordering_match]
-            seurat_obj@meta.data[[paste0("proportion_scaled_dupli_", lv)]] = features_to_add$feature_vector_chrs_gene_dupli_proportion_scaled[[lv]][cell_ordering_match]
-        }
+      
+      if (! is.null(column_prefix)) {
+        prefix <- paste(column_prefix, "_", sep = "")
         
+      } else {
+        prefix <- ""
+      }
+      
+      
+        for (lv in levels(infercnv_obj@gene_order$chr)) {
+            seurat_obj@meta.data[[paste0(prefix, "has_cnv_", lv)]] = features_to_add$feature_vector_chrs_has_cnv[[lv]][cell_ordering_match]
+            seurat_obj@meta.data[[paste0(prefix, "has_loss_", lv)]] = features_to_add$feature_vector_chrs_has_loss[[lv]][cell_ordering_match]
+            seurat_obj@meta.data[[paste0(prefix, "has_dupli_", lv)]] = features_to_add$feature_vector_chrs_has_dupli[[lv]][cell_ordering_match]
+            seurat_obj@meta.data[[paste0(prefix, "proportion_cnv_", lv)]] = features_to_add$feature_vector_chrs_gene_cnv_proportion[[lv]][cell_ordering_match]
+            seurat_obj@meta.data[[paste0(prefix, "proportion_loss_", lv)]] = features_to_add$feature_vector_chrs_gene_loss_proportion[[lv]][cell_ordering_match]
+            seurat_obj@meta.data[[paste0(prefix, "proportion_dupli_", lv)]] = features_to_add$feature_vector_chrs_gene_dupli_proportion[[lv]][cell_ordering_match]
+            if (mode == "i6") {
+                seurat_obj@meta.data[[paste0(prefix, "proportion_scaled_cnv_", lv)]] = features_to_add$feature_vector_chrs_gene_cnv_proportion_scaled[[lv]][cell_ordering_match]
+                seurat_obj@meta.data[[paste0(prefix, "proportion_scaled_loss_", lv)]] = features_to_add$feature_vector_chrs_gene_loss_proportion_scaled[[lv]][cell_ordering_match][cell_ordering_match]
+                seurat_obj@meta.data[[paste0(prefix, "proportion_scaled_dupli_", lv)]] = features_to_add$feature_vector_chrs_gene_dupli_proportion_scaled[[lv]][cell_ordering_match]
+            }
+        }
+      
         for (n in names(features_to_add)[grep(names(features_to_add), pattern = "top_")] ) {
-            seurat_obj@meta.data[[n]] = features_to_add[[n]][cell_ordering_match]
+          
+            seurat_obj@meta.data[[paste0(prefix, n)]] = features_to_add[[n]][cell_ordering_match]
         }
     }
-    
-    out_mat = matrix(NA, ncol=((9 * length(levels(infercnv_obj@gene_order$chr))) + length(features_to_add) - 9), nrow=ncol(infercnv_obj@expr.data))
-    out_mat_feature_names = vector("character", ((9 * length(levels(infercnv_obj@gene_order$chr))) + length(features_to_add) - 9))
+
+    if (mode == "i6") {
+        out_mat = matrix(NA, ncol=((9 * length(levels(infercnv_obj@gene_order$chr))) + length(features_to_add) - 9), nrow=ncol(infercnv_obj@expr.data))
+        out_mat_feature_names = vector("character", ((9 * length(levels(infercnv_obj@gene_order$chr))) + length(features_to_add) - 9))
+    }
+    else {
+        out_mat = matrix(NA, ncol=((6 * length(levels(infercnv_obj@gene_order$chr))) + length(features_to_add) - 6), nrow=ncol(infercnv_obj@expr.data))
+        out_mat_feature_names = vector("character", ((6 * length(levels(infercnv_obj@gene_order$chr))) + length(features_to_add) - 6))
+    }
     
     i = 1
     for (lv in levels(infercnv_obj@gene_order$chr)) {
@@ -137,13 +163,18 @@ add_to_seurat <- function(seurat_obj = NULL,
         out_mat[, i+3] = features_to_add$feature_vector_chrs_gene_cnv_proportion[[lv]]
         out_mat[, i+4] = features_to_add$feature_vector_chrs_gene_loss_proportion[[lv]]
         out_mat[, i+5] = features_to_add$feature_vector_chrs_gene_dupli_proportion[[lv]]
-        out_mat[, i+6] = features_to_add$feature_vector_chrs_gene_cnv_proportion_scaled[[lv]]
-        out_mat[, i+7] = features_to_add$feature_vector_chrs_gene_loss_proportion_scaled[[lv]]
-        out_mat[, i+8] = features_to_add$feature_vector_chrs_gene_dupli_proportion_scaled[[lv]]
+        if (mode == "i6") {
+            out_mat[, i+6] = features_to_add$feature_vector_chrs_gene_cnv_proportion_scaled[[lv]]
+            out_mat[, i+7] = features_to_add$feature_vector_chrs_gene_loss_proportion_scaled[[lv]]
+            out_mat[, i+8] = features_to_add$feature_vector_chrs_gene_dupli_proportion_scaled[[lv]]
         
-        out_mat_feature_names[i:(i+8)] = c(paste0("has_cnv_", lv), paste0("has_loss_", lv), paste0("has_dupli_", lv), paste0("proportion_cnv_", lv), paste0("proportion_loss_", lv), paste0("proportion_dupli_", lv), paste0("proportion_scaled_cnv_", lv), paste0("proportion_scaled_loss_", lv), paste0("proportion_scaled_dupli_", lv))
-        
-        i = i + 9
+            out_mat_feature_names[i:(i+8)] = c(paste0("has_cnv_", lv), paste0("has_loss_", lv), paste0("has_dupli_", lv), paste0("proportion_cnv_", lv), paste0("proportion_loss_", lv), paste0("proportion_dupli_", lv), paste0("proportion_scaled_cnv_", lv), paste0("proportion_scaled_loss_", lv), paste0("proportion_scaled_dupli_", lv))
+            i = i + 9
+        }
+        else {
+            out_mat_feature_names[i:(i+5)] = c(paste0("has_cnv_", lv), paste0("has_loss_", lv), paste0("has_dupli_", lv), paste0("proportion_cnv_", lv), paste0("proportion_loss_", lv), paste0("proportion_dupli_", lv))
+            i = i + 6
+        }
     }
     
     for (n in names(features_to_add)[grep(names(features_to_add), pattern = "top_")] ) {
@@ -177,6 +208,8 @@ add_to_seurat <- function(seurat_obj = NULL,
 #'
 #' @param scaling_factor Factor to multiply divergence from center_state to get CNA amplitude.
 #'
+#' @param mode "i3" or "i6", if i3 there is no scaled proportion field as the precise number of lost or gained copies is unknown. 
+#'
 #' @param by_cells Whether the HMM predictions are given by cells or not.
 #'
 #' @param top_n How many of the largest CNA (in number of genes) to get.
@@ -186,7 +219,7 @@ add_to_seurat <- function(seurat_obj = NULL,
 #' @keywords internal
 #' @noRd
 #'
-.get_features <- function(infercnv_obj, infercnv_output_path, regions, hmm_genes, center_state, scaling_factor, by_cells, top_n, bp_tolerance) {
+.get_features <- function(infercnv_obj, infercnv_output_path, regions, hmm_genes, center_state, scaling_factor, by_cells, mode, top_n, bp_tolerance) {
     
     chr_gene_count = table(infercnv_obj@gene_order$chr)
     
@@ -204,9 +237,11 @@ add_to_seurat <- function(seurat_obj = NULL,
     all_features$feature_vector_chrs_gene_cnv_proportion = c()
     all_features$feature_vector_chrs_gene_dupli_proportion = c()
     all_features$feature_vector_chrs_gene_loss_proportion = c()
-    all_features$feature_vector_chrs_gene_cnv_proportion_scaled = c()
-    all_features$feature_vector_chrs_gene_dupli_proportion_scaled = c()
-    all_features$feature_vector_chrs_gene_loss_proportion_scaled = c()
+    if (mode == "i6") {
+        all_features$feature_vector_chrs_gene_cnv_proportion_scaled = c()
+        all_features$feature_vector_chrs_gene_dupli_proportion_scaled = c()
+        all_features$feature_vector_chrs_gene_loss_proportion_scaled = c()
+    }
     for (lv in levels(infercnv_obj@gene_order$chr)) {
         all_features$feature_vector_chrs_has_cnv[[lv]] = logical_feature_vector
         all_features$feature_vector_chrs_has_dupli[[lv]] = logical_feature_vector
@@ -214,9 +249,11 @@ add_to_seurat <- function(seurat_obj = NULL,
         all_features$feature_vector_chrs_gene_cnv_proportion[[lv]] = double_feature_vector
         all_features$feature_vector_chrs_gene_dupli_proportion[[lv]] = double_feature_vector
         all_features$feature_vector_chrs_gene_loss_proportion[[lv]] = double_feature_vector
-        all_features$feature_vector_chrs_gene_cnv_proportion_scaled[[lv]] = double_feature_vector
-        all_features$feature_vector_chrs_gene_dupli_proportion_scaled[[lv]] = double_feature_vector
-        all_features$feature_vector_chrs_gene_loss_proportion_scaled[[lv]] = double_feature_vector
+        if (mode == "i6") {
+            all_features$feature_vector_chrs_gene_cnv_proportion_scaled[[lv]] = double_feature_vector
+            all_features$feature_vector_chrs_gene_dupli_proportion_scaled[[lv]] = double_feature_vector
+            all_features$feature_vector_chrs_gene_loss_proportion_scaled[[lv]] = double_feature_vector
+        }
     }
     
     # map for top_n mapping
@@ -233,21 +270,27 @@ add_to_seurat <- function(seurat_obj = NULL,
                     for (c in unique(res$chr)) {
                         all_features$feature_vector_chrs_has_cnv[[c]][names(infercnv_obj@tumor_subclusters$subclusters[[clust]][[subclust]])] = TRUE
                         all_features$feature_vector_chrs_gene_cnv_proportion[[c]][names(infercnv_obj@tumor_subclusters$subclusters[[clust]][[subclust]])] = (length(which(gres$chr == c)) / chr_gene_count[[c]])
-                        all_features$feature_vector_chrs_gene_cnv_proportion_scaled[[c]][names(infercnv_obj@tumor_subclusters$subclusters[[clust]][[subclust]])] = (sum(abs(gres[(which(gres$chr == c)), "state"] - center_state)) / (chr_gene_count[[c]] * scaling_factor))
+                        if (mode == "i6") {
+                               all_features$feature_vector_chrs_gene_cnv_proportion_scaled[[c]][names(infercnv_obj@tumor_subclusters$subclusters[[clust]][[subclust]])] = (sum(abs(gres[(which(gres$chr == c)), "state"] - center_state)) / (chr_gene_count[[c]] * scaling_factor))
+                        }
                     }
                     
                     sub_gres = gres[gres$state < center_state, ]
                     for (c in unique(sub_gres$chr)) {
                         all_features$feature_vector_chrs_has_loss[[c]][names(infercnv_obj@tumor_subclusters$subclusters[[clust]][[subclust]])] = TRUE
                         all_features$feature_vector_chrs_gene_loss_proportion[[c]][names(infercnv_obj@tumor_subclusters$subclusters[[clust]][[subclust]])] = (length(which(sub_gres$chr == c)) / chr_gene_count[[c]])
-                        all_features$feature_vector_chrs_gene_loss_proportion_scaled[[c]][names(infercnv_obj@tumor_subclusters$subclusters[[clust]][[subclust]])] = (abs(sum(sub_gres[(which(sub_gres$chr == c)), "state"] - center_state)) / (chr_gene_count[[c]] * scaling_factor))
+                        if (mode == "i6") {
+                            all_features$feature_vector_chrs_gene_loss_proportion_scaled[[c]][names(infercnv_obj@tumor_subclusters$subclusters[[clust]][[subclust]])] = (abs(sum(sub_gres[(which(sub_gres$chr == c)), "state"] - center_state)) / (chr_gene_count[[c]] * scaling_factor))
+                        }
                     }
                     
                     sub_gres = gres[gres$state > center_state, ]
                     for (c in unique(sub_gres$chr)) {
                         all_features$feature_vector_chrs_has_dupli[[c]][names(infercnv_obj@tumor_subclusters$subclusters[[clust]][[subclust]])] = TRUE
                         all_features$feature_vector_chrs_gene_dupli_proportion[[c]][names(infercnv_obj@tumor_subclusters$subclusters[[clust]][[subclust]])] = (length(which(sub_gres$chr == c)) / chr_gene_count[[c]])
-                        all_features$feature_vector_chrs_gene_dupli_proportion_scaled[[c]][names(infercnv_obj@tumor_subclusters$subclusters[[clust]][[subclust]])] = (sum(sub_gres[(which(sub_gres$chr == c)), "state"] - center_state) / (chr_gene_count[[c]] * scaling_factor))
+                        if (mode == "i6") {
+                            all_features$feature_vector_chrs_gene_dupli_proportion_scaled[[c]][names(infercnv_obj@tumor_subclusters$subclusters[[clust]][[subclust]])] = (sum(sub_gres[(which(sub_gres$chr == c)), "state"] - center_state) / (chr_gene_count[[c]] * scaling_factor))
+                        }
                     }
                 }
             }
@@ -261,21 +304,27 @@ add_to_seurat <- function(seurat_obj = NULL,
                 for (c in unique(res$chr)) {
                     all_features$feature_vector_chrs_has_cnv[[c]][cell_name] = TRUE
                     all_features$feature_vector_chrs_gene_cnv_proportion[[c]][cell_name] = (length(which(gres$chr == c)) / chr_gene_count[[c]])
-                    all_features$feature_vector_chrs_gene_cnv_proportion_scaled[[c]][cell_name] = (sum(abs(gres[(which(gres$chr == c)), "state"] - center_state)) / (chr_gene_count[[c]] * scaling_factor))
+                    if (mode == "i6") {
+                        all_features$feature_vector_chrs_gene_cnv_proportion_scaled[[c]][cell_name] = (sum(abs(gres[(which(gres$chr == c)), "state"] - center_state)) / (chr_gene_count[[c]] * scaling_factor))
+                    }
                 }
                 
                 sub_gres = gres[gres$state < center_state, ]
                 for (c in unique(sub_gres$chr)) {
                     all_features$feature_vector_chrs_has_loss[[c]][cell_name] = TRUE
                     all_features$feature_vector_chrs_gene_loss_proportion[[c]][cell_name] = (length(which(sub_gres$chr == c)) / chr_gene_count[[c]])
-                    all_features$feature_vector_chrs_gene_loss_proportion_scaled[[c]][cell_name] = (abs(sum(sub_gres[(which(sub_gres$chr == c)), "state"] - center_state)) / (chr_gene_count[[c]] * scaling_factor))
+                    if (mode == "i6") {
+                        all_features$feature_vector_chrs_gene_loss_proportion_scaled[[c]][cell_name] = (abs(sum(sub_gres[(which(sub_gres$chr == c)), "state"] - center_state)) / (chr_gene_count[[c]] * scaling_factor))
+                    }
                 }
                 
                 sub_gres = gres[gres$state > center_state, ]
                 for (c in unique(sub_gres$chr)) {
                     all_features$feature_vector_chrs_has_dupli[[c]][cell_name] = TRUE
                     all_features$feature_vector_chrs_gene_dupli_proportion[[c]][cell_name] = (length(which(sub_gres$chr == c)) / chr_gene_count[[c]])
-                    all_features$feature_vector_chrs_gene_dupli_proportion_scaled[[c]][cell_name] = (sum(sub_gres[(which(sub_gres$chr == c)), "state"] - center_state) / (chr_gene_count[[c]] * scaling_factor))
+                    if (mode == "i6") {
+                        all_features$feature_vector_chrs_gene_dupli_proportion_scaled[[c]][cell_name] = (sum(sub_gres[(which(sub_gres$chr == c)), "state"] - center_state) / (chr_gene_count[[c]] * scaling_factor))
+                    }
                 }
             }
         }
