@@ -107,12 +107,15 @@ define_signif_tumor_subclusters <- function(infercnv_obj,
     infercnv_obj@tumor_subclusters <- res
 
     if (per_chr_hmm_subclusters && partition_method == "leiden") {
-        subclusters_per_chr <- .whole_dataset_leiden_subclustering_per_chr(expr_data = infercnv_obj@expr.data,
+        if (!is.null(outliers)) {
+            tumor_expr_data = infercnv_obj@expr.data[-outliers, , drop=FALSE]
+        }
+        subclusters_per_chr <- .whole_dataset_leiden_subclustering_per_chr(expr_data = tumor_expr_data,
                                                                            chrs = chrs,
                                                                            k_nn = k_nn,
                                                                            leiden_resolution = (leiden_resolution/10),
                                                                            leiden_function = leiden_function
-                                                                           )         
+                                                                           )
     }
     else {
         subclusters_per_chr = NULL
