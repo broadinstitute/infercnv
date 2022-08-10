@@ -258,7 +258,7 @@ setAlleleMatrix <- function(infercnv_allele_obj,
 #' 
 #' @param infercnv_allele_obj infercnv_allele_object
 #' 
-#' @param @param snp_min_coverage the minimum number of threshold that each instance should have in allele/coverage data. 
+#' @param snp_min_coverage the minimum number of threshold that each instance should have in allele/coverage data. 
 #' Each instance that is less than this number will be replaced with 0. default = 0 (No action)
 #' 
 #' @param snp_filter a boolean value whether to do pre-filtering for allele matrix. default = TRUE
@@ -350,7 +350,7 @@ setAlleleMatrix_HB <- function(infercnv_allele_obj,
 
 #' @title map2gene
 #' 
-#' @description This function aims to map snp data back to gene data given the annotation file
+#' @description This function aims to map snp data back to gene data given the annotation file provided
 #' 
 #' @param infercnv_allele_obj infercnv_allele based obj
 #' 
@@ -614,7 +614,7 @@ collapse_snp2gene <- function(infercnv_allele_obj,
 
 #' @title plot_allele
 #' 
-#' @description plot a summary figure containing allele frequency, HMM prediction 
+#' @description plot a summary figure containing allele frequency
 #' 
 #' @keywords internal
 #' 

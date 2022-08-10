@@ -6,10 +6,12 @@
 \alias{MCMC_infercnv_combined}
 \title{MCMC infercnv_combined class}
 \description{
-This class extends the functionality of infercnv/infercnv_allele class
-aiming to cooperate MCMC object leveraging Bayesian model
-
-Slots in the MCMC_infercnv_combined object include:
+Uses Markov Chain Monte Carlo (MCMC) and Gibbs sampling to estimate the posterior
+probability of being in one of three/six Copy Number Variation states 
+(i6 states: 1-2,Deletion; 3,Neutral; 4-6,Amplification; 7,cnLOH,if enable_cnLOH),
+(i3 states: 1,Deletion; 2,Neutral; 3,Amplification; 4,cnLOH,if enable_cnLOH),
+for CNV's identified by inferCNV's HMM. Posterior probabilities are found for the entire CNV cluster 
+and each individual cell line in the CNV.
 }
 \section{Slots}{
 
@@ -31,7 +33,5 @@ Slots in the MCMC_infercnv_combined object include:
 \item{\code{infercnv_obj_sig}}{fitted values for cell lines, 1/standard deviation to be used for determining the distribution of each cell line.}
 
 \item{\code{infercnv_allele_obj}}{InferCNV_allele obj.}
-
-\item{\code{States}}{NOT defined yet.}
 }}
 

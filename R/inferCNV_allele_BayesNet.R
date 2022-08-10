@@ -1,21 +1,18 @@
 #' MCMC infercnv_allele class
 #' 
-#' @description This class extends the functionality of infercnv_allele class
-#' aiming to cooperate MCMC object leveraging Bayesian model
-#' 
-#' Slots in the MCMC_infercnv_allele object (besides infercnv_allele) include:
+#' @description Uses Markov Chain Monte Carlo (MCMC) and Gibbs sampling to estimate the posterior
+#' probability of being in one of two Copy Number Variation states 
+#' (i2 states: 1,Deletion; 2,Neutral) for CNV's identified by inferCNV_allele's HMM.
 #' 
 #' @slot bugs_model BUGS model.
 #' 
 #' @slot cell_gene List containing the Cells and Genes that make up each CNV.
 #' 
-#' @slot cnv_probabilities Probabilities of each CNV belonging to a particular state from 0 (least likely)to 1 (most likely).
+#' @slot cnv_probabilities Probabilities of each CNV belonging to a particular state from 0 (least likely) to 1 (most likely).
 #' 
-#' @slot cell_probabilities Probabilities of each cell being in a particular state, from 0 (least likely)to 1 (most likely).
+#' @slot cell_probabilities Probabilities of each cell being in a particular state, from 0 (least likely) to 1 (most likely).
 #' 
 #' @slot cnv_regions ID for each CNV found by the HMM.
-#' 
-#' @slot States NOT defined yet.
 #' 
 #' @export
 #' 
@@ -25,10 +22,10 @@ MCMC_infercnv_allele <- methods::setClass(
             cell_gene = "list",
             cnv_probabilities = "list",
             cell_probabilities = "list",
-            cnv_regions = "factor",
-            States = "ANY"),
+            cnv_regions = "factor"),
   contains = "infercnv_allele")
 
+# file_path the path to cnv_reports
 # file_token file name
 # infercnv_allele_obj based obj
 # two modes: snp and gene
@@ -306,6 +303,9 @@ plot_Diagnostics <- function(mcmc, output_path){
 #' @param output_path (string) Path to where the output file should be saved to.
 #' 
 #' @param cores Option to run parallel by specifying the number of cores to be used. (Default: 5)
+#' 
+#' @return Returns a MCMC_inferCNV_allele_obj and posterior probability of being in one of two Copy Number Variation states
+#' (i2 states: 1,Deletion; 2,Neutral) for CNV's identified by inferCNV_allele's HMM.
 #'
 #' @export
 

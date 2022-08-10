@@ -12,5 +12,5 @@ map2gene(infercnv_allele_obj, gene_order)
 \item{gene_order}{gene annotation file}
 }
 \description{
-This function aims to map snp data back to gene data given the annotation file
+This function aims to map snp data back to gene data given the annotation file provided
 }

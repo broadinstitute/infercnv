@@ -27,6 +27,10 @@ inferCNVAlleleBayesNet(
 
 \item{cores}{Option to run parallel by specifying the number of cores to be used. (Default: 5)}
 }
+\value{
+Returns a MCMC_inferCNV_allele_obj and posterior probability of being in one of two Copy Number Variation states
+(i2 states: 1,Deletion; 2,Neutral) for CNV's identified by inferCNV_allele's HMM.
+}
 \description{
 Uses Markov Chain Monte Carlo (MCMC) and Gibbs sampling to estimate the posterior
 probability of being in one of two Copy Number Variation states 

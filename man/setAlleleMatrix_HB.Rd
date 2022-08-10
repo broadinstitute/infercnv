@@ -15,6 +15,9 @@ setAlleleMatrix_HB(
 \arguments{
 \item{infercnv_allele_obj}{infercnv_allele_object}
 
+\item{snp_min_coverage}{the minimum number of threshold that each instance should have in allele/coverage data. 
+Each instance that is less than this number will be replaced with 0. default = 0 (No action)}
+
 \item{snp_filter}{a boolean value whether to do pre-filtering for allele matrix. default = TRUE}
 
 \item{snp_het.deviance.threshold}{a threshold used to filter 
@@ -22,9 +25,6 @@ out non-hetergozous snps. default = 0.1}
 
 \item{snp_min.cell}{a threshold used to filter out snps that express less than 
 the minimum number of cells. default = 3}
-
-\item{@param}{snp_min_coverage the minimum number of threshold that each instance should have in allele/coverage data. 
-Each instance that is less than this number will be replaced with 0. default = 0 (No action)}
 }
 \description{
 This function mimics the way the HB does aiming to initialize the lesser allele fraction/count.

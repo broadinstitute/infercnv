@@ -29,7 +29,7 @@ run(
   sim_method = "meanvar",
   sim_foreground = FALSE,
   reassignCNVs = TRUE,
-  analysis_mode = c("samples", "subclusters", "cells"),
+  analysis_mode = c("subclusters", "samples", "cells"),
   tumor_subcluster_partition_method = c("leiden", "random_trees", "qnorm", "pheight",
     "qgamma", "shc"),
   tumor_subcluster_pval = 0.1,

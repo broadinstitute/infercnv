@@ -36,9 +36,14 @@ inferCNVCombinedBayesNet(
 
 \item{cores}{Option to run parallel by specifying the number of cores to be used. (Default: 5)}
 }
+\value{
+Returns a MCMC_infercnv_combined obj and posterior probability of being in one of three/six Copy Number Variation states
+(i6 states: 1-2,Deletion; 3,Neutral; 4-6,Amplification; 7,cnLOH,if enable_cnLOH),
+(i3 states: 1,Deletion; 2,Neutral; 3,Amplification; 4,cnLOH,if enable_cnLOH), for CNV's identified by inferCNV's HMM.
+}
 \description{
 Uses Markov Chain Monte Carlo (MCMC) and Gibbs sampling to estimate the posterior
-probability of being in one of two Copy Number Variation states 
+probability of being in one of three/six Copy Number Variation states 
 (i6 states: 1-2,Deletion; 3,Neutral; 4-6,Amplification; 7,cnLOH,if enable_cnLOH),
 (i3 states: 1,Deletion; 2,Neutral; 3,Amplification; 4,cnLOH,if enable_cnLOH),
 for CNV's identified by inferCNV's HMM. Posterior probabilities are found for the entire CNV cluster 

@@ -1,9 +1,11 @@
 #' MCMC infercnv_combined class
 #' 
-#' @description This class extends the functionality of infercnv/infercnv_allele class
-#' aiming to cooperate MCMC object leveraging Bayesian model
-#' 
-#' Slots in the MCMC_infercnv_combined object include:
+#' @description Uses Markov Chain Monte Carlo (MCMC) and Gibbs sampling to estimate the posterior
+#' probability of being in one of three/six Copy Number Variation states 
+#' (i6 states: 1-2,Deletion; 3,Neutral; 4-6,Amplification; 7,cnLOH,if enable_cnLOH),
+#' (i3 states: 1,Deletion; 2,Neutral; 3,Amplification; 4,cnLOH,if enable_cnLOH),
+#' for CNV's identified by inferCNV's HMM. Posterior probabilities are found for the entire CNV cluster 
+#' and each individual cell line in the CNV.
 #' 
 #' @slot bugs_model BUGS model.
 #' 
@@ -23,8 +25,6 @@
 #' 
 #' @slot infercnv_allele_obj InferCNV_allele obj.
 #' 
-#' @slot States NOT defined yet.
-#' 
 #' @export
 #' 
 MCMC_infercnv_combined <- methods::setClass(
@@ -37,8 +37,7 @@ MCMC_infercnv_combined <- methods::setClass(
             infercnv_obj = "infercnv",
             infercnv_obj_mu = "numeric",
             infercnv_obj_sig = "numeric",
-            infercnv_allele_obj = "infercnv_allele",
-            States = "ANY"))
+            infercnv_allele_obj = "infercnv_allele"))
 
 # file_path the path to HMM reports
 # file_token file name
@@ -261,7 +260,7 @@ getGenesCells_combined <- function(obj, pred_cnv_genes_df, cell_groups_df,
 #' Expression and Allele Data To Obtain Posterior Probabilities For HMM Predicted States
 #'
 #' @description Uses Markov Chain Monte Carlo (MCMC) and Gibbs sampling to estimate the posterior
-#' probability of being in one of two Copy Number Variation states 
+#' probability of being in one of three/six Copy Number Variation states 
 #' (i6 states: 1-2,Deletion; 3,Neutral; 4-6,Amplification; 7,cnLOH,if enable_cnLOH),
 #' (i3 states: 1,Deletion; 2,Neutral; 3,Amplification; 4,cnLOH,if enable_cnLOH),
 #' for CNV's identified by inferCNV's HMM. Posterior probabilities are found for the entire CNV cluster 
@@ -284,6 +283,10 @@ getGenesCells_combined <- function(obj, pred_cnv_genes_df, cell_groups_df,
 #' @param output_path (string) Path to where the output file should be saved to.
 #' 
 #' @param cores Option to run parallel by specifying the number of cores to be used. (Default: 5)
+#' 
+#' @return Returns a MCMC_infercnv_combined obj and posterior probability of being in one of three/six Copy Number Variation states
+#' (i6 states: 1-2,Deletion; 3,Neutral; 4-6,Amplification; 7,cnLOH,if enable_cnLOH),
+#' (i3 states: 1,Deletion; 2,Neutral; 3,Amplification; 4,cnLOH,if enable_cnLOH), for CNV's identified by inferCNV's HMM.
 #'
 #' @export
 
