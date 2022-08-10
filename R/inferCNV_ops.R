@@ -1054,8 +1054,8 @@ run <- function(infercnv_obj,
             if (save_rds) {
                 saveRDS(infercnv_obj, reload_info$expected_file_names[[step_count]])
                 if(per_chr_hmm_subclusters) {
-                    tmp = length(reload_info$expected_file_names[[step_count]])
-                    tmp = paste0(reload_info$expected_file_names[[step_count]][1:(tmp-13)], ".per_chr_subclusts", reload_info$expected_file_names[[step_count]][(tmp-13):tmp])
+                    tmp = nchar(reload_info$expected_file_names[[step_count]])
+                    tmp = paste0(substr(reload_info$expected_file_names[[step_count]], 1, tmp-13), ".per_chr_subclusters", substr(reload_info$expected_file_names[[step_count]], tmp-12, tmp))
                     saveRDS(subclusters_per_chr, tmp)
                 }
             }
