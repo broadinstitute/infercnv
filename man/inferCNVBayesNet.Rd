@@ -46,7 +46,7 @@ inferCNVBayesNet(
 
 \item{diagnostics}{Option to plot Diagnostic plots and tables. (Default: FALSE)}
 
-\item{HMM_type}{The type of HMM that was ra, either 'i3' or 'i6'. Determines how many state were predicted by the HMM.}
+\item{HMM_type}{The type of HMM that was ran, either 'i3' or 'i6'. Determines how many states were predicted by the HMM.}
 
 \item{k_obs_groups}{Number of groups in which to break the observations. (default: 1)}
 

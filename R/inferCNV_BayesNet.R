@@ -1182,7 +1182,7 @@ plot_cnv_prob <- function(df, title, HMM_type){
 #' @param plotingProbs Option for adding plots of Cell and CNV probabilities. (Default: TRUE)
 #' @param quietly Option to print descriptions along each step. (Default: TRUE)
 #' @param diagnostics Option to plot Diagnostic plots and tables. (Default: FALSE)
-#' @param HMM_type The type of HMM that was ra, either 'i3' or 'i6'. Determines how many state were predicted by the HMM.
+#' @param HMM_type The type of HMM that was ran, either 'i3' or 'i6'. Determines how many states were predicted by the HMM.
 #' @param k_obs_groups Number of groups in which to break the observations. (default: 1)
 #' @param cluster_by_groups If observations are defined according to groups (ie. patients), each group
 #'                            of cells will be clustered separately. (default=FALSE, instead will use k_obs_groups setting)
