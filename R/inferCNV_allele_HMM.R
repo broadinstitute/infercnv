@@ -24,7 +24,7 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
   coverage.data <- infercnv_allele_obj@coverage.data
   
   ## initialize hmm states for allele data
-  hmm.allele.data <- matrix(0,
+  hmm.allele.data <- matrix(2,
                             nrow = nrow(lesser.data),
                             ncol = ncol(lesser.data))
   rownames(hmm.allele.data) <- rownames(lesser.data)
@@ -129,7 +129,7 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
         
         if(!is.null(HMM_region)){
           hmm.allele.data[infercnv_allele_obj@SNP_info %over% HMM_region,
-                          tumor_subcluster_cells_idx] <<- -1
+                          tumor_subcluster_cells_idx] <<- 1
         }
       }
     })
@@ -167,7 +167,7 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
   coverage.data <- infercnv_allele_obj@coverage.data
   
   ## initialize hmm allele data
-  hmm.allele.data <- matrix(0,
+  hmm.allele.data <- matrix(2,
                             nrow = nrow(lesser.data),
                             ncol = ncol(lesser.data))
   rownames(hmm.allele.data) <- rownames(lesser.data)
@@ -271,7 +271,7 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
         
         if(!is.null(HMM_region)){
           hmm.allele.data[infercnv_allele_obj@SNP_info %over% HMM_region,
-                          tumor_sample_cells_idx] <<- -1
+                          tumor_sample_cells_idx] <<- 1
         }
       }
     })
