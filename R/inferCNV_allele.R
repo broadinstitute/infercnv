@@ -189,8 +189,12 @@ setAlleleMatrix <- function(infercnv_allele_obj,
     num_snps_all = sum(snp_index)
     flog.info(sprintf("Number of heterozygous snps used for modeling: %s ...", num_snps_all))
     
-    infercnv_allele_obj <- infercnv:::remove_snps(infercnv_allele_obj,which(!snp_index))
-    allele_matrix <- allele_matrix[snp_index,]
+    if(length(which(!snp_index)) != 0){
+      
+      infercnv_allele_obj <- infercnv:::remove_snps(infercnv_allele_obj,which(!snp_index))
+      allele_matrix <- allele_matrix[snp_index,]
+      
+    }
   }
   
   flog.info("Setting composite lesser allele fraction ...")
