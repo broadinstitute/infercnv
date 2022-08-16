@@ -557,3 +557,208 @@ plot_mcmc <- function(samples,
   #        prob_plot)
 }
 
+#' @title filterHighPNormals_allele: Filter the HMM (allele-based HMM or combined-based HMM) identified CNV's 
+#' by the CNV's posterior probability of belonging to a normal state.
+#'
+#' @description The following function will filter the HMM identified CNV's by the CNV's posterior
+#' probability of belonging to a normal state identified by the function inferCNVAlleleBayesNet() or
+#' inferCNVCombinedBayesNet(). Will filter CNV's based on a user desired threshold probability. 
+#' Any CNV with a probability of being normal above the threshold will be removed.
+#'
+#' @param MCMC_inferCNV_obj MCMC infernCNV_allele or MCMC infernCNV_combined object.
+#' 
+#' @param HMM_states InferCNV object with HMM states in allele/both allele and expression data.
+#' 
+#' @param BayesMaxPNormal Option to filter CNV or cell lines by some probability threshold.
+#' 
+#' @param reassignCNVs (boolean) Given the CNV associated probability of belonging to each possible state, 
+#' reassign the state assignments made by the HMM to the state that has the highest probability. (default: TRUE)
+#' 
+#' @param HMM_type The type of HMM that was ran, either 'i2' (allele), 'i3' (combined) or 'i6' (combined). 
+#' Determines how many states were predicted by the HMM.
+#'
+#' @return Returns a list of (MCMC_inferCNV_obj, HMM_states) With removed CNV's.
+#'
+#' @export
+
+filterHighPNormals_allele <- function(MCMC_inferCNV_obj,
+                                      HMM_states,
+                                      BayesMaxPNormal,
+                                      reassignCNVs = T,
+                                      HMM_type = c("i2","i3","i6")){
+  
+  HMM_type <- match.arg(HMM_type)
+  
+  post_removed <- removeCNV_allele(MCMC_inferCNV_obj, 
+                                   HMM_states, 
+                                   BayesMaxPNormal, 
+                                   HMM_type)
+  MCMC_inferCNV_obj <- post_removed[[1]]
+  HMM_states <- post_removed[[2]]
+  
+  if(reassignCNVs){
+    
+    post_reassign <- reassignCNV_allele(MCMC_inferCNV_obj, 
+                                        HMM_states,
+                                        HMM_type)
+    MCMC_inferCNV_obj <- post_reassign[[1]]
+    HMM_states <- post_reassign[[2]]
+    
+  }
+  
+  return(list(MCMC_inferCNV_obj, HMM_states))
+  
+}
+
+removeCNV_allele <- function(obj,
+                             HMM_states,
+                             BayesMaxPNormal,
+                             HMM_type){
+  
+  ## removeCNV(obj, HMM_states)
+  ## If there are CNVs that have probabilities of being normal state greater than the applied threshold, 
+  ##    1. find which CNVs to remove, 
+  ##    2. reassign there state to the normal state in the state matrix 
+  ##    3. remove the CNVs form; list of CNVs (cell_gene), CNV probabilities, cell probabilities 
+  
+  # Assign index and state that represents normal based on the HMM method 
+  normalID <- ifelse(HMM_type == 'i6', 3, 2)
+  
+  cnv_means <- sapply(obj@cnv_probabilities,function(i) colMeans(i))
+  
+  futile.logger::flog.info(paste("Attempting to removing CNV(s) with a probability of being normal above ", BayesMaxPNormal))
+  futile.logger::flog.info(paste("Removing ",length(which(cnv_means[normalID,] > BayesMaxPNormal)), " CNV(s) identified by the HMM."))
+  
+  # If no CNV's need to be removed, stop running function and return the object and HMM_states 
+  if (length(which(cnv_means[normalID,] > BayesMaxPNormal)) == 0){ return(list(obj, HMM_states)) }
+  
+  # check if any CNVs with probability of being normal greater than threshold
+  if (any(cnv_means[normalID,] > BayesMaxPNormal)){
+    
+    # 1.
+    remove_cnv <- which(cnv_means[normalID,] > BayesMaxPNormal)
+    
+    flog.info("CNV's being removed have the following posterior probabilities of being a normal state: ")
+    
+    # 2.
+    if(HMM_type == "i2"){
+      
+      lapply(remove_cnv, function(i) {
+        
+        if(is.null(obj@cell_gene[[i]]$SNPs)){
+          
+          flog.info( paste(obj@cell_gene[[i]]$cnv_regions, ", Genes: ", 
+                           length(obj@cell_gene[[i]]$Genes), " Cells: ", 
+                           length(obj@cell_gene[[i]]$Cells)) )
+          ## Change the states to normal states
+          HMM_states[obj@cell_gene[[i]]$Genes , obj@cell_gene[[i]]$Cells ] <<- normalID
+          
+        } else{
+          
+          flog.info( paste(obj@cell_gene[[i]]$cnv_regions, ", SNPs: ", 
+                           length(obj@cell_gene[[i]]$SNPs), " Cells: ", 
+                           length(obj@cell_gene[[i]]$Cells)) )
+          ## Change the states to normal states
+          HMM_states[obj@cell_gene[[i]]$SNPs , obj@cell_gene[[i]]$Cells ] <<- normalID
+  
+        }
+        
+      })
+      
+    } else{
+      
+      lapply(remove_cnv, function(i) {
+        
+        flog.info( paste(obj@cell_gene[[i]]$cnv_regions, ", Genes: ", 
+                         length(obj@cell_gene[[i]]$infercnv_Genes), " Cells: ", 
+                         length(obj@cell_gene[[i]]$infercnv_Cells)) )
+        
+        ## Change the states to normal states
+        HMM_states[obj@cell_gene[[i]]$infercnv_Genes , obj@cell_gene[[i]]$infercnv_Cells ] <<- normalID
+      })
+      
+    }
+    
+    # 3. 
+    ## Remove the CNV's from the following matrices
+    obj@cell_gene <- obj@cell_gene[-remove_cnv]
+    obj@cell_probabilities <- obj@cell_probabilities[-remove_cnv]
+    obj@cnv_probabilities <- obj@cnv_probabilities[-remove_cnv]
+  
+    futile.logger::flog.info(paste("Total CNV's after removing: ", length(obj@cell_gene)))
+  }
+  
+  return(list(obj, HMM_states))
+  
+}
+
+reassignCNV_allele <- function(obj, 
+                               HMM_states,
+                               HMM_type){
+  
+  ## reassignCNV(obj, HMM_states)
+  ## reassign the state assignments made by the HMM to the state that has the highest probability 
+  ##    1. identify the CNVs that have a higher probability of being in a state different than what was assigned to the CNV by the HMM. 
+  ##    2. if normal state is the highest probability, ignore because this is handled by the BayesMaxPNormal threshold. 
+  ##    3. Reassign the states to the new states in the HMM identified state matrix. 
+  
+  futile.logger::flog.info("Reassigning CNVs based on state probabilities.")
+  # Assign state that represents normal based on the HMM method 
+  normalID <- ifelse(HMM_type == 'i6', 3, 2)
+  
+  # 1.
+  # get probabilities for each cnv
+  cnv_means <- sapply(obj@cnv_probabilities,function(i) colMeans(i))
+  # get HMM state asignments per CNV 
+  hmm_assigned_states <- vapply(obj@cell_gene, function(i){i$State}, FUN.VALUE = numeric(1) )
+  # get the highest probabillity state for each cnv 
+  highest_prob <- apply(cnv_means, 2, function(i) which( i == max(i)))
+  
+  # 2. 
+  # Handle cnvs that have normal state as its highest probability
+  #     Keep original state assignment by HMM 
+  # normIDX <- which(highest_prob == normalID)
+  # highest_prob[normIDX] <- hmm_assigned_states[normIDX]
+  
+  # Change the state assignment in objects gene_cell information 
+  lapply(seq_len(length(obj@cell_gene)), function(i) obj@cell_gene[[i]]$State <<- highest_prob[i])
+  
+  # 3. 
+  if(HMM_type == "i2"){
+    lapply(obj@cell_gene, function(i){
+      if(is.null(i$SNPs)){
+        HMM_states[i$Genes , i$Cells ] <<- i$State
+      } else{
+        HMM_states[i$SNPs , i$Cells ] <<- i$State
+      }
+    })
+  } else{
+    lapply(obj@cell_gene, function(i){
+      HMM_states[i$infercnv_Genes , i$infercnv_Cells ] <<- i$State
+    })
+  }
+  
+  reassignIDX <- which(hmm_assigned_states != highest_prob)
+  
+  ## If any CNVs are reassigned
+  ##    Send a messge of which CNVs are being reassigned from what state -> to what new state 
+  if (length(reassignIDX) > 0){
+    cnvMessage <- sapply(reassignIDX, function(i) {
+      temp <- obj@cell_gene[[i]]
+      
+      if(hmm_assigned_states[i] %in% seq(nrow(cnv_means))){
+        
+        paste(temp$cnv_regions,":", hmm_assigned_states[i], " (P=",cnv_means[hmm_assigned_states[i],i],") -> ", highest_prob[i], "(P=",cnv_means[highest_prob[i],i],")")
+        
+      } else{
+        
+        paste(temp$cnv_regions,":", hmm_assigned_states[i], " -> ", highest_prob[i], "(P=",cnv_means[highest_prob[i],i],")")
+        
+      }
+          })
+    futile.logger::flog.info(paste("Changing the following CNV's states assigned by the HMM to the following based on the CNV's state probabilities.\n", paste(cnvMessage, sep = "",collapse = "\n")))
+  }
+  
+  return(list(obj, HMM_states))
+  
+}
