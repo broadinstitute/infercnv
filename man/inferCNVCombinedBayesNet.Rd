@@ -11,6 +11,7 @@ inferCNVCombinedBayesNet(
   infercnv_obj,
   infercnv_allele_obj,
   allele_mode = c("snp_level", "gene_level"),
+  method = c("common", "union"),
   type = c("i6", "i3"),
   enable_cnLOH = TRUE,
   output_path,
@@ -27,6 +28,10 @@ inferCNVCombinedBayesNet(
 \item{infercnv_allele_obj}{InferCNV allele object.}
 
 \item{allele_mode}{The type of allele data provided. "snp_level" or "gene_level".}
+
+\item{method}{The way integrating HMM boundaries from two methods: union/common.
+"union" keeps those expression-specific gene that are not found in allele data during modeling,
+while "common" removes those ones.}
 
 \item{type}{The type of combined model running in Bayesian Method. i6 or i3.}
 

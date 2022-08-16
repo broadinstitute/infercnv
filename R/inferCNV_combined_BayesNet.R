@@ -276,6 +276,10 @@ getGenesCells_combined <- function(obj, pred_cnv_genes_df, cell_groups_df,
 #' 
 #' @param allele_mode The type of allele data provided. "snp_level" or "gene_level".
 #' 
+#' @param method The way integrating HMM boundaries from two methods: union/common.
+#' "union" keeps those expression-specific gene that are not found in allele data during modeling,
+#' while "common" removes those ones.
+#' 
 #' @param type The type of combined model running in Bayesian Method. i6 or i3.
 #' 
 #' @param enable_cnLOH Option for detecting cnLOH events by adding one more state in Bayesian Method. (Default: True)
@@ -295,12 +299,14 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
                                      infercnv_obj,
                                      infercnv_allele_obj,
                                      allele_mode = c("snp_level","gene_level"),
+                                     method = c("common","union"),
                                      type = c("i6", "i3"),
                                      enable_cnLOH = TRUE,
                                      output_path,
                                      cores = 5){
   
   allele_mode <- match.arg(allele_mode)
+  method <- match.arg(method)
   type <- match.arg(type)
   
   if(!dir.exists(file.path(output_path))){
@@ -332,6 +338,12 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
     sd <- c(1/(cnv_mean_sd$sigma^2),
             1/(cnv_mean_sd$sigma^2),
             1/(cnv_mean_sd$sigma^2))
+  }
+  
+  if(method == "common"){
+    infercnv_obj <- remove_genes(infercnv_obj,
+                                 which(! rownames(infercnv_obj@gene_order) %in% 
+                                         infercnv_allele_obj@SNP_info$gene))
   }
   
   mcmc_combined <- initialize_combined_mcmc(file_path = combined_file_path,
