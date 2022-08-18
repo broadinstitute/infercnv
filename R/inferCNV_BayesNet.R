@@ -1211,7 +1211,7 @@ plot_cnv_prob <- function(df, title, HMM_type){
 #'                                          cutoff=1,
 #'                                          out_dir=out_dir, 
 #'                                          cluster_by_groups=TRUE, 
-#'                                          denoise=TRUE,
+#'                                          denoise=FALSE,
 #'                                          HMM=TRUE,
 #'                                          num_threads=2,
 #'                                          no_plot=TRUE)

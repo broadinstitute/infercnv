@@ -84,7 +84,7 @@ infercnv_object_example <- infercnv::run(infercnv_object_example,
                                          cutoff=1,
                                          out_dir=out_dir, 
                                          cluster_by_groups=TRUE, 
-                                         denoise=TRUE,
+                                         denoise=FALSE,
                                          HMM=TRUE,
                                          num_threads=2,
                                          no_plot=TRUE)
