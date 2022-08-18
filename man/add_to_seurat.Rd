@@ -6,6 +6,7 @@
 \usage{
 add_to_seurat(
   seurat_obj = NULL,
+  assay_name = "RNA",
   infercnv_output_path,
   top_n = 10,
   bp_tolerance = 2e+06,
@@ -14,6 +15,8 @@ add_to_seurat(
 }
 \arguments{
 \item{seurat_obj}{Seurat object to add meta.data to (default: NULL)}
+
+\item{assay_name}{Name of the assay in the Seurat object if provided. (default: "RNA")}
 
 \item{infercnv_output_path}{Path to the output folder of the infercnv run to use}
 

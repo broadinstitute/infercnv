@@ -35,7 +35,7 @@ run(
   tumor_subcluster_pval = 0.1,
   k_nn = 20,
   leiden_resolution = 0.05,
-  leiden_method = c("default", "seurat"),
+  leiden_method = c("PCA", "simple"),
   leiden_function = c("CPM", "modularity"),
   per_chr_hmm_subclusters = TRUE,
   z_score_filter = 0.8,
@@ -171,7 +171,7 @@ qnorm: defines tree height based on the quantile defined by the tumor_subcluster
 
 \item{leiden_resolution}{resolution parameter for the Leiden algorithm using the CPM quality score (default: 0.05)}
 
-\item{leiden_method}{Method used to generate the graph on which the Leiden algorithm is applied (default: "seurat")}
+\item{leiden_method}{Method used to generate the graph on which the Leiden algorithm is applied (default: "PCA")}
 
 \item{leiden_function}{Whether to use the Constant Potts Model (CPM) or modularity in igraph. Must be either "CPM" or "modularity". (default: "CPM")}
 

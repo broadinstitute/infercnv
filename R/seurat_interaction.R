@@ -5,6 +5,8 @@
 #'
 #' @param seurat_obj Seurat object to add meta.data to (default: NULL)
 #'
+#' @param assay_name Name of the assay in the Seurat object if provided. (default: "RNA")
+#'
 #' @param infercnv_output_path Path to the output folder of the infercnv run to use
 #'
 #' @param top_n How many of the largest CNA (in number of genes) to get.
@@ -19,6 +21,7 @@
 #'
 
 add_to_seurat <- function(seurat_obj = NULL,
+                          assay_name="RNA",
                           infercnv_output_path,
                           top_n = 10,
                           bp_tolerance = 2000000,
@@ -35,17 +38,17 @@ add_to_seurat <- function(seurat_obj = NULL,
         flog.info("No Seurat object provided, will only write metadata matrix.")
     }
     else if(!(setequal(row.names(seurat_obj@meta.data), colnames(infercnv_obj@expr.data)) ||
-         setequal(colnames(seurat_obj@assays$RNA), colnames(infercnv_obj@expr.data)))) {
+         setequal(colnames(seurat_obj@assays[[assay_name]]), colnames(infercnv_obj@expr.data)))) {
         flog.warn("::Cell names in Seurat object and infercnv results do not match")
         stop()
     }
 
-    # all(colnames(infercnv_obj@expr.data)[match(colnames(seurat_obj@assays$RNA), colnames(infercnv_obj@expr.data))] == colnames(seurat_obj@assays$RNA))
+    # all(colnames(infercnv_obj@expr.data)[match(colnames(seurat_obj@assays[[assay_name]]), colnames(infercnv_obj@expr.data))] == colnames(seurat_obj@assays[[assay_name]]))
     if (is.null(seurat_obj)) {
         cell_ordering_match = seq_len(ncol(infercnv_obj@expr.data))
     }
     else {
-        cell_ordering_match = match(colnames(seurat_obj@assays$RNA), colnames(infercnv_obj@expr.data))
+        cell_ordering_match = match(colnames(seurat_obj@assays[[assay_name]]), colnames(infercnv_obj@expr.data))
     }
     
     ## add check that data row/col names match seurat obj
@@ -76,8 +79,8 @@ add_to_seurat <- function(seurat_obj = NULL,
             stop()
         }
         # sort to take lowest BayesProb if there are multiple
-        regions = read.table(paste(infercnv_output_path, sort(lfiles[grep(lfiles, pattern=paste0("HMM_CNV_predictions.HMMi[36].*", analysis_mode_pattern, ".Pnorm_0.[0-9]+.pred_cnv_regions.dat"))])[1], sep=.Platform$file.sep), sep="\t", header=TRUE, check.names=FALSE)
-        hmm_genes = read.table(paste(infercnv_output_path, sort(lfiles[grep(lfiles, pattern=paste0("HMM_CNV_predictions.HMMi[36].*", analysis_mode_pattern, ".Pnorm_0.[0-9]+.pred_cnv_genes.dat"))])[1], sep=.Platform$file.sep), sep="\t", header=TRUE, check.names=FALSE)
+        regions = read.table(paste(infercnv_output_path, sort(lfiles[grep(lfiles, pattern=paste0("HMM_CNV_predictions.HMMi[36].*", analysis_mode_pattern, ".Pnorm_0.[0-9]+.pred_cnv_regions.dat"))])[1], sep=.Platform$file.sep), sep="\t", header=TRUE, check.names=FALSE, colClasses = c("character", "character", "integer", "character", "integer", "integer"))
+        hmm_genes = read.table(paste(infercnv_output_path, sort(lfiles[grep(lfiles, pattern=paste0("HMM_CNV_predictions.HMMi[36].*", analysis_mode_pattern, ".Pnorm_0.[0-9]+.pred_cnv_genes.dat"))])[1], sep=.Platform$file.sep), sep="\t", header=TRUE, check.names=FALSE, colClasses = c("character", "character", "integer", "character", "character", "integer", "integer"))
         # from_pbayes()
     }
     else if (any(grep(lfiles, pattern = paste0("17_HMM_predHMM.*", analysis_mode_pattern)))) {
@@ -95,8 +98,8 @@ add_to_seurat <- function(seurat_obj = NULL,
             flog.warn("::Found HMM predictions output, but they do not match any known model type")
             stop()
         }
-        regions = read.table(paste(infercnv_output_path, lfiles[grep(lfiles, pattern=paste0("17_HMM_predHMMi[36].*", analysis_mode_pattern, ".pred_cnv_regions.dat"))][1], sep=.Platform$file.sep), sep="\t", header=TRUE, check.names=FALSE)
-        hmm_genes = read.table(paste(infercnv_output_path, lfiles[grep(lfiles, pattern=paste0("17_HMM_predHMMi[36].*", analysis_mode_pattern, ".pred_cnv_genes.dat"))][1], sep=.Platform$file.sep), sep="\t", header=TRUE, check.names=FALSE)
+        regions = read.table(paste(infercnv_output_path, lfiles[grep(lfiles, pattern=paste0("17_HMM_predHMMi[36].*", analysis_mode_pattern, ".pred_cnv_regions.dat"))][1], sep=.Platform$file.sep), sep="\t", header=TRUE, check.names=FALSE, colClasses = c("character", "character", "integer", "character", "integer", "integer"))
+        hmm_genes = read.table(paste(infercnv_output_path, lfiles[grep(lfiles, pattern=paste0("17_HMM_predHMMi[36].*", analysis_mode_pattern, ".pred_cnv_genes.dat"))][1], sep=.Platform$file.sep), sep="\t", header=TRUE, check.names=FALSE, colClasses = c("character", "character", "integer", "character", "character", "integer", "integer"))
         # from_hmm()
     }
     else {

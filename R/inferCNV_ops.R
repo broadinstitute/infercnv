@@ -100,7 +100,7 @@
 #'
 #' @param leiden_resolution resolution parameter for the Leiden algorithm using the CPM quality score (default: 0.05)
 #'
-#' @param leiden_method Method used to generate the graph on which the Leiden algorithm is applied (default: "seurat")
+#' @param leiden_method Method used to generate the graph on which the Leiden algorithm is applied (default: "PCA")
 #'
 #' @param leiden_function Whether to use the Constant Potts Model (CPM) or modularity in igraph. Must be either "CPM" or "modularity". (default: "CPM")
 #'
@@ -274,7 +274,7 @@ run <- function(infercnv_obj,
                 tumor_subcluster_pval=0.1,
                 k_nn=20,
                 leiden_resolution=0.05,
-                leiden_method=c("default", "seurat"),
+                leiden_method=c("PCA", "simple"),
                 leiden_function = c("CPM", "modularity"),
                 per_chr_hmm_subclusters=TRUE,
                 z_score_filter = 0.8,
@@ -1046,7 +1046,6 @@ run <- function(infercnv_obj,
                                                    per_chr_hmm_subclusters = per_chr_hmm_subclusters,
                                                    z_score_filter=z_score_filter
                                                    )
-            #browser()
             infercnv_obj = res[[1]]
             subclusters_per_chr = res[[2]]
             rm(res)
@@ -1092,6 +1091,7 @@ run <- function(infercnv_obj,
                                                             hclust_method=hclust_method,
                                                             cluster_by_groups=cluster_by_groups,
                                                             partition_method='none',
+                                                            per_chr_hmm_subclusters=FALSE,
                                                             z_score_filter=z_score_filter
                                                             )[[1]]
             
