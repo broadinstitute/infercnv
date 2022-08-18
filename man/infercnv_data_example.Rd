@@ -6,7 +6,7 @@
 \title{Generated SmartSeq2 expression data with 10 normal cells and 10 tumor cells.
 This is only to demonstrate how to use methods, not actual data to be used in an analysis.}
 \format{
-A data frame with 8252 rows (genes) and 20 columns (cells)
+A data frame with 1150 rows (genes) and 20 columns (cells)
 }
 \usage{
 infercnv_data_example
