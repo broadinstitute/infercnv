@@ -25,6 +25,7 @@ the threshold will be removed.
 }
 \examples{
 data(mcmc_obj)
+data(HMM_states)
 
 mcmc_obj_hmm_states_list <- infercnv::filterHighPNormals( MCMC_inferCNV_obj = mcmc_obj, 
                                           HMM_states        = HMM_states, 
