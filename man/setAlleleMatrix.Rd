@@ -22,9 +22,20 @@ Each instance that is less than this number will be replaced with 0. default = 0
 \item{snp_min.cell}{a threshold used to filter out non-heterozygous snps. The minimum number of (normal) cells 
 having both alleles. default = 3}
 }
+\value{
+infercnv_allele
+}
 \description{
 This function initializes the lesser allele fraction/count determined by at least the minimum
 number of snps having allele fraction less/more than 0.5 with the minimum of cells supported. 
 lesser allele fraction will be stored in the slot @expr.data. lesser allele count 
 will be stored in the slot @count.data
+}
+\examples{
+data(infercnv_object_example)
+
+infercnv_object_allele_example <- infercnv::setAlleleMatrix(infercnv_object_example@.allele ,
+                                                            snp_min_coverage = 0,
+                                                            snp_min.cell = 2)
+
 }

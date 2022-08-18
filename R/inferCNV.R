@@ -58,10 +58,14 @@ infercnv <- methods::setClass(
 #'                           If a filename is given, it'll be read via read.table()
 #'                           otherwise, if matrix or Matrix, will use the data directly.
 #' 
-#' @param raw_allele_matrix the matrix of alternate allele if provided
+#' @param raw_allele_matrix the matrix of alternate allele,if provided, containing the raw counts 
+#' If a filename is given, it'll be read via read.table()
+#' otherwise, if matrix or Matrix, will use the data directly. 
 #' 
-#' @param raw_coverage_matrix the matrix of coverage allele if provided
-#' 
+#' @param raw_coverage_matrix the matrix of coverage allele, if provided, containing the raw counts
+#' If a filename is given, it'll be read via read.table()
+#' otherwise, if matrix or Matrix, will use the data directly.
+#'  
 #' @param gene_order_file data file containing the positions of each gene along each chromosome in the genome.
 #'
 #' @param annotations_file a description of the cells, indicating the cell type classifications
@@ -83,41 +87,54 @@ infercnv <- methods::setClass(
 #'
 #' The raw_counts_matrix:
 #'
-#'           MGH54_P16_F12 MGH53_P5_C12 MGH54_P12_C10 MGH54_P16_F02 MGH54_P11_C11  ...
-#' DDX11L1     0.0000000     0.000000      0.000000      0.000000     0.0000000
-#' WASH7P      0.0000000     2.231939      7.186235      5.284944     0.9650009
-#' FAM138A     0.1709991     0.000000      0.000000      0.000000     0.0000000
-#' OR4F5       0.0000000     0.000000      0.000000      0.000000     0.0000000
-#' OR4F29      0.0000000     0.000000      0.000000      0.000000     0.0000000
+#'            MGH36_P10_A01 MGH36_P10_E09 MGH36_P3_D05 MGH36_P4_F07 MGH36_P4_G01 ...
+#' AL627309.1             0             0            0            1            0
+#' CICP27                 0             0           16           71          101
+#' AL627309.5             3            34           24           31           12
+#' FO538757.1             0             0            2            0            3
+#' AP006222.1             2             0            1           11            0
 #' ...
 #'
+#' The raw_allele_matrix (if provided):
+#' 
+#'               MGH36_P10_A01 MGH36_P10_E09 MGH36_P3_D05 MGH36_P4_F07 MGH36_P4_G01 ...
+#' chr1::1543953         0.001             0            0            0            0
+#' chr1::1860776         0.000             2            9            0            0
+#' chr1::7779884         0.001             4            0            0            0
+#' chr1::7780866         0.001             4            0            0            0
+#' chr1::7961718         0.000             0            0            3            0
+#' ...
+#'
+#' The raw_coverage_matrix (if provided):
+#'
+#'               MGH36_P10_A01 MGH36_P10_E09 MGH36_P3_D05 MGH36_P4_F07 MGH36_P4_G01 ...
+#' chr1::1543953             1             0            0            0            0
+#' chr1::1860776             0             6            9            0            0
+#' chr1::7779884             2            12            0            0            0
+#' chr1::7780866             2             9            0            0            0
+#' chr1::7961718             0             0            0            3            0
+#' ...
+#' 
 #' The gene_order_file, contains chromosome, start, and stop position for each gene, tab-delimited:
 #'
-#'          chr  start   stop
-#' DDX11L1 chr1  11869  14412
-#' WASH7P  chr1  14363  29806
-#' FAM138A chr1  34554  36081
-#' OR4F5   chr1  69091  70008
-#' OR4F29  chr1 367640 368634
-#' OR4F16  chr1 621059 622053
+#'             chr  start   stop
+#' AL627309.1 chr1  89295 133723
+#' CICP27     chr1 131025 134836
+#' AL627309.5 chr1 141474 173862
+#' FO538757.1 chr1 185217 195411
+#' AP006222.1 chr1 257864 359681
+#' AL732372.2 chr1 365389 522928
 #' ...
 #' 
 #' The annotations_file, containing the cell name and the cell type classification, tab-delimited.
 #'
-#'             V1                   V2
-#' 1 MGH54_P2_C12 Microglia/Macrophage
-#' 2 MGH36_P6_F03 Microglia/Macrophage
-#' 3 MGH53_P4_H08 Microglia/Macrophage
-#' 4 MGH53_P2_E09 Microglia/Macrophage
-#' 5 MGH36_P5_E12 Oligodendrocytes (non-malignant)
-#' 6 MGH54_P2_H07 Oligodendrocytes (non-malignant)
-#' ...
-#' 179  93_P9_H03 malignant
-#' 180 93_P10_D04 malignant
-#' 181  93_P8_G09 malignant
-#' 182 93_P10_B10 malignant
-#' 183  93_P9_C07 malignant
-#' 184  93_P8_A12 malignant
+#'                                 V2    V3
+#' MGH36_P10_A01 Microglia/Macrophage MGH36
+#' MGH36_P10_E09 Microglia/Macrophage MGH36
+#' MGH36_P3_D05  Microglia/Macrophage MGH36
+#' MGH36_P4_F07             malignant MGH36
+#' MGH36_P4_G01             malignant MGH36
+#' MGH36_P4_H01             malignant MGH36
 #' ...
 #'
 #'
@@ -131,11 +148,16 @@ infercnv <- methods::setClass(
 #' data(infercnv_data_example)
 #' data(infercnv_annots_example)
 #' data(infercnv_genes_example)
+#' data(infercnv_allele_alt_example)
+#' data(infercnv_allele_tot_example)
 #'
-#' infercnv_object_example <- infercnv::CreateInfercnvObject(raw_counts_matrix=infercnv_data_example, 
-#'                                                gene_order_file=infercnv_genes_example,
-#'                                                annotations_file=infercnv_annots_example,
-#'                                                ref_group_names=c("normal"))
+#' infercnv_object_example <- infercnv::CreateInfercnvObject(raw_counts_matrix = infercnv_data_example,
+#'                                                           raw_allele_matrix = infercnv_allele_alt_example,
+#'                                                           raw_coverage_matrix = infercnv_allele_tot_example,
+#'                                                           gene_order_file = infercnv_genes_example,
+#'                                                           annotations_file = infercnv_annots_example,
+#'                                                           ref_group_names=c("Microglia/Macrophage"),
+#'                                                           snp_split_by = "::")
 #'
 
 

@@ -13,12 +13,29 @@ collapse_snp2gene(
 \arguments{
 \item{infercnv_allele_obj}{infercnv_allele based obj}
 
-\item{gene_annot}{a gene order annotation}
+\item{gene_annot}{data file containing the positions of each gene along each chromosome in the genome}
 
 \item{collapse_method}{The method used to collapse snp into gene. Take the highest coverage/median/mean
 value within each gene as its representative. default = "highest"}
 }
+\value{
+infercnv_allele
+}
 \description{
 This function aims to collapse infercnv_allele obj from snp level into gene level
-by only leveraging different characteristics
+}
+\examples{
+data(infercnv_object_example)
+
+infercnv_object_allele_example <- infercnv::setAlleleMatrix(infercnv_object_example@.allele ,
+                                                            snp_min_coverage = 0,
+                                                            snp_min.cell = 2)
+infercnv_object_allele_example <- infercnv::map2gene(infercnv_object_allele_example,
+                                                     infercnv_object_example@gene_order )
+
+infercnv_object_allele_example@tumor_subclusters <- infercnv_object_example@tumor_subclusters
+
+infercnv_object_allele_gene_example <- infercnv::collapse_snp2gene(infercnv_object_allele_example,
+                                                                   gene_annot = infercnv_object_example@gene_order ,
+                                                                   collapse_method = "highest")
 }

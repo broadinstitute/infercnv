@@ -26,8 +26,11 @@ out non-hetergozous snps. default = 0.1}
 \item{snp_min.cell}{a threshold used to filter out snps that express less than 
 the minimum number of cells. default = 3}
 }
+\value{
+infercnv_allele
+}
 \description{
-This function mimics the way the HB does aiming to initialize the lesser allele fraction/count.
+This function mimics the way the HoneyBadger does aiming to initialize the lesser allele fraction/count.
 lesser allele fraction will be stored in the slot @expr.data. lesser allele count 
 will be stored in the slot @count.data
 }

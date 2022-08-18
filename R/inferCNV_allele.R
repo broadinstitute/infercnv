@@ -142,7 +142,17 @@ remove_snps <- function(infercnv_allele_obj, snps_indices_to_remove) {
 #' @param snp_min.cell a threshold used to filter out non-heterozygous snps. The minimum number of (normal) cells 
 #' having both alleles. default = 3
 #' 
+#' @return infercnv_allele
+#' 
 #' @export
+#' 
+#' @examples 
+#' data(infercnv_object_example)
+#' 
+#' infercnv_object_allele_example <- infercnv::setAlleleMatrix(infercnv_object_example@.allele ,
+#'                                                             snp_min_coverage = 0,
+#'                                                             snp_min.cell = 2)
+#'
 setAlleleMatrix <- function(infercnv_allele_obj,
                             snp_min_coverage = 0,
                             snp_filter = TRUE,
@@ -256,7 +266,7 @@ setAlleleMatrix <- function(infercnv_allele_obj,
 
 #' @title setAlleleMatrix_HB -- deprecated
 #' 
-#' @description This function mimics the way the HB does aiming to initialize the lesser allele fraction/count.
+#' @description This function mimics the way the HoneyBadger does aiming to initialize the lesser allele fraction/count.
 #' lesser allele fraction will be stored in the slot @expr.data. lesser allele count 
 #' will be stored in the slot @count.data
 #' 
@@ -272,6 +282,8 @@ setAlleleMatrix <- function(infercnv_allele_obj,
 #' 
 #' @param snp_min.cell a threshold used to filter out snps that express less than 
 #' the minimum number of cells. default = 3
+#' 
+#' @return infercnv_allele
 #' 
 #' @export
 setAlleleMatrix_HB <- function(infercnv_allele_obj,
@@ -354,13 +366,26 @@ setAlleleMatrix_HB <- function(infercnv_allele_obj,
 
 #' @title map2gene
 #' 
-#' @description This function aims to map snp data back to gene data given the annotation file provided
+#' @description This function aims to map snp-based data back to gene-based data given the annotation file provided
 #' 
 #' @param infercnv_allele_obj infercnv_allele based obj
 #' 
-#' @param gene_order gene annotation file
+#' @param gene_order data file containing the positions of each gene along each chromosome in the genome
+#' 
+#' @return infercnv_allele
 #' 
 #' @export
+#' 
+#' @examples 
+#' data(infercnv_object_example)
+#' 
+#' infercnv_object_allele_example <- infercnv::setAlleleMatrix(infercnv_object_example@.allele ,
+#'                                                             snp_min_coverage = 0,
+#'                                                             snp_min.cell = 2)
+#' infercnv_object_allele_example <- infercnv::map2gene(infercnv_object_allele_example,
+#'                                                      infercnv_object_example@gene_order )
+#'
+
 map2gene <- function(infercnv_allele_obj,
                      gene_order){
   
@@ -474,16 +499,33 @@ map2gene <- function(infercnv_allele_obj,
 #' @title collapse_snp2gene
 #' 
 #' @description This function aims to collapse infercnv_allele obj from snp level into gene level
-#' by only leveraging different characteristics
 #' 
 #' @param infercnv_allele_obj infercnv_allele based obj
 #' 
-#' @param gene_annot a gene order annotation
+#' @param gene_annot data file containing the positions of each gene along each chromosome in the genome
 #' 
 #' @param collapse_method The method used to collapse snp into gene. Take the highest coverage/median/mean
 #' value within each gene as its representative. default = "highest"
 #' 
+#' @return infercnv_allele
+#' 
 #' @export
+#' 
+#' @examples 
+#' data(infercnv_object_example)
+#' 
+#' infercnv_object_allele_example <- infercnv::setAlleleMatrix(infercnv_object_example@.allele ,
+#'                                                             snp_min_coverage = 0,
+#'                                                             snp_min.cell = 2)
+#' infercnv_object_allele_example <- infercnv::map2gene(infercnv_object_allele_example,
+#'                                                      infercnv_object_example@gene_order )
+#' 
+#' infercnv_object_allele_example@tumor_subclusters <- infercnv_object_example@tumor_subclusters
+#' 
+#' infercnv_object_allele_gene_example <- infercnv::collapse_snp2gene(infercnv_object_allele_example,
+#'                                                                    gene_annot = infercnv_object_example@gene_order ,
+#'                                                                    collapse_method = "highest")
+
 collapse_snp2gene <- function(infercnv_allele_obj,
                               gene_annot,
                               collapse_method = c("highest","median","mean")){
@@ -619,6 +661,22 @@ collapse_snp2gene <- function(infercnv_allele_obj,
 #' @title plot_allele
 #' 
 #' @description plot a summary figure containing allele frequency
+#' 
+#' @param infercnv_allele_obj infercnv_allele based obj
+#' 
+#' @param initialzied_method The method used to initialize allele matrix. default = "default" as the same as setAlleleMatrix()
+#' 
+#' @param allele_frequency_mode (boolean) Whether to plot the distribution of snp data across chrs
+#' 
+#' @param name_to_plot The path/name used to save the plot
+#' 
+#' @param trend_smK The window size used to smooth allele data
+#' 
+#' @param CELL_POINT_ALPHA A parameter to control the transparency during plotting
+#' 
+#' @param dotsize A parameter to control the size during plotting
+#' 
+#' @param colorscheme The color panel used to plot
 #' 
 #' @keywords internal
 #' 
