@@ -84,3 +84,10 @@
 #'
 #'
 "mcmc_obj"
+
+#' infercnv_allele object result of the processing of inferCNVAlleleBayesNet in the example, to be used for other examples.
+#'
+#' @format An infercnv_allele object containing posterior probability of CNV states (gene level)
+#'
+#'
+"mcmc_obj_allele_gene"
