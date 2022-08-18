@@ -37,3 +37,43 @@ probability of being in one of two Copy Number Variation states
 (i2 states: 1,Deletion; 2,Neutral) for CNV's identified by inferCNV_allele's HMM. 
 Posterior probabilities are found for the entire CNV cluster and each individual cell line in the CNV.
 }
+\examples{
+data(infercnv_object_allele_example)
+data(infercnv_object_allele_gene_example)
+
+out_dir <- tempfile()
+dir.create(out_dir)
+file_snp_token <- "HMM_snp_pred"
+file_snp_path <- "bayesian_snp_folder"
+file_gene_token <- "HMM_gene_pred"
+file_gene_path <- "bayesian_gene_folder"
+
+hmm_allele_obj_HMM_samples <- infercnv:::allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_object_allele_example,
+                                                                                               trim = 0)
+hmm_allele_gene_obj_HMM_samples <- infercnv:::allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_object_allele_gene_example,
+                                                                                                    trim = 0)
+                                                                                                                                                                                                   
+infercnv:::generate_cnv_region_reports(hmm_allele_obj_HMM_samples, 
+                                       output_filename_prefix=file_snp_token,
+                                       out_dir=out_dir,
+                                       ignore_neutral_state = 2,
+                                       by="subcluster")
+infercnv:::generate_cnv_region_reports(hmm_allele_gene_obj_HMM_samples, 
+                                       output_filename_prefix=file_gene_token,
+                                       out_dir=out_dir,
+                                       ignore_neutral_state = 2,
+                                       by="subcluster")
+                                       
+mcmc_allele_snp <- infercnv::inferCNVAlleleBayesNet(file_path = out_dir,
+                                                    file_token = file_snp_token,
+                                                    infercnv_allele_obj = infercnv_object_allele_example,
+                                                    allele_mode = "snp_level",
+                                                    output_path = file.path(out_dir, file_snp_path), 
+                                                    cores = 1)                                       
+mcmc_allele_gene <- infercnv::inferCNVAlleleBayesNet(file_path = out_dir,
+                                                     file_token = file_gene_token,
+                                                     infercnv_allele_obj = infercnv_object_allele_gene_example,
+                                                     allele_mode = "gene_level",
+                                                     output_path = file.path(out_dir, file_gene_path), 
+                                                     cores = 1) 
+}

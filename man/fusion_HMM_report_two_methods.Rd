@@ -43,7 +43,60 @@ while "common" removes those ones.}
 \item{output_prefix}{name prefix when naming output files.}
 
 \item{HMM_report_by}{cell, consensus, subcluster (default: subcluster)}
+
+\item{...}{Additional parameters passed to infercnv::plot_cnv()}
+}
+\value{
+Returns an Infercnv hmm-based obj, and HMM states store in the slot of expr.data
+(i6 states: 1-2,Deletion; 3,Neutral; 4-6,Amplification; 7,cnLOH; 8, Opposed prediction),
+(i3 states: 1,Deletion; 2,Neutral; 3,Amplification; 4,cnLOH; 5, Opposed prediction), for CNV's identified by inferCNV's HMM.
 }
 \description{
 This function aims to integrate HMM boundaries from expression/allele based methods.
+}
+\examples{
+data(infercnv_data_example)
+data(infercnv_annots_example)
+data(infercnv_genes_example)
+data(infercnv_allele_alt_example)
+data(infercnv_allele_tot_example)
+data(infercnv_object_allele_gene_example)
+
+infercnv_object_example <- infercnv::CreateInfercnvObject(raw_counts_matrix = infercnv_data_example,
+                                                          raw_allele_matrix = infercnv_allele_alt_example,
+                                                          raw_coverage_matrix = infercnv_allele_tot_example,
+                                                          gene_order_file = infercnv_genes_example,
+                                                          annotations_file = infercnv_annots_example,
+                                                          ref_group_names=c("Microglia/Macrophage"),
+                                                          snp_split_by = "::")
+          
+out_dir = tempfile()
+file_gene_token <- "HMM_gene_pred"
+infercnv_object_example <- infercnv::run(infercnv_object_example,
+                                         cutoff=1,
+                                         out_dir=out_dir, 
+                                         cluster_by_groups=F, 
+                                         denoise=FALSE,
+                                         HMM=TRUE,
+                                         analysis_mode = "samples",
+                                         no_plot=TRUE)
+                                         
+hmm_allele_gene_obj_HMM_samples <- infercnv:::allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_object_allele_gene_example,
+                                                                                                    trim = 0)
+infercnv:::generate_cnv_region_reports(hmm_allele_gene_obj_HMM_samples, 
+                                       output_filename_prefix=file_gene_token,
+                                       out_dir=out_dir,
+                                       ignore_neutral_state = 2,
+                                       by="subcluster")
+combined_obj <- infercnv::fusion_HMM_report_two_methods(expression_file_path = out_dir,
+                                                        expression_file_token = "17_HMM_predHMMi6.hmm_mode-samples",
+                                                        allele_file_path = out_dir,
+                                                        allele_file_token = file_gene_token,
+                                                        infercnv_obj = infercnv_object_example,
+                                                        infercnv_allele_obj = infercnv_object_allele_gene_example,
+                                                        method = "common",
+                                                        type = "i6",
+                                                        cluster_by_groups=F,
+                                                        output_path = out_dir,
+                                                        output_prefix = "combined")
 }

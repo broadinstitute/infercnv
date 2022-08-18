@@ -308,6 +308,46 @@ plot_Diagnostics <- function(mcmc, output_path){
 #' (i2 states: 1,Deletion; 2,Neutral) for CNV's identified by inferCNV_allele's HMM.
 #'
 #' @export
+#' 
+#' @examples 
+#' data(infercnv_object_allele_example)
+#' data(infercnv_object_allele_gene_example)
+#' 
+#' out_dir <- tempfile()
+#' dir.create(out_dir)
+#' file_snp_token <- "HMM_snp_pred"
+#' file_snp_path <- "bayesian_snp_folder"
+#' file_gene_token <- "HMM_gene_pred"
+#' file_gene_path <- "bayesian_gene_folder"
+#' 
+#' hmm_allele_obj_HMM_samples <- infercnv:::allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_object_allele_example,
+#'                                                                                                trim = 0)
+#' hmm_allele_gene_obj_HMM_samples <- infercnv:::allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_object_allele_gene_example,
+#'                                                                                                     trim = 0)
+#'                                                                                                                                                                                                    
+#' infercnv:::generate_cnv_region_reports(hmm_allele_obj_HMM_samples, 
+#'                                        output_filename_prefix=file_snp_token,
+#'                                        out_dir=out_dir,
+#'                                        ignore_neutral_state = 2,
+#'                                        by="subcluster")
+#' infercnv:::generate_cnv_region_reports(hmm_allele_gene_obj_HMM_samples, 
+#'                                        output_filename_prefix=file_gene_token,
+#'                                        out_dir=out_dir,
+#'                                        ignore_neutral_state = 2,
+#'                                        by="subcluster")
+#'                                        
+#' mcmc_allele_snp <- infercnv::inferCNVAlleleBayesNet(file_path = out_dir,
+#'                                                     file_token = file_snp_token,
+#'                                                     infercnv_allele_obj = infercnv_object_allele_example,
+#'                                                     allele_mode = "snp_level",
+#'                                                     output_path = file.path(out_dir, file_snp_path), 
+#'                                                     cores = 1)                                       
+#' mcmc_allele_gene <- infercnv::inferCNVAlleleBayesNet(file_path = out_dir,
+#'                                                      file_token = file_gene_token,
+#'                                                      infercnv_allele_obj = infercnv_object_allele_gene_example,
+#'                                                      allele_mode = "gene_level",
+#'                                                      output_path = file.path(out_dir, file_gene_path), 
+#'                                                      cores = 1) 
 
 inferCNVAlleleBayesNet <- function(file_path,
                                    file_token,
@@ -577,9 +617,20 @@ plot_mcmc <- function(samples,
 #' @param HMM_type The type of HMM that was ran, either 'i2' (allele), 'i3' (combined) or 'i6' (combined). 
 #' Determines how many states were predicted by the HMM.
 #'
-#' @return Returns a list of (MCMC_inferCNV_obj, HMM_states) With removed CNV's.
+#' @return Returns a list of (MCMC_inferCNV_allele_obj or MCMC_inferCNV_combined_obj, HMM_states) With removed CNV's.
 #'
 #' @export
+#' 
+#' @examples 
+#' data(mcmc_obj_allele_gene)
+#' data(HMM_allele_gene_states)
+#' 
+#' mcmc_combined_mod_list <- filterHighPNormals_allele(MCMC_inferCNV_obj = mcmc_obj_allele_gene,
+#'                                                     HMM_states = HMM_allele_gene_states,
+#'                                                     BayesMaxPNormal = 0.5,
+#'                                                     reassignCNVs = T,
+#'                                                     HMM_type = "i2")
+
 
 filterHighPNormals_allele <- function(MCMC_inferCNV_obj,
                                       HMM_states,

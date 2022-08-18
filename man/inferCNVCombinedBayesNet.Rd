@@ -54,3 +54,59 @@ probability of being in one of three/six Copy Number Variation states
 for CNV's identified by inferCNV's HMM. Posterior probabilities are found for the entire CNV cluster 
 and each individual cell line in the CNV.
 }
+\examples{
+data(infercnv_data_example)
+data(infercnv_annots_example)
+data(infercnv_genes_example)
+data(infercnv_allele_alt_example)
+data(infercnv_allele_tot_example)
+data(infercnv_object_allele_gene_example)
+
+infercnv_object_example <- infercnv::CreateInfercnvObject(raw_counts_matrix = infercnv_data_example,
+                                                          raw_allele_matrix = infercnv_allele_alt_example,
+                                                          raw_coverage_matrix = infercnv_allele_tot_example,
+                                                          gene_order_file = infercnv_genes_example,
+                                                          annotations_file = infercnv_annots_example,
+                                                          ref_group_names=c("Microglia/Macrophage"),
+                                                          snp_split_by = "::")
+          
+out_dir = tempfile()
+file_gene_token <- "HMM_gene_pred"
+infercnv_object_example <- infercnv::run(infercnv_object_example,
+                                         cutoff=1,
+                                         out_dir=out_dir, 
+                                         cluster_by_groups=F, 
+                                         denoise=FALSE,
+                                         HMM=TRUE,
+                                         analysis_mode = "samples",
+                                         no_plot=TRUE)
+                                         
+hmm_allele_gene_obj_HMM_samples <- infercnv:::allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_object_allele_gene_example,
+                                                                                                    trim = 0)
+infercnv:::generate_cnv_region_reports(hmm_allele_gene_obj_HMM_samples, 
+                                       output_filename_prefix=file_gene_token,
+                                       out_dir=out_dir,
+                                       ignore_neutral_state = 2,
+                                       by="subcluster")
+                                       
+combined_obj <- infercnv::fusion_HMM_report_two_methods(expression_file_path = out_dir,
+                                                        expression_file_token = "17_HMM_predHMMi6.hmm_mode-samples",
+                                                        allele_file_path = out_dir,
+                                                        allele_file_token = file_gene_token,
+                                                        infercnv_obj = infercnv_object_example,
+                                                        infercnv_allele_obj = infercnv_object_allele_gene_example,
+                                                        method = "common",
+                                                        type = "i6",
+                                                        cluster_by_groups=F,
+                                                        output_path = out_dir,
+                                                        output_prefix = "combined")
+mcmc_combined <- infercnv::inferCNVCombinedBayesNet(combined_file_path = out_dir,
+                                                    combined_file_token = "combined",
+                                                    infercnv_obj = infercnv_object_example,
+                                                    infercnv_allele_obj = infercnv_object_allele_gene_example,
+                                                    allele_mode = "gene_level",
+                                                    method = "common",
+                                                    type = "i6",
+                                                    enable_cnLOH = TRUE,
+                                                    output_path = file.path(out_dir,"bayesian_folder"))
+}

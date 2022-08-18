@@ -27,11 +27,21 @@ reassign the state assignments made by the HMM to the state that has the highest
 Determines how many states were predicted by the HMM.}
 }
 \value{
-Returns a list of (MCMC_inferCNV_obj, HMM_states) With removed CNV's.
+Returns a list of (MCMC_inferCNV_allele_obj or MCMC_inferCNV_combined_obj, HMM_states) With removed CNV's.
 }
 \description{
 The following function will filter the HMM identified CNV's by the CNV's posterior
 probability of belonging to a normal state identified by the function inferCNVAlleleBayesNet() or
 inferCNVCombinedBayesNet(). Will filter CNV's based on a user desired threshold probability. 
 Any CNV with a probability of being normal above the threshold will be removed.
+}
+\examples{
+data(mcmc_obj_allele_gene)
+data(HMM_allele_gene_states)
+
+mcmc_combined_mod_list <- filterHighPNormals_allele(MCMC_inferCNV_obj = mcmc_obj_allele_gene,
+                                                    HMM_states = HMM_allele_gene_states,
+                                                    BayesMaxPNormal = 0.5,
+                                                    reassignCNVs = T,
+                                                    HMM_type = "i2")
 }
