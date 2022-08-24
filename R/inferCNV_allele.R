@@ -784,7 +784,7 @@ plot_allele <- function(infercnv_allele_obj,
   
   alleledatamelt$chr = str_replace(string=alleledatamelt$seqnames, pattern="chr", replacement="")
   
-  alleledatamelt = alleledatamelt %>% dplyr::filter(chr %in% 1:22)
+  alleledatamelt = alleledatamelt %>% dplyr::filter(chr %in% 1:22) # should not constrain to 1:22 or even specific names
   
   alleledatamelt = alleledatamelt %>% mutate(chr = ordered(chr, levels=1:22))
   alleledatamelt$pos = as.numeric(alleledatamelt$pos)
@@ -922,11 +922,11 @@ plot_allele <- function(infercnv_allele_obj,
   # #############
   # 
   
-  make_plots = function(alleledataToPlot, 
-                        #gexdataToPlot = NULL, 
-                        chr_maxpos_snp = chr_maxpos_snp, 
-                        #chr_maxpos_gex = chr_maxpos_gex,
-                        infercnv_allele_obj) {
+  #make_plots = function(alleledataToPlot, 
+  #                      #gexdataToPlot = NULL, 
+  #                      chr_maxpos_snp = chr_maxpos_snp, 
+  #                      #chr_maxpos_gex = chr_maxpos_gex,
+  #                      infercnv_allele_obj) {
     #browser()
     ## normal cell plot
     
@@ -941,7 +941,7 @@ plot_allele <- function(infercnv_allele_obj,
       color_cell <- c("#00BFC4", "#F8766D")
       flog.info("Making normal plot ...")
       
-      normal_dataToPlot = alleledataToPlot %>% dplyr::filter(cell %in% normal_cells)
+      normal_dataToPlot = alleledatamelt %>% dplyr::filter(cell %in% normal_cells)
       
       
       normal_snps_plot = ggplot(data=normal_dataToPlot) + facet_grid (~chr, scales = 'free_x', space = 'fixed') +
@@ -979,7 +979,7 @@ plot_allele <- function(infercnv_allele_obj,
     
     num_malignant_cells = length(malignant_cells)
     
-    malignant_dataToPlot = alleledataToPlot %>% dplyr::filter(cell %in% malignant_cells)
+    malignant_dataToPlot = alleledatamelt %>% dplyr::filter(cell %in% malignant_cells)
     
     malignant_snps_plot = ggplot(data=malignant_dataToPlot) + facet_grid (~chr, scales = 'free_x', space = 'fixed') +
       
@@ -1012,7 +1012,7 @@ plot_allele <- function(infercnv_allele_obj,
     flog.info("Making allele freq plot ...")
     
     
-    allele_freq_means = alleledataToPlot %>%
+    allele_freq_means = alleledatamelt %>%
       group_by(chrpos,sample_type) %>%
       mutate(grp_pos_mean_AF = mean(AF)) %>% select(chrpos, chr, pos, sample_type, grp_pos_mean_AF) %>% unique()
     
@@ -1233,8 +1233,8 @@ plot_allele <- function(infercnv_allele_obj,
                      ncol=1, align='v',
                      rel_heights=c(1/3,2/3))
     }
-    return(pg)
-  }
+  #  return(pg)
+  #}
   
   flog.info("Generating outputs ...")
   
@@ -1248,12 +1248,12 @@ plot_allele <- function(infercnv_allele_obj,
   #   gexdata <- gexdata %>% dplyr::filter(genename %in% common_gene)
   # }
   # 
-  p <- make_plots(alleledataToPlot = alleledatamelt, 
-                  #gexdataToPlot = gexdata,
-                  chr_maxpos_snp = chr_maxpos_snp, 
-                  #chr_maxpos_gex = chr_maxpos_gex, 
-                  infercnv_allele_obj = infercnv_allele_obj)
+  #p <- make_plots(alleledataToPlot = alleledatamelt, 
+  #                #gexdataToPlot = gexdata,
+  #                chr_maxpos_snp = chr_maxpos_snp, 
+  #                #chr_maxpos_gex = chr_maxpos_gex, 
+  #                infercnv_allele_obj = infercnv_allele_obj)
   
-  ggsave (name_to_plot, p, width = 13.33, height = 7.5, units = 'in', dpi = 300)
+  ggsave (name_to_plot, pg, width = 13.33, height = 7.5, units = 'in', dpi = 300)
   flog.info("Done!")
 }

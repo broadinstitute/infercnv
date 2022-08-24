@@ -383,21 +383,21 @@ CreateInfercnvObject <- function(raw_counts_matrix,
         raw.coverage.data <- order_ret_allele$coverage.data
         snps <- order_ret_allele$snps
         
-        allele_obejct <- new(Class = "infercnv_allele",
+        allele_object <- new(Class = "infercnv_allele",
                              allele.data = raw.allele.data,
                              coverage.data = raw.coverage.data,
                              SNP_info = snps,
                              gene_order = order_ret_allele$gene_order,
                              reference_grouped_cell_indices = ref_group_cell_indices,
                              observation_grouped_cell_indices = obs_group_cell_indices)
-        validate_infercnv_allele_obj(allele_obejct)
+        validate_infercnv_allele_obj(allele_object)
     }
     else{
         raw.allele.data <- NULL
         raw.coverage.data <- NULL
         snps <- GRanges()
         
-        allele_obejct <- new(Class = "infercnv_allele")
+        allele_object <- new(Class = "infercnv_allele")
     }
     
     object <- new(
@@ -413,7 +413,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
                        "min_max_counts_per_cell" = min_max_counts_per_cell,
                        "counts_md5" = digest(raw.data)),
         .hspike = NULL,
-        .allele = allele_obejct)
+        .allele = allele_object)
 
     validate_infercnv_obj(object)
     
