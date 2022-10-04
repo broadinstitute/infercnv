@@ -529,72 +529,75 @@ collapse_snp2gene <- function(infercnv_allele_obj,
 
     if (collapse_method == "median") {
 
-        subset_melt_data <- melt_data %>% group_by(cell, gene) 
-                                      %>% mutate(AF = median(AF),
+        subset_melt_data <- melt_data %>% group_by(cell, gene) %>% 
+                                          mutate(AF = median(AF),
                                                  ALT = median(ALT),
                                                  allele = median(allele),
-                                                 COV = median(COV)) 
-                                      %>% ungroup()
+                                                 COV = median(COV)) %>% 
+                                          ungroup()
         
     } 
 
     if (collapse_method == "mean") {
 
-        subset_melt_data <- melt_data %>% group_by(cell, gene)
-                                      %>% mutate(AF = mean(AF),
+        subset_melt_data <- melt_data %>% group_by(cell, gene) %>%
+                                          mutate(AF = mean(AF),
                                                  ALT = mean(ALT),
                                                  allele = mean(allele),
-                                                 COV = mean(COV))
-                                      %>% ungroup()      
+                                                 COV = mean(COV)) %>%
+                                          ungroup()      
     }
 
     if (collapse_method == "highest") {
 
-        subset_melt_data <- melt_data %>% group_by(cell, gene)
-                                      %>% arrange(desc(COV))
-                                      %>% dplyr::filter(dplyr::row_number() == 1)
-                                      %>% ungroup()
+        subset_melt_data <- melt_data %>% group_by(cell, gene) %>%
+                                          arrange(desc(COV)) %>%
+                                          dplyr::filter(dplyr::row_number() == 1) %>%
+                                          ungroup()
     }
 
-    expr.data <- subset_melt_data %>% select(cell, gene, AF)
-                                  %>% unique() 
-                                  %>% pivot_wider(names_from = cell,
+    expr.data <- subset_melt_data %>% select(cell, gene, AF) %>%
+                                      unique() %>%
+                                      pivot_wider(names_from = cell,
                                                   values_from = AF,
-                                                  values_fill = 0)
-                                  %>% data.frame()
+                                                  values_fill = 0) %>%
+                                      data.frame()
+
+    # why the unique()?
+    # expr.data = subset_melt_data %>% select(cell, gene, AF) %>% tidytext::cast_sparse("gene", "cell", "AF")
 
     rownames(expr.data) <- expr.data$gene
     expr.data[,"gene"] <- NULL
     expr.data <- as.matrix(expr.data)
 
-    count.data <- subset_melt_data %>% select(cell, gene, ALT) 
-                                   %>% unique() 
-                                   %>% pivot_wider(names_from = cell,
+    count.data <- subset_melt_data %>% select(cell, gene, ALT) %>%
+                                       unique() %>%
+                                       pivot_wider(names_from = cell,
                                                    values_from = ALT,
-                                                   values_fill = 0)
-                                   %>% data.frame()
+                                                   values_fill = 0) %>%
+                                       data.frame()
 
     rownames(count.data) <- count.data$gene
     count.data[,"gene"] <- NULL
     count.data <- as.matrix(count.data) %>% round()
 
-    allele.data <- subset_melt_data %>% select(cell, gene, allele)
-                                    %>% unique() 
-                                    %>% pivot_wider(names_from = cell,
+    allele.data <- subset_melt_data %>% select(cell, gene, allele) %>%
+                                        unique() %>%
+                                        pivot_wider(names_from = cell,
                                                     values_from = allele,
-                                                    values_fill = 0)
-                                    %>% data.frame()
+                                                    values_fill = 0) %>%
+                                        data.frame()
 
     rownames(allele.data) <- allele.data$gene
     allele.data[,"gene"] <- NULL
     allele.data <- as.matrix(allele.data) %>% round()
 
-    coverage.data <- subset_melt_data %>% select(cell, gene, COV)
-                                      %>% unique() 
-                                      %>% pivot_wider(names_from = cell,
+    coverage.data <- subset_melt_data %>% select(cell, gene, COV) %>%
+                                          unique() %>%
+                                          pivot_wider(names_from = cell,
                                                       values_from = COV,
-                                                      values_fill = 0)
-                                      %>% data.frame()
+                                                      values_fill = 0) %>%
+                                          data.frame()
 
     rownames(coverage.data) <- coverage.data$gene
     coverage.data[,"gene"] <- NULL
@@ -610,8 +613,8 @@ collapse_snp2gene <- function(infercnv_allele_obj,
                                             IRanges::IRanges(gene_order[[C_START]],
                                             gene_order[[C_STOP]]))
     names(gene_order_gr) <- rownames(gene_order)
-    gene_order_gr <- gene_order_gr %>% sortSeqlevels()
-                                   %>% sort()
+    gene_order_gr <- gene_order_gr %>% sortSeqlevels() %>%
+                                       sort()
 
     expr.data <- expr.data[names(gene_order_gr), ]
     count.data <- count.data[names(gene_order_gr), ]
@@ -620,12 +623,12 @@ collapse_snp2gene <- function(infercnv_allele_obj,
     gene_order <- gene_order[names(gene_order_gr),]
     gene_order_gr$gene <- names(gene_order_gr)
 
-    names(gene_order_gr) <- rownames(expr.data)
-                         <- rownames(count.data)  
-                         <- rownames(allele.data) 
-                         <- rownames(coverage.data) 
-                         <- rownames(gene_order) 
-                         <- paste0(gene_order[[C_CHR]], ":",
+    names(gene_order_gr) <- rownames(expr.data) <- 
+                            rownames(count.data) <-
+                            rownames(allele.data) <-
+                            rownames(coverage.data) <-
+                            rownames(gene_order) <-
+                            paste0(gene_order[[C_CHR]], ":",
                                    gene_order[[C_START]], ":",
                                    gene_order[[C_STOP]])
 
@@ -776,8 +779,8 @@ plot_allele <- function(infercnv_allele_obj,
     alleledatamelt$pos = as.numeric(alleledatamelt$pos)
 
     ## get chr bounds for plotting later.
-    chr_maxpos_snp = alleledatamelt %>% group_by(chr)
-                                    %>% summarise(maxpos = max(pos))
+    chr_maxpos_snp = alleledatamelt %>% group_by(chr) %>%
+                                        summarise(maxpos = max(pos))
     chr_maxpos_snp$minpos = 1
 
 
@@ -931,10 +934,10 @@ plot_allele <- function(infercnv_allele_obj,
         normal_dataToPlot = alleledatamelt %>% dplyr::filter(cell %in% normal_cells)
 
 
-        normal_snps_plot = ggplot(data=normal_dataToPlot) + facet_grid (~chr, scales = 'free_x', space = 'fixed')
-                            + labs(title=paste0("SNPs in normal cells: ", length(normal_cells)))
-                            + theme_bw()
-                            + theme(text = element_text(size = 12),
+        normal_snps_plot = ggplot(data=normal_dataToPlot) + facet_grid (~chr, scales = 'free_x', space = 'fixed') +
+                              labs(title=paste0("SNPs in normal cells: ", length(normal_cells))) +
+                              theme_bw() +
+                              theme(text = element_text(size = 12),
                                     axis.ticks.x = element_blank(),
                                     axis.text.x = element_blank(),
                                     axis.title.x = element_blank(),
@@ -944,11 +947,11 @@ plot_allele <- function(infercnv_allele_obj,
                                     panel.grid.minor.x = element_blank(),
                                     panel.grid.major.y = element_blank(),
                                     panel.grid.minor.y = element_blank()
-                                   )
-                            + geom_vline(data=chr_maxpos_snp, aes(xintercept=minpos), color=NA)
-                            + geom_vline(data=chr_maxpos_snp, aes(xintercept=maxpos), color=NA)
-                            + geom_point(aes(x=pos, y=cell, color=AF), alpha=CELL_POINT_ALPHA, size=dotsize)
-                            + scale_radius() 
+                                   ) +
+                              geom_vline(data=chr_maxpos_snp, aes(xintercept=minpos), color=NA) +
+                              geom_vline(data=chr_maxpos_snp, aes(xintercept=maxpos), color=NA) +
+                              geom_point(aes(x=pos, y=cell, color=AF), alpha=CELL_POINT_ALPHA, size=dotsize) +
+                              scale_radius() 
           
       
         if (colorscheme == "BlueRed") {
@@ -966,10 +969,10 @@ plot_allele <- function(infercnv_allele_obj,
     
     malignant_dataToPlot = alleledatamelt %>% dplyr::filter(cell %in% malignant_cells)
     
-    malignant_snps_plot = ggplot(data=malignant_dataToPlot) + facet_grid (~chr, scales = 'free_x', space = 'fixed')
-                            + labs(title=paste0("SNPs in tumor cells: ", length(malignant_cells)))
-                            + theme_bw()
-                            + theme(text = element_text(size = 12),
+    malignant_snps_plot = ggplot(data=malignant_dataToPlot) + facet_grid (~chr, scales = 'free_x', space = 'fixed') +
+                              labs(title=paste0("SNPs in tumor cells: ", length(malignant_cells))) +
+                              theme_bw() +
+                              theme(text = element_text(size = 12),
                                     axis.ticks.x = element_blank(),
                                     axis.text.x = element_blank(),
                                     axis.title.x = element_blank(),
@@ -979,11 +982,11 @@ plot_allele <- function(infercnv_allele_obj,
                                     panel.grid.minor.x = element_blank(),
                                     panel.grid.major.y = element_blank(),
                                     panel.grid.minor.y = element_blank()
-                                   )
-                            + geom_vline(data=chr_maxpos_snp, aes(xintercept=minpos), color=NA)
-                            + geom_vline(data=chr_maxpos_snp, aes(xintercept=maxpos), color=NA)
-                            + geom_point(aes(x=pos, y=cell, color=AF), alpha=CELL_POINT_ALPHA, size=dotsize)
-                            + scale_radius()
+                                   ) +
+                              geom_vline(data=chr_maxpos_snp, aes(xintercept=minpos), color=NA) +
+                              geom_vline(data=chr_maxpos_snp, aes(xintercept=maxpos), color=NA) +
+                              geom_point(aes(x=pos, y=cell, color=AF), alpha=CELL_POINT_ALPHA, size=dotsize) +
+                              scale_radius()
     
     if (colorscheme == "BlueRed") {
         malignant_snps_plot = malignant_snps_plot + scale_color_gradient(low="blue", high="red")
@@ -1015,11 +1018,11 @@ plot_allele <- function(infercnv_allele_obj,
 
     allele_freq_means = do.call(rbind, lapply(splitdata, smoother))
 
-    allele_freq_plot = allele_freq_means %>% ggplot(aes(x=pos, y=grp_pos_mean_AF))
-                                              + facet_grid (~chr, scales = 'free_x', space = 'fixed')
-                                              + labs(title="Allele frequency", y="mean_AF")
-                                              + theme_bw()
-                                              + theme(text = element_text(size = 12),
+    allele_freq_plot = allele_freq_means %>% ggplot(aes(x=pos, y=grp_pos_mean_AF)) +
+                                                facet_grid (~chr, scales = 'free_x', space = 'fixed') +
+                                                labs(title="Allele frequency", y="mean_AF") +
+                                                theme_bw() +
+                                                theme(text = element_text(size = 12),
                                                       axis.ticks.x = element_blank(),
                                                       axis.text.x = element_blank(),
                                                       axis.title.x = element_blank(),
@@ -1027,15 +1030,14 @@ plot_allele <- function(infercnv_allele_obj,
                                                       panel.grid.minor.x = element_blank(),
                                                       panel.grid.major.y = element_blank(),
                                                       panel.grid.minor.y = element_blank()
-                                                     )
-                                              + geom_vline(data=chr_maxpos_snp, aes(xintercept=minpos), color=NA)
-                                              + geom_vline(data=chr_maxpos_snp, aes(xintercept=maxpos), color=NA)
-                                              + geom_point(aes(color=sample_type), alpha=0.2, size=0.2)
+                                                     ) +
+                                                geom_vline(data=chr_maxpos_snp, aes(xintercept=minpos), color=NA) +
+                                                geom_vline(data=chr_maxpos_snp, aes(xintercept=maxpos), color=NA) +
+                                                geom_point(aes(color=sample_type), alpha=0.2, size=0.2)
 
-    allele_freq_plot_w_trendlines = allele_freq_plot 
-                                        + geom_line(data=allele_freq_means, aes(x=pos, y=grp_pos_mean_AF_sm, color=sample_type), size=0.5, alpha=1) 
-                                        + scale_color_manual(values = color_cell) 
-                                        + ylim(c(0,1))
+    allele_freq_plot_w_trendlines = allele_freq_plot + geom_line(data=allele_freq_means, aes(x=pos, y=grp_pos_mean_AF_sm, color=sample_type), size=0.5, alpha=1) +
+                                                       scale_color_manual(values = color_cell) +
+                                                       ylim(c(0,1))
 
     # # HMM prediction if existed
     # if(!is.null(HMM)){
@@ -1129,24 +1131,24 @@ plot_allele <- function(infercnv_allele_obj,
     
     if(allele_frequency_mode){
 
-        cell_count <- alleledatamelt %>% select(chr, cell, sample_type)
-                                     %>% unique()
-                                     %>% group_by(chr, sample_type)
-                                     %>% summarise(cell_count = n(), .groups = 'drop')
-                                     %>% select(cell_count)
+        cell_count <- alleledatamelt %>% select(chr, cell, sample_type) %>%
+                                         unique() %>%
+                                         group_by(chr, sample_type) %>%
+                                         summarise(cell_count = n(), .groups = 'drop') %>%
+                                         select(cell_count)
 
-        bar_data <- alleledatamelt %>% select(chrpos, chr, sample_type)
-                                   %>% unique()
-                                   %>% group_by(chr, sample_type)
-                                   %>% summarise(snp_count = n(), .groups = 'drop')
-                                   %>% mutate(cell_count, "SNPs coverage per cell" = snp_count/cell_count)
+        bar_data <- alleledatamelt %>% select(chrpos, chr, sample_type) %>%
+                                       unique() %>%
+                                       group_by(chr, sample_type) %>%
+                                       summarise(snp_count = n(), .groups = 'drop') %>%
+                                       mutate(cell_count, "SNPs coverage per cell" = snp_count/cell_count) %>%
 
-        bar_plot <- bar_data %>% ggplot(aes(x = sample_type, y = `SNPs coverage per cell`, fill = sample_type))
-                                    + geom_bar(stat='identity')
-                                    + facet_grid (~chr, scales = 'free_x', space = 'fixed')
-                                    + labs(title="Fraction of heterozygous snps used")
-                                    + theme_bw() +
-                                    + theme(text = element_text(size = 12),
+        bar_plot <- bar_data %>% ggplot(aes(x = sample_type, y = `SNPs coverage per cell`, fill = sample_type)) +
+                                      geom_bar(stat='identity') +
+                                      facet_grid (~chr, scales = 'free_x', space = 'fixed') +
+                                      labs(title="Fraction of heterozygous snps used") +
+                                      theme_bw() +
+                                      theme(text = element_text(size = 12),
                                             axis.ticks.x = element_blank(),
                                             axis.text.x = element_blank(),
                                             axis.title.x = element_blank(),
@@ -1154,8 +1156,8 @@ plot_allele <- function(infercnv_allele_obj,
                                             panel.grid.minor.x = element_blank(),
                                             panel.grid.major.y = element_blank(),
                                             panel.grid.minor.y = element_blank()
-                                           ) 
-                                    + scale_fill_manual(values = color_cell)
+                                           ) +
+                                      scale_fill_manual(values = color_cell)
 
     }
     #     

@@ -9,136 +9,133 @@
 #' @noRd
 allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_obj,
                                                                 t = 1e-6, pd = 0.1, pn = 0.45,
-                                                                min.num.snps = 5, trim = 0.1){
-  ## pre-check for allele data
-  if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)){
-    flog.info("Initializing the lesser allele fraction ...")
-    infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
-  }
-  
-  flog.info("predict_allele_CNV_via_HMM_on_tumor_subclusters")
-  
-  chrs = unique(infercnv_allele_obj@gene_order$chr)
-  gene_order = infercnv_allele_obj@gene_order
-  lesser.data <- infercnv_allele_obj@count.data
-  coverage.data <- infercnv_allele_obj@coverage.data
-  
-  ## initialize hmm states for allele data
-  hmm.allele.data <- matrix(2,
-                            nrow = nrow(lesser.data),
-                            ncol = ncol(lesser.data))
-  rownames(hmm.allele.data) <- rownames(lesser.data)
-  colnames(hmm.allele.data) <- colnames(lesser.data)
-  
-  tumor_subclusters <- unlist(infercnv_allele_obj@tumor_subclusters[["subclusters"]], recursive=FALSE)
-  
-  HMM_output <- c()
-  cell_index <- c()
-  ## add the normals, so they get predictions too:
-  #tumor_subclusters <- c(tumor_subclusters, infercnv_allele_obj@reference_grouped_cell_indices)
-  
-  ## run HMM across chromosomes
-  lapply(chrs, function(chr){
-    
-    chr_snp_idx = which(gene_order$chr == chr)
-    
-    lapply(tumor_subclusters, function(tumor_subcluster_cells_idx){
-      
-      if (length(tumor_subcluster_cells_idx) > 1){
-        
-        if(mean(tumor_subcluster_cells_idx %in% 
-                unlist(infercnv_allele_obj@observation_grouped_cell_indices)) == 1){
-          status <- "tumor"
-        }
-        if(mean(tumor_subcluster_cells_idx %in% 
-                unlist(infercnv_allele_obj@reference_grouped_cell_indices)) == 1){
-          status <- "normal"
-        }
-        
-        lesser.data <- lesser.data[chr_snp_idx, tumor_subcluster_cells_idx,drop=FALSE]
-        coverage.data <- coverage.data[chr_snp_idx, tumor_subcluster_cells_idx,drop=FALSE]
-        
-        mafl <- rowSums(lesser.data > 0)
-        sizel <- rowSums(coverage.data > 0)
-        
-        ## change point
-        delta <- c(0.5, 0.5)
-        z <- dthmm(mafl, matrix(c(1-t, t, t, 1-t), 
-                                byrow=TRUE, nrow=2), 
-                   delta, "binom", list(prob=c(pd, pn)), 
-                   list(size=sizel), discrete=TRUE)
-        #results <- Viterbi(z)
-        results <- Viterbi.dthmm.allele.adj(z)
-        boundsnps <- rownames(lesser.data)[results == 1]
-        
-        ## vote
-        vote <- rep(0, nrow(lesser.data))
-        names(vote) <- rownames(lesser.data)
-        vote[boundsnps] <- 1
-        
-        if(max(vote) == 0) {
-          flog.info(sprintf('Exiting; no new bound SNPs found at %s in %s cells ...', 
-                            chr, status))
-          return() ## exit iteration, no more bound SNPs found
-        }
-        
-        vote[vote > 0] <- 1
-        mv <- 1 ## at least 1 vote
-        cs <- 1
-        bound.snps.cont <- rep(0, length(vote))
-        names(bound.snps.cont) <- names(vote)
-        
-        for(i in 2:length(vote)) {
-          if(vote[i] >= mv & vote[i] == vote[i-1]) {
-            bound.snps.cont[i] <- cs
-          } else {
-            cs <- cs + 1
-          }
-        }
-        
-        tb <- table(bound.snps.cont)
-        tbv <- as.vector(tb)
-        names(tbv) <- names(tb)
-        tbv <- tbv[-1] # get rid of 0
-        
-        ## all detected deletions have fewer than 5 SNPs...reached the end
-        tbv <- tbv[tbv >= min.num.snps]
-        if(length(tbv)==0) {
-          flog.info(sprintf('Exiting; less than %s new bound SNPs found at %s in %s cells ...', 
-                            min.num.snps, chr, status))
-          return()
-        }
-        
-        HMM_info <- lapply(names(tbv), function(ti) {
-          
-          bound.snps.new <- names(bound.snps.cont)[bound.snps.cont == ti]
-          
-          ## trim
-          bound.snps.new <- bound.snps.new[1:round(length(bound.snps.new)-length(bound.snps.new)*trim)]
-          cell_index <<- c(cell_index, list(tumor_subcluster_cells_idx))
-          
-          return(bound.snps.new)
-          
+                                                                min.num.snps = 5, trim = 0.1) {
+    ## pre-check for allele data
+    if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)) {
+        flog.info("Initializing the lesser allele fraction ...")
+        infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
+    }
+
+    flog.info("predict_allele_CNV_via_HMM_on_tumor_subclusters")
+
+    chrs = unique(infercnv_allele_obj@gene_order$chr)
+    gene_order = infercnv_allele_obj@gene_order
+    lesser.data <- infercnv_allele_obj@count.data
+    coverage.data <- infercnv_allele_obj@coverage.data
+
+    ## initialize hmm states for allele data
+    hmm.allele.data <- matrix(2,
+                              nrow = nrow(lesser.data),
+                              ncol = ncol(lesser.data))
+    rownames(hmm.allele.data) <- rownames(lesser.data)
+    colnames(hmm.allele.data) <- colnames(lesser.data)
+
+    tumor_subclusters <- unlist(infercnv_allele_obj@tumor_subclusters[["subclusters"]], recursive=FALSE)
+
+    HMM_output <- c()
+    cell_index <- c()
+    ## add the normals, so they get predictions too:
+    #tumor_subclusters <- c(tumor_subclusters, infercnv_allele_obj@reference_grouped_cell_indices)
+
+    ## run HMM across chromosomes
+    lapply(chrs, function(chr){
+
+        chr_snp_idx = which(gene_order$chr == chr)
+
+        lapply(tumor_subclusters, function(tumor_subcluster_cells_idx){
+
+            if (length(tumor_subcluster_cells_idx) > 1){
+
+                if(all(tumor_subcluster_cells_idx %in% unlist(infercnv_allele_obj@observation_grouped_cell_indices))){
+                    status <- "tumor"
+                } else if(all(tumor_subcluster_cells_idx %in% unlist(infercnv_allele_obj@reference_grouped_cell_indices))){
+                    status <- "normal"
+                }
+
+                lesser.data <- lesser.data[chr_snp_idx, tumor_subcluster_cells_idx,drop=FALSE]
+                coverage.data <- coverage.data[chr_snp_idx, tumor_subcluster_cells_idx,drop=FALSE]
+
+                mafl <- rowSums(lesser.data > 0)
+                sizel <- rowSums(coverage.data > 0)
+
+                ## change point
+                delta <- c(0.5, 0.5)
+                z <- dthmm(mafl,
+                           matrix(c(1-t, t, t, 1-t), byrow=TRUE, nrow=2), 
+                           delta,
+                           "binom",
+                           list(prob=c(pd, pn)), 
+                           list(size=sizel),
+                           discrete=TRUE)
+                #results <- Viterbi(z)
+                results <- Viterbi.dthmm.allele.adj(z)
+                boundsnps <- rownames(lesser.data)[results == 1]
+
+                ## vote
+                vote <- rep(0, nrow(lesser.data))
+                names(vote) <- rownames(lesser.data)
+                vote[boundsnps] <- 1
+
+                if(max(vote) == 0) {
+                    flog.info(sprintf('Exiting; no new bound SNPs found at %s in %s cells ...', chr, status))
+                    return() ## exit iteration, no more bound SNPs found
+                }
+
+                vote[vote > 0] <- 1
+                mv <- 1 ## at least 1 vote
+                cs <- 1
+                bound.snps.cont <- rep(0, length(vote))
+                names(bound.snps.cont) <- names(vote)
+
+                for(i in 2:length(vote)) {
+                    if(vote[i] >= mv & vote[i] == vote[i-1]) {
+                        bound.snps.cont[i] <- cs
+                    } else {
+                        cs <- cs + 1
+                    }
+                }
+
+                tb <- table(bound.snps.cont)
+                tbv <- as.vector(tb)
+                names(tbv) <- names(tb)
+                tbv <- tbv[-1] # get rid of 0
+
+                ## all detected deletions have fewer than 5 SNPs...reached the end
+                tbv <- tbv[tbv >= min.num.snps]
+                if(length(tbv) == 0) {
+                    flog.info(sprintf('Exiting; less than %s new bound SNPs found at %s in %s cells ...', min.num.snps, chr, status))
+                    return()
+                }
+
+                HMM_info <- lapply(names(tbv), function(ti) {
+
+                    bound.snps.new <- names(bound.snps.cont)[bound.snps.cont == ti]
+
+                    ## trim
+                    bound.snps.new <- bound.snps.new[1:round(length(bound.snps.new) - length(bound.snps.new) * trim)]
+                    cell_index <<- c(cell_index, list(tumor_subcluster_cells_idx))
+
+                    return(bound.snps.new)
+
+                })
+                HMM_output <<- c(HMM_output, HMM_info)
+                HMM_region <- do.call("c", lapply(HMM_info, function(bs) range(infercnv_allele_obj@SNP_info[bs])))
+
+                flog.info(sprintf("Done extracting HMM regions at %s in %s cells ...", chr, status))
+                print(HMM_region)
+
+                if(!is.null(HMM_region)) {
+                    hmm.allele.data[infercnv_allele_obj@SNP_info %over% HMM_region,
+                    tumor_subcluster_cells_idx] <<- 1
+                }
+            }
         })
-        HMM_output <<- c(HMM_output, HMM_info)
-        HMM_region <- do.call("c", lapply(HMM_info, function(bs) range(infercnv_allele_obj@SNP_info[bs])))
-        
-        flog.info(sprintf("Done extracting HMM regions at %s in %s cells ...", 
-                          chr, status))
-        print(HMM_region)
-        
-        if(!is.null(HMM_region)){
-          hmm.allele.data[infercnv_allele_obj@SNP_info %over% HMM_region,
-                          tumor_subcluster_cells_idx] <<- 1
-        }
-      }
     })
-  })
-  infercnv_allele_obj@expr.data <- hmm.allele.data
-  # return(list(infercnv_allele_obj = infercnv_allele_obj, 
-  #             HMM_output = HMM_output,
-  #             cell_index = cell_index))
-  return(infercnv_allele_obj)
+    infercnv_allele_obj@expr.data <- hmm.allele.data
+    # return(list(infercnv_allele_obj = infercnv_allele_obj, 
+    #             HMM_output = HMM_output,
+    #             cell_index = cell_index))
+    return(infercnv_allele_obj)
 }
 
 #' @title allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples
@@ -151,530 +148,520 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
 #' 
 #' @noRd
 allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allele_obj,
-                                                                  t = 1e-6, pd = 0.1, pn = 0.45,
-                                                                  min.num.snps = 5, trim = 0.1){
-  ## pre-check for allele data
-  if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)){
-    flog.info("Initializing the lesser allele fraction ...")
-    infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
-  }
-  
-  flog.info("predict_allele_CNV_via_HMM_on_whole_tumor_samples")
-  
-  chrs = unique(infercnv_allele_obj@gene_order$chr)
-  gene_order = infercnv_allele_obj@gene_order
-  lesser.data <- infercnv_allele_obj@count.data
-  coverage.data <- infercnv_allele_obj@coverage.data
-  
-  ## initialize hmm allele data
-  hmm.allele.data <- matrix(2,
-                            nrow = nrow(lesser.data),
-                            ncol = ncol(lesser.data))
-  rownames(hmm.allele.data) <- rownames(lesser.data)
-  colnames(hmm.allele.data) <- colnames(lesser.data)
-  
-  ## add the normals, so they get predictions too:
-  tumor_samples <- c(infercnv_allele_obj@observation_grouped_cell_indices, 
-                     infercnv_allele_obj@reference_grouped_cell_indices)
-  HMM_output <- c()
-  cell_index <- c()
-  
-  ## run HMM across chromosomes
-  lapply(chrs, function(chr){
-    
-    chr_snp_idx = which(gene_order$chr == chr)
-    
-    lapply(tumor_samples, function(tumor_sample_cells_idx){
+                                                                  t = 1e-6,
+                                                                  pd = 0.1,
+                                                                  pn = 0.45,
+                                                                  min.num.snps = 5,
+                                                                  trim = 0.1) {
+    ## pre-check for allele data
+    if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)) {
+        flog.info("Initializing the lesser allele fraction ...")
+        infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
+    }
 
-      if(length(tumor_sample_cells_idx) > 1){
-        
-        if(mean(tumor_sample_cells_idx %in% 
-                unlist(infercnv_allele_obj@observation_grouped_cell_indices)) == 1){
-          status <- "tumor"
-        }
-        if(mean(tumor_sample_cells_idx %in% 
-                unlist(infercnv_allele_obj@reference_grouped_cell_indices)) == 1){
-          status <- "normal"
-        }
-        
-        lesser.data <- lesser.data[chr_snp_idx, tumor_sample_cells_idx,drop=FALSE]
-        coverage.data <- coverage.data[chr_snp_idx, tumor_sample_cells_idx,drop=FALSE]
-        
-        mafl <- rowSums(lesser.data > 0)
-        sizel <- rowSums(coverage.data > 0)
-        
-        ## change point
-        delta <- c(0.5, 0.5)
-        z <- dthmm(mafl, matrix(c(1-t, t, t, 1-t), 
-                                byrow=TRUE, nrow=2), 
-                   delta, "binom", list(prob=c(pd, pn)), 
-                   list(size=sizel), discrete=TRUE)
-        #results <- Viterbi(z)
-        results <- Viterbi.dthmm.allele.adj(z)
-        boundsnps <- rownames(lesser.data)[results == 1]
-        
-        ## vote
-        vote <- rep(0, nrow(lesser.data))
-        names(vote) <- rownames(lesser.data)
-        
-        vote[boundsnps] <- 1
-        
-        if(max(vote) == 0) {
-          flog.info(sprintf('Exiting; no new bound SNPs found at %s in %s cells ...', 
-                            chr, status))
-          return() ## exit iteration, no more bound SNPs found
-        }
-        
-        vote[vote > 0] <- 1
-        mv <- 1 ## at least 1 vote
-        cs <- 1
-        bound.snps.cont <- rep(0, length(vote))
-        names(bound.snps.cont) <- names(vote)
-        
-        for(i in 2:length(vote)) {
-          if(vote[i] >= mv & vote[i] == vote[i-1]) {
-            bound.snps.cont[i] <- cs
-          } else {
-            cs <- cs + 1
-          }
-        }
-        
-        tb <- table(bound.snps.cont)
-        tbv <- as.vector(tb)
-        names(tbv) <- names(tb)
-        tbv <- tbv[-1] # get rid of 0
-        
-        ## all detected deletions have fewer than 5 SNPs...reached the end
-        tbv <- tbv[tbv >= min.num.snps]
-        if(length(tbv)==0) {
-          flog.info(sprintf('Exiting; less than %s new bound SNPs found at %s in %s cells ...', 
-                            min.num.snps, chr, status))
-          return()
-        }
-        
-        HMM_info <- lapply(names(tbv), function(ti) {
-          
-          bound.snps.new <- names(bound.snps.cont)[bound.snps.cont == ti]
-          
-          ## trim
-          bound.snps.new <- bound.snps.new[1:round(length(bound.snps.new)-length(bound.snps.new)*trim)]
-          
-          cell_index <<- c(cell_index, list(tumor_sample_cells_idx))
-          return(bound.snps.new)
+    flog.info("predict_allele_CNV_via_HMM_on_whole_tumor_samples")
+
+    chrs = unique(infercnv_allele_obj@gene_order$chr)  #levels(infercnv_allele_obj@gene_order$chr) should provide this unless some chr were filtered out since creation
+    gene_order = infercnv_allele_obj@gene_order
+    lesser.data <- infercnv_allele_obj@count.data
+    coverage.data <- infercnv_allele_obj@coverage.data
+
+    ## initialize hmm allele data
+    hmm.allele.data <- matrix(2,
+                              nrow = nrow(lesser.data),
+                              ncol = ncol(lesser.data))
+    rownames(hmm.allele.data) <- rownames(lesser.data)
+    colnames(hmm.allele.data) <- colnames(lesser.data)
+
+    ## add the normals, so they get predictions too:
+    tumor_samples <- c(infercnv_allele_obj@observation_grouped_cell_indices, 
+                       infercnv_allele_obj@reference_grouped_cell_indices)
+    HMM_output <- c()
+    cell_index <- c()
+
+    ## run HMM across chromosomes
+    lapply(chrs, function(chr){
+
+        chr_snp_idx = which(gene_order$chr == chr)
+
+        lapply(tumor_samples, function(tumor_sample_cells_idx){
+
+            if(length(tumor_sample_cells_idx) > 1){
+
+                if(all(tumor_sample_cells_idx %in% unlist(infercnv_allele_obj@observation_grouped_cell_indices))) {
+                    status <- "tumor"
+                } else if(all(tumor_sample_cells_idx %in% unlist(infercnv_allele_obj@reference_grouped_cell_indices))) {
+                    status <- "normal"
+                }
+
+                lesser.data <- lesser.data[chr_snp_idx, tumor_sample_cells_idx,drop=FALSE]
+                coverage.data <- coverage.data[chr_snp_idx, tumor_sample_cells_idx,drop=FALSE]
+
+                mafl <- rowSums(lesser.data > 0)
+                sizel <- rowSums(coverage.data > 0)
+
+                ## change point
+                delta <- c(0.5, 0.5)
+                z <- dthmm(mafl,
+                           matrix(c(1-t, t, t, 1-t), byrow=TRUE, nrow=2), 
+                           delta,
+                           "binom",
+                           list(prob=c(pd, pn)),
+                           list(size=sizel),
+                           discrete=TRUE)
+                #results <- Viterbi(z)
+                results <- Viterbi.dthmm.allele.adj(z)
+                boundsnps <- rownames(lesser.data)[results == 1]
+
+                ## vote
+                vote <- rep(0, nrow(lesser.data))
+                names(vote) <- rownames(lesser.data)
+
+                vote[boundsnps] <- 1
+
+                if(max(vote) == 0) {
+                    flog.info(sprintf('Exiting; no new bound SNPs found at %s in %s cells ...', chr, status))
+                    return() ## exit iteration, no more bound SNPs found
+                }
+
+                vote[vote > 0] <- 1
+                mv <- 1 ## at least 1 vote
+                cs <- 1
+                bound.snps.cont <- rep(0, length(vote))
+                names(bound.snps.cont) <- names(vote)
+
+                for(i in 2:length(vote)) {
+                    if(vote[i] >= mv & vote[i] == vote[i-1]) {
+                        bound.snps.cont[i] <- cs
+                    } else {
+                        cs <- cs + 1
+                    }
+                }
+
+                tb <- table(bound.snps.cont)
+                tbv <- as.vector(tb)
+                names(tbv) <- names(tb)
+                tbv <- tbv[-1] # get rid of 0
+
+                ## all detected deletions have fewer than 5 SNPs...reached the end
+                tbv <- tbv[tbv >= min.num.snps]
+                if(length(tbv)==0) {
+                    flog.info(sprintf('Exiting; less than %s new bound SNPs found at %s in %s cells ...', min.num.snps, chr, status))
+                    return()
+                }
+
+                HMM_info <- lapply(names(tbv), function(ti) {
+
+                    bound.snps.new <- names(bound.snps.cont)[bound.snps.cont == ti]
+
+                    ## trim
+                    bound.snps.new <- bound.snps.new[1:round(length(bound.snps.new)-length(bound.snps.new)*trim)]
+
+                    cell_index <<- c(cell_index, list(tumor_sample_cells_idx))
+                    return(bound.snps.new)
+                })
+                HMM_output <<- c(HMM_output, HMM_info)
+                HMM_region <- do.call("c", lapply(HMM_info, function(bs) range(infercnv_allele_obj@SNP_info[bs])))
+
+                flog.info(sprintf("Done extracting HMM regions at %s in %s cells ...", chr, status))
+                print(HMM_region)
+
+                if(!is.null(HMM_region)) {
+                    hmm.allele.data[infercnv_allele_obj@SNP_info %over% HMM_region,
+                    tumor_sample_cells_idx] <<- 1
+                }
+            }
         })
-        HMM_output <<- c(HMM_output, HMM_info)
-        HMM_region <- do.call("c", lapply(HMM_info, function(bs) range(infercnv_allele_obj@SNP_info[bs])))
-        
-        flog.info(sprintf("Done extracting HMM regions at %s in %s cells ...", 
-                          chr, status))
-        print(HMM_region)
-        
-        if(!is.null(HMM_region)){
-          hmm.allele.data[infercnv_allele_obj@SNP_info %over% HMM_region,
-                          tumor_sample_cells_idx] <<- 1
-        }
-      }
     })
-  })
-  infercnv_allele_obj@expr.data <- hmm.allele.data
-  # return(list(infercnv_allele_obj = infercnv_allele_obj, 
-  #             HMM_output = HMM_output,
-  #             cell_index = cell_index))
-  return(infercnv_allele_obj)
+    infercnv_allele_obj@expr.data <- hmm.allele.data
+    # return(list(infercnv_allele_obj = infercnv_allele_obj, 
+    #             HMM_output = HMM_output,
+    #             cell_index = cell_index))
+    return(infercnv_allele_obj)
 }
 
 
 ################## deprecated 
 allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters_mod <- function(infercnv_allele_obj,
-                                                                    t = 1e-6, pd = 0.1, pn = 0.45,
-                                                                    min.num.snps = 5, trim = 0.1,
+                                                                    t = 1e-6,
+                                                                    pd = 0.1,
+                                                                    pn = 0.45,
+                                                                    min.num.snps = 5, 
+                                                                    trim = 0.1,
                                                                     min.traverse = 3){
-  
-  ## pre-check for allele data
-  if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)){
-    flog.info("Initializing the lesser allele fraction ...")
-    infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
-  }
-  
-  flog.info("predict_allele_CNV_via_HMM_on_tumor_subclusters")
-  
-  chrs = unique(infercnv_allele_obj@gene_order$chr)
-  gene_order = infercnv_allele_obj@gene_order
-  lesser.frac.data <- infercnv_allele_obj@expr.data
-  lesser.data <- infercnv_allele_obj@count.data
-  coverage.data <- infercnv_allele_obj@coverage.data
-  
-  ## initialize hmm states for allele data
-  hmm.allele.data <- matrix(0,
-                            nrow = nrow(lesser.data),
-                            ncol = ncol(lesser.data))
-  rownames(hmm.allele.data) <- rownames(lesser.data)
-  colnames(hmm.allele.data) <- colnames(lesser.data)
-  
-  tumor_subclusters <- unlist(infercnv_allele_obj@tumor_subclusters[["subclusters"]], recursive=FALSE)
-  
-  HMM_output <- c()
-  cell_index <- c()
-  ## add the normals, so they get predictions too:
-  #tumor_subclusters <- c(tumor_subclusters, infercnv_allele_obj@reference_grouped_cell_indices)
-  
-  ## run HMM across chromosomes
-  lapply(chrs, function(chr){
-    
-    chr_snp_idx = which(gene_order$chr == chr)
-    
-    lapply(tumor_subclusters, function(tumor_subcluster_cells_idx){
-      
-      if (length(tumor_subcluster_cells_idx) > 1){
-        
-        if(mean(tumor_subcluster_cells_idx %in% 
-                unlist(infercnv_allele_obj@observation_grouped_cell_indices)) == 1){
-          status <- "tumor"
-        }
-        if(mean(tumor_subcluster_cells_idx %in% 
-                unlist(infercnv_allele_obj@reference_grouped_cell_indices)) == 1){
-          status <- "normal"
-        }
-        
-        lesser.frac.data <- lesser.frac.data[chr_snp_idx,
-                                             tumor_subcluster_cells_idx,drop=FALSE]
-        lesser.data <- lesser.data[chr_snp_idx,
-                                   tumor_subcluster_cells_idx,drop=FALSE]
-        coverage.data <- coverage.data[chr_snp_idx,
-                                       tumor_subcluster_cells_idx,drop=FALSE]
-        
-        d <- parallelDist(t(lesser.frac.data), 
-                          method = "euclidean", threads = 5) # parallel dist
-        hc <- hclust(d, method="ward.D2")
-        
-        flog.info('Starting iterative HMM ...')
-        heights <- 1:min(min.traverse, 
-                         ncol(lesser.frac.data))
-        
-        boundsnps.pred <- lapply(heights, function(h) {
-          
-          ct <- cutree(hc, k = h)
-          cuts <- unique(ct)
-          
-          ## look at each group, if deletion present
-          boundsnps.pred <- lapply(cuts, function(group) {
-            
-            if(sum(ct == group)>1) {
-              
-              mafl <- rowSums(lesser.data[, ct == group]>0)
-              sizel <- rowSums(coverage.data[, ct == group]>0)
-              
-              ## change point
-              delta <- c(0, 1)
-              z <- dthmm(mafl, matrix(c(1-t, t, t, 1-t),
-                                      byrow=TRUE, nrow=2),
-                         delta, "binom", list(prob=c(pd, pn)),
-                         list(size=sizel), discrete=TRUE)
-              results <- Viterbi(z)
-              
-              ## Get boundaries from states
-              boundsnps <- rownames(lesser.frac.data)[results == 1]
-              return(boundsnps)
+
+    ## pre-check for allele data
+    if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)){
+        flog.info("Initializing the lesser allele fraction ...")
+        infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
+    }
+
+    flog.info("predict_allele_CNV_via_HMM_on_tumor_subclusters")
+
+    chrs = unique(infercnv_allele_obj@gene_order$chr)
+    gene_order = infercnv_allele_obj@gene_order
+    lesser.frac.data <- infercnv_allele_obj@expr.data
+    lesser.data <- infercnv_allele_obj@count.data
+    coverage.data <- infercnv_allele_obj@coverage.data
+
+    ## initialize hmm states for allele data
+    hmm.allele.data <- matrix(0,
+                              nrow = nrow(lesser.data),
+                              ncol = ncol(lesser.data))
+    rownames(hmm.allele.data) <- rownames(lesser.data)
+    colnames(hmm.allele.data) <- colnames(lesser.data)
+
+    tumor_subclusters <- unlist(infercnv_allele_obj@tumor_subclusters[["subclusters"]], recursive=FALSE)
+
+    HMM_output <- c()
+    cell_index <- c()
+    ## add the normals, so they get predictions too:
+    #tumor_subclusters <- c(tumor_subclusters, infercnv_allele_obj@reference_grouped_cell_indices)
+
+    ## run HMM across chromosomes
+    lapply(chrs, function(chr) {
+
+        chr_snp_idx = which(gene_order$chr == chr)
+
+        lapply(tumor_subclusters, function(tumor_subcluster_cells_idx) {
+
+            if (length(tumor_subcluster_cells_idx) > 1){
+
+                if(all(tumor_subcluster_cells_idx %in% unlist(infercnv_allele_obj@observation_grouped_cell_indices))) {
+                    status <- "tumor"
+                } else if(all(tumor_subcluster_cells_idx %in% unlist(infercnv_allele_obj@reference_grouped_cell_indices))) {
+                    status <- "normal"
+                }
+
+                lesser.frac.data <- lesser.frac.data[chr_snp_idx, tumor_subcluster_cells_idx,drop=FALSE]
+                lesser.data      <-      lesser.data[chr_snp_idx, tumor_subcluster_cells_idx,drop=FALSE]
+                coverage.data    <-    coverage.data[chr_snp_idx, tumor_subcluster_cells_idx,drop=FALSE]
+
+                d <- parallelDist(t(lesser.frac.data), method = "euclidean", threads = infercnv.env$GLOBAL_NUM_THREADS) # parallel dist
+                hc <- hclust(d, method="ward.D2")
+
+                flog.info('Starting iterative HMM ...')
+                heights <- 1:min(min.traverse, ncol(lesser.frac.data))
+
+                boundsnps.pred <- lapply(heights, function(h) {
+
+                    ct <- cutree(hc, k = h)
+                    cuts <- unique(ct)
+
+                    ## look at each group, if deletion present
+                    boundsnps.pred <- lapply(cuts, function(group) {
+
+                        if(sum(ct == group)>1) {
+
+                            mafl <- rowSums(lesser.data[, ct == group]>0)
+                            sizel <- rowSums(coverage.data[, ct == group]>0)
+
+                            ## change point
+                            delta <- c(0, 1)
+                            z <- dthmm(mafl, matrix(c(1-t, t, t, 1-t),
+                              byrow=TRUE, nrow=2),
+                            delta, "binom", list(prob=c(pd, pn)),
+                            list(size=sizel), discrete=TRUE)
+                            results <- Viterbi(z)
+
+                            ## Get boundaries from states
+                            boundsnps <- rownames(lesser.frac.data)[results == 1]
+                            return(boundsnps)
+                        }
+                    })
+                })
+
+                boundsnps_res <- table(unlist(boundsnps.pred))
+
+                # vote
+                vote <- rep(0, nrow(lesser.frac.data))
+                names(vote) <- rownames(lesser.frac.data)
+                vote[names(boundsnps_res)] <- boundsnps_res
+
+                if(max(vote) == 0) {
+                    flog.info('Exiting; no new bound SNPs found ...')
+                    return() ## exit iteration, no more bound SNPs found
+                }
+
+                vote[vote > 0] <- 1
+                mv <- 1 ## at least 1 vote
+                cs <- 1
+                bound.snps.cont <- rep(0, length(vote))
+                names(bound.snps.cont) <- names(vote)
+
+                for(i in 2:length(vote)) {
+                    if(vote[i] >= mv & vote[i] == vote[i-1]) {
+                        bound.snps.cont[i] <- cs
+                    } else {
+                        cs <- cs + 1
+                    }
+                }
+
+                tb <- table(bound.snps.cont)
+                tbv <- as.vector(tb)
+                names(tbv) <- names(tb)
+                tbv <- tbv[-1] # get rid of 0
+
+                ## all detected deletions have fewer than 5 SNPs...reached the end
+                tbv <- tbv[tbv >= min.num.snps]
+                if(length(tbv) == 0) {
+                    flog.info(sprintf('Exiting; less than %s new bound SNPs found ...', min.num.snps))
+                    return()
+                }
+
+                HMM_info <- lapply(names(tbv), function(ti) {
+                    bound.snps.new <- names(bound.snps.cont)[bound.snps.cont == ti]
+
+                    ## trim
+                    bound.snps.new <- bound.snps.new[1:round(length(bound.snps.new)-length(bound.snps.new)*trim)]
+                    cell_index <<- c(cell_index, list(tumor_subcluster_cells_idx))
+
+                    return(bound.snps.new)
+                })
+
+                HMM_output <<- c(HMM_output, HMM_info)
+                HMM_region <- do.call("c", lapply(HMM_info, function(bs) range(infercnv_allele_obj@SNP_info[bs])))
+
+                flog.info(sprintf("Done extracting HMM regions at %s in %s cells ...", chr, status))
+                print(HMM_region)
+
+                if(!is.null(HMM_region)) {
+                    hmm.allele.data[infercnv_allele_obj@SNP_info %over% HMM_region,
+                    tumor_subcluster_cells_idx] <<- -1
+                }
             }
-          })
         })
-        
-        boundsnps_res <- table(unlist(boundsnps.pred))
-        
-        # vote
-        vote <- rep(0, nrow(lesser.frac.data))
-        names(vote) <- rownames(lesser.frac.data)
-        vote[names(boundsnps_res)] <- boundsnps_res
-        
-        if(max(vote) == 0) {
-          flog.info('Exiting; no new bound SNPs found ...')
-          return() ## exit iteration, no more bound SNPs found
-        }
-        
-        vote[vote > 0] <- 1
-        mv <- 1 ## at least 1 vote
-        cs <- 1
-        bound.snps.cont <- rep(0, length(vote))
-        names(bound.snps.cont) <- names(vote)
-        
-        for(i in 2:length(vote)) {
-          if(vote[i] >= mv & vote[i] == vote[i-1]) {
-            bound.snps.cont[i] <- cs
-          } else {
-            cs <- cs + 1
-          }
-        }
-        
-        tb <- table(bound.snps.cont)
-        tbv <- as.vector(tb)
-        names(tbv) <- names(tb)
-        tbv <- tbv[-1] # get rid of 0
-        
-        ## all detected deletions have fewer than 5 SNPs...reached the end
-        tbv <- tbv[tbv >= min.num.snps]
-        if(length(tbv)==0) {
-          flog.info(sprintf('Exiting; less than %s new bound SNPs found ...', min.num.snps))
-          return()
-        }
-        
-        HMM_info <- lapply(names(tbv), function(ti) {
-          
-          bound.snps.new <- names(bound.snps.cont)[bound.snps.cont == ti]
-          
-          ## trim
-          bound.snps.new <- bound.snps.new[1:round(length(bound.snps.new)-length(bound.snps.new)*trim)]
-          cell_index <<- c(cell_index, list(tumor_subcluster_cells_idx))
-          
-          return(bound.snps.new)
-          
-        })
-        HMM_output <<- c(HMM_output, HMM_info)
-        HMM_region <- do.call("c", lapply(HMM_info, function(bs) range(infercnv_allele_obj@SNP_info[bs])))
-        
-        flog.info(sprintf("Done extracting HMM regions at %s in %s cells ...", 
-                          chr, status))
-        print(HMM_region)
-        
-        if(!is.null(HMM_region)){
-          hmm.allele.data[infercnv_allele_obj@SNP_info %over% HMM_region,
-                          tumor_subcluster_cells_idx] <<- -1
-        }
-      }
     })
-  })
-  
-  infercnv_allele_obj@expr.data <- hmm.allele.data
-  return(infercnv_allele_obj)
-  
+
+    infercnv_allele_obj@expr.data <- hmm.allele.data
+    return(infercnv_allele_obj)
 }
+
 allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples_mod <- function(infercnv_allele_obj,
-                                                                      t = 1e-6, pd = 0.1, pn = 0.45,
-                                                                      min.num.snps = 5, trim = 0.1,
+                                                                      t = 1e-6,
+                                                                      pd = 0.1,
+                                                                      pn = 0.45,
+                                                                      min.num.snps = 5,
+                                                                      trim = 0.1,
                                                                       min.traverse = 3){
-  
-  ## pre-check for allele data
-  if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)){
-    flog.info("Initializing the lesser allele fraction ...")
-    infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
-  }
-  
-  flog.info("predict_allele_CNV_via_HMM_on_whole_tumor_samples_mod")
-  
-  chrs = unique(infercnv_allele_obj@gene_order$chr)
-  gene_order = infercnv_allele_obj@gene_order
-  lesser.frac.data <- infercnv_allele_obj@expr.data
-  lesser.data <- infercnv_allele_obj@count.data
-  coverage.data <- infercnv_allele_obj@coverage.data
-  
-  ## initialize hmm allele data
-  hmm.allele.data <- matrix(0,
-                            nrow = nrow(lesser.data),
-                            ncol = ncol(lesser.data))
-  rownames(hmm.allele.data) <- rownames(lesser.data)
-  colnames(hmm.allele.data) <- colnames(lesser.data)
-  
-  ## add the normals, so they get predictions too:
-  tumor_samples <- c(infercnv_allele_obj@observation_grouped_cell_indices, 
-                     infercnv_allele_obj@reference_grouped_cell_indices)
-  HMM_output <- c()
-  cell_index <- c()
-  
-  ## run HMM across chromosomes
-  lapply(chrs, function(chr){
-    
-    chr_snp_idx = which(gene_order$chr == chr)
-    
-    lapply(tumor_samples, function(tumor_sample_cells_idx){
-      
-      if(length(tumor_sample_cells_idx) > 1){
-        
-        if(mean(tumor_sample_cells_idx %in% 
-                unlist(infercnv_allele_obj@observation_grouped_cell_indices)) == 1){
-          status <- "tumor"
-        }
-        if(mean(tumor_sample_cells_idx %in% 
-                unlist(infercnv_allele_obj@reference_grouped_cell_indices)) == 1){
-          status <- "normal"
-        }
-        
-        lesser.frac.data <- lesser.frac.data[chr_snp_idx,
-                                             tumor_sample_cells_idx,drop=FALSE]
-        lesser.data <- lesser.data[chr_snp_idx,
-                                   tumor_sample_cells_idx,drop=FALSE]
-        coverage.data <- coverage.data[chr_snp_idx,
-                                       tumor_sample_cells_idx,drop=FALSE]
-        
-        d <- parallelDist(t(lesser.frac.data), 
-                     method = "euclidean", threads = 5) # parallel dist
-        hc <- hclust(d, method="ward.D2")
 
-        flog.info('Starting iterative HMM ...')
-        heights <- 1:min(min.traverse, 
-                         ncol(lesser.frac.data))
+    ## pre-check for allele data
+    if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)){
+        flog.info("Initializing the lesser allele fraction ...")
+        infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
+    }
 
-        boundsnps.pred <- lapply(heights, function(h) {
-          
-          ct <- cutree(hc, k = h)
-          cuts <- unique(ct)
+    flog.info("predict_allele_CNV_via_HMM_on_whole_tumor_samples_mod")
 
-          ## look at each group, if deletion present
-          boundsnps.pred <- lapply(cuts, function(group) {
-            
-            if(sum(ct == group)>1) {
-              
-              mafl <- rowSums(lesser.data[, ct == group]>0)
-              sizel <- rowSums(coverage.data[, ct == group]>0)
+    chrs = unique(infercnv_allele_obj@gene_order$chr)
+    gene_order = infercnv_allele_obj@gene_order
+    lesser.frac.data <- infercnv_allele_obj@expr.data
+    lesser.data <- infercnv_allele_obj@count.data
+    coverage.data <- infercnv_allele_obj@coverage.data
 
-              ## change point
-              delta <- c(0, 1)
-              z <- dthmm(mafl, matrix(c(1-t, t, t, 1-t),
-                                      byrow=TRUE, nrow=2),
-                         delta, "binom", list(prob=c(pd, pn)),
-                         list(size=sizel), discrete=TRUE)
-              results <- Viterbi(z)
+    ## initialize hmm allele data
+    hmm.allele.data <- matrix(0,
+                              nrow = nrow(lesser.data),
+                              ncol = ncol(lesser.data))
+    rownames(hmm.allele.data) <- rownames(lesser.data)
+    colnames(hmm.allele.data) <- colnames(lesser.data)
 
-              ## Get boundaries from states
-              boundsnps <- rownames(lesser.frac.data)[results == 1]
-              return(boundsnps)
+    ## add the normals, so they get predictions too:
+    tumor_samples <- c(infercnv_allele_obj@observation_grouped_cell_indices, infercnv_allele_obj@reference_grouped_cell_indices)
+    HMM_output <- c()
+    cell_index <- c()
+
+    ## run HMM across chromosomes
+    lapply(chrs, function(chr){
+
+        chr_snp_idx = which(gene_order$chr == chr)
+
+        lapply(tumor_samples, function(tumor_sample_cells_idx){
+
+            if(length(tumor_sample_cells_idx) > 1){
+
+                if(all(tumor_sample_cells_idx %in% unlist(infercnv_allele_obj@observation_grouped_cell_indices))) {
+                    status <- "tumor"
+                } else if(all(tumor_sample_cells_idx %in% unlist(infercnv_allele_obj@reference_grouped_cell_indices))) {
+                    status <- "normal"
+                }
+
+                lesser.frac.data <- lesser.frac.data[chr_snp_idx, tumor_sample_cells_idx,drop=FALSE]
+                lesser.data      <-      lesser.data[chr_snp_idx, tumor_sample_cells_idx,drop=FALSE]
+                coverage.data    <-    coverage.data[chr_snp_idx, tumor_sample_cells_idx,drop=FALSE]
+
+                d <- parallelDist(t(lesser.frac.data), method = "euclidean", threads = infercnv.env$GLOBAL_NUM_THREADS) # parallel dist
+                hc <- hclust(d, method="ward.D2")
+
+                flog.info('Starting iterative HMM ...')
+                heights <- 1:min(min.traverse, ncol(lesser.frac.data))
+
+                boundsnps.pred <- lapply(heights, function(h) {
+
+                    ct <- cutree(hc, k = h)
+                    cuts <- unique(ct)
+
+                    ## look at each group, if deletion present
+                    boundsnps.pred <- lapply(cuts, function(group) {
+
+                        if(sum(ct == group)>1) {
+
+                            mafl <- rowSums(lesser.data[, ct == group]>0)
+                            sizel <- rowSums(coverage.data[, ct == group]>0)
+
+                            ## change point
+                            delta <- c(0, 1)
+                            z <- dthmm(mafl, 
+                                       matrix(c(1-t, t, t, 1-t), byrow=TRUE, nrow=2),
+                                       delta,
+                                       "binom",
+                                       list(prob=c(pd, pn)),
+                                       list(size=sizel),
+                                       discrete=TRUE)
+                            results <- Viterbi(z)
+
+                            ## Get boundaries from states
+                            boundsnps <- rownames(lesser.frac.data)[results == 1]
+                            return(boundsnps)
+                        }
+                    })
+                })
+
+                boundsnps_res <- table(unlist(boundsnps.pred))
+
+                # vote
+                vote <- rep(0, nrow(lesser.frac.data))
+                names(vote) <- rownames(lesser.frac.data)
+                vote[names(boundsnps_res)] <- boundsnps_res
+
+                if(max(vote) == 0) {
+                    flog.info('Exiting; no new bound SNPs found ...')
+                    return() ## exit iteration, no more bound SNPs found
+                }
+
+                vote[vote > 0] <- 1
+                mv <- 1 ## at least 1 vote
+                cs <- 1
+                bound.snps.cont <- rep(0, length(vote))
+                names(bound.snps.cont) <- names(vote)
+
+                for(i in 2:length(vote)) {
+                    if(vote[i] >= mv & vote[i] == vote[i-1]) {
+                        bound.snps.cont[i] <- cs
+                    } else {
+                        cs <- cs + 1
+                    }
+                }
+
+                tb <- table(bound.snps.cont)
+                tbv <- as.vector(tb)
+                names(tbv) <- names(tb)
+                tbv <- tbv[-1] # get rid of 0
+
+                ## all detected deletions have fewer than 5 SNPs...reached the end
+                tbv <- tbv[tbv >= min.num.snps]
+                if(length(tbv)==0) {
+                    flog.info(sprintf('Exiting; less than %s new bound SNPs found ...', min.num.snps))
+                    return()
+                }
+
+                HMM_info <- lapply(names(tbv), function(ti) {
+
+                    bound.snps.new <- names(bound.snps.cont)[bound.snps.cont == ti]
+
+                    ## trim
+                    bound.snps.new <- bound.snps.new[1:round(length(bound.snps.new)-length(bound.snps.new)*trim)]
+
+                    cell_index <<- c(cell_index, list(tumor_sample_cells_idx))
+                    return(bound.snps.new)
+                })
+                HMM_output <<- c(HMM_output, HMM_info)
+                HMM_region <- do.call("c", lapply(HMM_info, function(bs) range(infercnv_allele_obj@SNP_info[bs])))
+
+                flog.info(sprintf("Done extracting HMM regions at %s in %s cells ...", 
+                    chr, status))
+                print(HMM_region)
+
+                if(!is.null(HMM_region)) {
+                    hmm.allele.data[infercnv_allele_obj@SNP_info %over% HMM_region,
+                    tumor_sample_cells_idx] <<- -1
+                }
             }
-          })
         })
-        
-        boundsnps_res <- table(unlist(boundsnps.pred))
-        
-        # vote
-        vote <- rep(0, nrow(lesser.frac.data))
-        names(vote) <- rownames(lesser.frac.data)
-        vote[names(boundsnps_res)] <- boundsnps_res
-
-        if(max(vote) == 0) {
-          flog.info('Exiting; no new bound SNPs found ...')
-          return() ## exit iteration, no more bound SNPs found
-        }
-
-        vote[vote > 0] <- 1
-        mv <- 1 ## at least 1 vote
-        cs <- 1
-        bound.snps.cont <- rep(0, length(vote))
-        names(bound.snps.cont) <- names(vote)
-
-        for(i in 2:length(vote)) {
-          if(vote[i] >= mv & vote[i] == vote[i-1]) {
-            bound.snps.cont[i] <- cs
-          } else {
-            cs <- cs + 1
-          }
-        }
-
-        tb <- table(bound.snps.cont)
-        tbv <- as.vector(tb)
-        names(tbv) <- names(tb)
-        tbv <- tbv[-1] # get rid of 0
-
-        ## all detected deletions have fewer than 5 SNPs...reached the end
-        tbv <- tbv[tbv >= min.num.snps]
-        if(length(tbv)==0) {
-          flog.info(sprintf('Exiting; less than %s new bound SNPs found ...', min.num.snps))
-          return()
-        }
-        
-        HMM_info <- lapply(names(tbv), function(ti) {
-          
-          bound.snps.new <- names(bound.snps.cont)[bound.snps.cont == ti]
-          
-          ## trim
-          bound.snps.new <- bound.snps.new[1:round(length(bound.snps.new)-length(bound.snps.new)*trim)]
-          
-          cell_index <<- c(cell_index, list(tumor_sample_cells_idx))
-          return(bound.snps.new)
-        })
-        HMM_output <<- c(HMM_output, HMM_info)
-        HMM_region <- do.call("c", lapply(HMM_info, function(bs) range(infercnv_allele_obj@SNP_info[bs])))
-        
-        flog.info(sprintf("Done extracting HMM regions at %s in %s cells ...", 
-                          chr, status))
-        print(HMM_region)
-        
-        if(!is.null(HMM_region)){
-          hmm.allele.data[infercnv_allele_obj@SNP_info %over% HMM_region,
-                          tumor_sample_cells_idx] <<- -1
-        }
-      }
     })
-  })
-  
-  infercnv_allele_obj@expr.data <- hmm.allele.data
-  return(infercnv_allele_obj)
-  
+
+    infercnv_allele_obj@expr.data <- hmm.allele.data
+    return(infercnv_allele_obj)
+
 }
 ##################
 
 
-Viterbi.dthmm.allele.adj <- function(object, ...){
-  #browser()
-  x <- object$x
-  size_l <- object$pn$size
-  
-  if (length(x) < 2) {
-    ## not enough run a trace on
-    return(2); # neutral state
-  }
-  
-  n <- length(x)
-  m <- nrow(object$Pi) # transition matrix
-  nu <- matrix(NA, nrow = n, ncol = m)  # scoring matrix
-  y <- rep(NA, n) # final trace
-  
-  ##
-  emissions <- matrix(NA, nrow = n, ncol = m) 
-  ##
-  
-  ## init first row
-  emission <- dbinom(x = x[1], size = size_l[1], prob = object$pm$prob)
-  emission[emission < object$Pi[1,2]] <- object$Pi[1,2]
-  ##
-  
-  ##
-  #emission <- 1 / (-1 * emission)
-  emission <- emission / sum(emission)
-  emissions[1,] <- log(emission)
-  #emissions[1,] <- emission
-  ##
-  
-  nu[1, ] <- log(object$delta) + # start probabilities
-    emissions[1,]
-  
-  logPi <- log(object$Pi) # convert transition matrix to log(p)
-  
-  for (i in 2:n) {
-    
-    matrixnu <- matrix(nu[i - 1, ], nrow = m, ncol = m)
-    
+Viterbi.dthmm.allele.adj <- function(object, ...) {
+    #browser()
+    x <- object$x
+    size_l <- object$pn$size
+
+    if (length(x) < 2) {
+        ## not enough run a trace on
+        return(2); # neutral state
+    }
+
+    n <- length(x)
+    m <- nrow(object$Pi) # transition matrix
+    nu <- matrix(NA, nrow = n, ncol = m)  # scoring matrix
+    y <- rep(NA, n) # final trace
+
     ##
-    emission <- dbinom(x = x[i], size = size_l[i], prob = object$pm$prob)
+    emissions <- matrix(NA, nrow = n, ncol = m) 
+    ##
+
+    ## init first row
+    emission <- dbinom(x = x[1], size = size_l[1], prob = object$pm$prob)
     emission[emission < object$Pi[1,2]] <- object$Pi[1,2]
-    
+    ##
+
+    ##
     #emission <- 1 / (-1 * emission)
     emission <- emission / sum(emission)
-    emissions[i,] <- log(emission)
-    #emissions[i,] <- emission
+    emissions[1,] <- log(emission)
+    #emissions[1,] <- emission
     ##
-    
-    nu[i, ] <- apply(matrixnu + logPi, 2, max) + emissions[i, ] 
-    
-  }
-  #return(nu)
-  
-  if (any(nu[n, ] == -Inf)) 
-    stop("Problems With Underflow")
-  
-  ## traceback
-  y[n] <- which.max(nu[n, ])
-  
-  for (i in seq(n - 1, 1, -1))
-    y[i] <- which.max(logPi[, y[i + 1]] + nu[i, ])
-  
-  return(y)
+
+    nu[1, ] <- log(object$delta) + # start probabilities
+                                   emissions[1,]
+
+    logPi <- log(object$Pi) # convert transition matrix to log(p)
+
+    for (i in 2:n) {
+
+        matrixnu <- matrix(nu[i - 1, ], nrow = m, ncol = m)
+
+        ##
+        emission <- dbinom(x = x[i], size = size_l[i], prob = object$pm$prob)
+        emission[emission < object$Pi[1,2]] <- object$Pi[1,2]
+
+        #emission <- 1 / (-1 * emission)
+        emission <- emission / sum(emission)
+        emissions[i,] <- log(emission)
+        #emissions[i,] <- emission
+        ##
+
+        nu[i, ] <- apply(matrixnu + logPi, 2, max) + emissions[i, ] 
+
+    }
+    #return(nu)
+
+    if (any(nu[n, ] == -Inf)) 
+        stop("Problems With Underflow")
+
+    ## traceback
+    y[n] <- which.max(nu[n, ])
+
+    for (i in seq(n - 1, 1, -1))
+        y[i] <- which.max(logPi[, y[i + 1]] + nu[i, ])
+
+    return(y)
 }
 
 ## aggregrate into a higher level
