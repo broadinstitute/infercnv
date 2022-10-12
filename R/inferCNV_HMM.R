@@ -685,8 +685,19 @@ predict_CNV_via_HMM_on_whole_tumor_samples  <- function(infercnv_obj,
 #' @noRd
 #'
 
-get_predicted_CNV_regions <- function(infercnv_obj, by=c("consensus", "subcluster", "cell")) {
+get_predicted_CNV_regions <- function(infercnv_obj,
+                                      by=c("consensus", "subcluster", "cell"),
+                                      mode=c("expression", "allele")) {
     by = match.arg(by)
+    mode = match.arg(mode)
+
+    if (mode == "expression") {
+        expr.data = infercnv_obj@expr.data
+        gene_order = infercnv_obj@gene_order
+    } else { # "allele"
+        expr.data = infercnv_obj@allele.expr.data
+        gene_order = infercnv_obj@allele.gene_order
+    }
 
     flog.info(sprintf("get_predicted_CNV_regions(%s)", by)) 
     
@@ -705,7 +716,7 @@ get_predicted_CNV_regions <- function(infercnv_obj, by=c("consensus", "subcluste
     } else if (by == "cell") {
         # cell_groups = lapply(unlist(infercnv_obj@observation_grouped_cell_indices), function(x) x) 
         cell_groups = c(unlist(infercnv_obj@reference_grouped_cell_indices, use.names=FALSE), unlist(infercnv_obj@observation_grouped_cell_indices, use.names=FALSE))
-        names(cell_groups) = colnames(infercnv_obj@expr.data)[cell_groups]
+        names(cell_groups) = colnames(expr.data)[cell_groups]
     }
     else {
         stop("Error, shouldn't get here ... bug")
@@ -721,13 +732,13 @@ get_predicted_CNV_regions <- function(infercnv_obj, by=c("consensus", "subcluste
 
         flog.info(sprintf("-processing cell_group_name: %s, size: %d", cell_group_name, length(cell_group)))
                 
-        cell_group_mtx = infercnv_obj@expr.data[,cell_group,drop=FALSE]
+        cell_group_mtx = expr.data[,cell_group,drop=FALSE]
         cell_group_names = colnames(cell_group_mtx)
 
         state_consensus <- .get_state_consensus(cell_group_mtx)
         
         names(state_consensus) <- rownames(cell_group_mtx)
-        cnv_gene_regions <- .define_cnv_gene_regions(state_consensus, infercnv_obj@gene_order, cnv_counter_start)
+        cnv_gene_regions <- .define_cnv_gene_regions(state_consensus, gene_order, cnv_counter_start)
         cnv_ranges <- .get_cnv_gene_region_bounds(cnv_gene_regions)
 
         consensus_state_list = list(cell_group_name=cell_group_name,
@@ -761,6 +772,8 @@ get_predicted_CNV_regions <- function(infercnv_obj, by=c("consensus", "subcluste
 #' @param by options("consensus", "subcluster", "cell"), determines the granularity at which to report
 #'           the CNV regions.  Ideally, set to the same level at which the HMM predictions were performed.
 #'
+#' @param mode options("expression", "allele"), determines if to generate the reports on the expression based results or allele based results.
+#'
 #' @return None
 #'
 #' @keywords internal
@@ -773,10 +786,12 @@ generate_cnv_region_reports <- function(infercnv_obj,
                                         output_filename_prefix,
                                         out_dir,
                                         ignore_neutral_state=NA,
-                                        by=c("consensus", "subcluster", "cell") ) {
+                                        by=c("consensus", "subcluster", "cell"),
+                                        mode=c("expression", "allele")) {
 
-    
-    cnv_regions <- get_predicted_CNV_regions(infercnv_obj, by)
+    mode = arg.match(mode)
+
+    cnv_regions <- get_predicted_CNV_regions(infercnv_obj, by, mode)
 
     ## cell clusters defined.
     cell_clusters_outfile = paste(out_dir, paste0(output_filename_prefix, ".cell_groupings"), sep="/")
@@ -843,7 +858,11 @@ generate_cnv_region_reports <- function(infercnv_obj,
     ## write file containing all genes that were leveraged in the predictions:
     gene_order_outfile = paste(out_dir, paste0(output_filename_prefix, ".genes_used.dat"), sep="/")
     flog.info(sprintf("-writing gene ordering info: %s", gene_order_outfile))
-    write.table(infercnv_obj@gene_order, file=gene_order_outfile, quote=FALSE, sep="\t")
+    if (mode == "expression") {
+        write.table(infercnv_obj@gene_order, file=gene_order_outfile, quote=FALSE, sep="\t")
+    } else { # "allele"
+        write.table(infercnv_obj@allele.gene_order, file=gene_order_outfile, quote=FALSE, sep="\t")
+    }
     
     
     return

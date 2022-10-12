@@ -10,18 +10,19 @@
 allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_obj,
                                                                 t = 1e-6, pd = 0.1, pn = 0.45,
                                                                 min.num.snps = 5, trim = 0.1) {
+
     ## pre-check for allele data
-    if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)) {
+    if(is.null(infercnv_allele_obj@allele.expr.data) | is.null(infercnv_allele_obj@allele.count.data)) {
         flog.info("Initializing the lesser allele fraction ...")
         infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
     }
 
     flog.info("predict_allele_CNV_via_HMM_on_tumor_subclusters")
 
-    chrs = unique(infercnv_allele_obj@gene_order$chr)
-    gene_order = infercnv_allele_obj@gene_order
-    lesser.data <- infercnv_allele_obj@count.data
-    coverage.data <- infercnv_allele_obj@coverage.data
+    chrs = unique(infercnv_allele_obj@allele.gene_order$chr)
+    gene_order = infercnv_allele_obj@allele.gene_order
+    lesser.data <- infercnv_allele_obj@allele.count.data
+    coverage.data <- infercnv_allele_obj@allele.coverage.data
 
     ## initialize hmm states for allele data
     hmm.allele.data <- matrix(2,
@@ -30,7 +31,7 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
     rownames(hmm.allele.data) <- rownames(lesser.data)
     colnames(hmm.allele.data) <- colnames(lesser.data)
 
-    tumor_subclusters <- unlist(infercnv_allele_obj@tumor_subclusters[["subclusters"]], recursive=FALSE)
+    tumor_subclusters <- unlist(infercnv_obj@tumor_subclusters[["subclusters"]], recursive=FALSE)
 
     HMM_output <- c()
     cell_index <- c()
@@ -131,7 +132,7 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
             }
         })
     })
-    infercnv_allele_obj@expr.data <- hmm.allele.data
+    infercnv_allele_obj@allele.expr.data <- hmm.allele.data
     # return(list(infercnv_allele_obj = infercnv_allele_obj, 
     #             HMM_output = HMM_output,
     #             cell_index = cell_index))
@@ -154,17 +155,17 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
                                                                   min.num.snps = 5,
                                                                   trim = 0.1) {
     ## pre-check for allele data
-    if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)) {
+    if(is.null(infercnv_allele_obj@allele.expr.data) | is.null(infercnv_allele_obj@allele.count.data)) {
         flog.info("Initializing the lesser allele fraction ...")
         infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
     }
 
     flog.info("predict_allele_CNV_via_HMM_on_whole_tumor_samples")
 
-    chrs = unique(infercnv_allele_obj@gene_order$chr)  #levels(infercnv_allele_obj@gene_order$chr) should provide this unless some chr were filtered out since creation
-    gene_order = infercnv_allele_obj@gene_order
-    lesser.data <- infercnv_allele_obj@count.data
-    coverage.data <- infercnv_allele_obj@coverage.data
+    chrs = unique(infercnv_allele_obj@allele.gene_order$chr)  #levels(infercnv_allele_obj@gene_order$chr) should provide this unless some chr were filtered out since creation
+    gene_order = infercnv_allele_obj@allele.gene_order
+    lesser.data <- infercnv_allele_obj@allele.count.data
+    coverage.data <- infercnv_allele_obj@allele.coverage.data
 
     ## initialize hmm allele data
     hmm.allele.data <- matrix(2,
@@ -273,7 +274,7 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
             }
         })
     })
-    infercnv_allele_obj@expr.data <- hmm.allele.data
+    infercnv_allele_obj@allele.expr.data <- hmm.allele.data
     # return(list(infercnv_allele_obj = infercnv_allele_obj, 
     #             HMM_output = HMM_output,
     #             cell_index = cell_index))
@@ -291,18 +292,18 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters_mod <- function(infercnv_all
                                                                     min.traverse = 3){
 
     ## pre-check for allele data
-    if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)){
+    if(is.null(infercnv_allele_obj@allele.expr.data) | is.null(infercnv_allele_obj@allele.count.data)){
         flog.info("Initializing the lesser allele fraction ...")
         infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
     }
 
     flog.info("predict_allele_CNV_via_HMM_on_tumor_subclusters")
 
-    chrs = unique(infercnv_allele_obj@gene_order$chr)
-    gene_order = infercnv_allele_obj@gene_order
-    lesser.frac.data <- infercnv_allele_obj@expr.data
-    lesser.data <- infercnv_allele_obj@count.data
-    coverage.data <- infercnv_allele_obj@coverage.data
+    chrs = unique(infercnv_allele_obj@allele.gene_order$chr)
+    gene_order = infercnv_allele_obj@allele.gene_order
+    lesser.frac.data <- infercnv_allele_obj@allele.expr.data
+    lesser.data <- infercnv_allele_obj@allele.count.data
+    coverage.data <- infercnv_allele_obj@allele.coverage.data
 
     ## initialize hmm states for allele data
     hmm.allele.data <- matrix(0,
@@ -433,7 +434,7 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters_mod <- function(infercnv_all
         })
     })
 
-    infercnv_allele_obj@expr.data <- hmm.allele.data
+    infercnv_allele_obj@allele.expr.data <- hmm.allele.data
     return(infercnv_allele_obj)
 }
 
@@ -446,18 +447,18 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples_mod <- function(infercnv_a
                                                                       min.traverse = 3){
 
     ## pre-check for allele data
-    if(is.null(infercnv_allele_obj@expr.data) | is.null(infercnv_allele_obj@count.data)){
+    if(is.null(infercnv_allele_obj@allele.expr.data) | is.null(infercnv_allele_obj@allele.count.data)){
         flog.info("Initializing the lesser allele fraction ...")
         infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
     }
 
     flog.info("predict_allele_CNV_via_HMM_on_whole_tumor_samples_mod")
 
-    chrs = unique(infercnv_allele_obj@gene_order$chr)
-    gene_order = infercnv_allele_obj@gene_order
-    lesser.frac.data <- infercnv_allele_obj@expr.data
-    lesser.data <- infercnv_allele_obj@count.data
-    coverage.data <- infercnv_allele_obj@coverage.data
+    chrs = unique(infercnv_allele_obj@allele.gene_order$chr)
+    gene_order = infercnv_allele_obj@allele.gene_order
+    lesser.frac.data <- infercnv_allele_obj@allele.expr.data
+    lesser.data <- infercnv_allele_obj@allele.count.data
+    coverage.data <- infercnv_allele_obj@allele.coverage.data
 
     ## initialize hmm allele data
     hmm.allele.data <- matrix(0,
@@ -590,7 +591,7 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples_mod <- function(infercnv_a
         })
     })
 
-    infercnv_allele_obj@expr.data <- hmm.allele.data
+    infercnv_allele_obj@allele.expr.data <- hmm.allele.data
     return(infercnv_allele_obj)
 
 }

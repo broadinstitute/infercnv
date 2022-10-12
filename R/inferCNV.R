@@ -46,8 +46,7 @@ infercnv <- methods::setClass(
                              observation_grouped_cell_indices = "list",
                              tumor_subclusters  = "ANY",
                              options = "list",
-                             .hspike = "ANY",
-                             .allele = "ANY") )
+                             .hspike = "ANY") )
 
 
 
@@ -197,7 +196,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     # } else {
     #     stop("CreateInfercnvObject:: Error, raw_counts_matrix isn't recognized as a matrix, data.frame, or filename")
     # }
-    if(!is.null(raw_counts_matrix) & (!is.null(raw_allele_matrix) & !is.null(raw_coverage_matrix))){
+    if (!is.null(raw_counts_matrix) & (!is.null(raw_allele_matrix) & !is.null(raw_coverage_matrix))) {
         flog.info("CreateInfercnvObject:: Leveraging both expression and allele data")
         raw.data <- .read_count_matrix(matrix = raw_counts_matrix, delim = delim)
         
@@ -208,7 +207,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
         raw.allele.data <- .read_count_matrix(matrix = raw_allele_matrix, delim = delim)
         raw.coverage.data <- .read_count_matrix(matrix = raw_coverage_matrix, delim = delim)
         .allele_precheck(raw.allele.data, raw.coverage.data, raw.data)
-    } else if(!is.null(raw_counts_matrix)){
+    } else if(!is.null(raw_counts_matrix)) {
         flog.info("CreateInfercnvObject:: Only Leveraging expression data")
         raw.data <- .read_count_matrix(matrix = raw_counts_matrix, delim = delim)
     }
@@ -383,39 +382,45 @@ CreateInfercnvObject <- function(raw_counts_matrix,
         raw.coverage.data <- order_ret_allele$coverage.data
         snps <- order_ret_allele$snps
         
-        allele_object <- new(Class = "infercnv_allele",
-                             allele.data = raw.allele.data,
-                             coverage.data = raw.coverage.data,
-                             SNP_info = snps,
-                             gene_order = order_ret_allele$gene_order,
-                             reference_grouped_cell_indices = ref_group_cell_indices,
-                             observation_grouped_cell_indices = obs_group_cell_indices)
+        object <- new(
+            Class = "infercnv_allele",
+            expr.data = raw.data, 
+            count.data = raw.data,
+            gene_order = input_gene_order,
+            reference_grouped_cell_indices = ref_group_cell_indices,
+            observation_grouped_cell_indices = obs_group_cell_indices,
+            tumor_subclusters = NULL,
+            allele.expr.data = raw.allele.data,
+            allele.coverage.data = raw.coverage.data,
+            SNP_info = snps,
+            allele.gene_order = order_ret_allele$gene_order,
+            options = list("chr_exclude" = chr_exclude,
+               "max_cells_per_group" = max_cells_per_group,
+               "min_max_counts_per_cell" = min_max_counts_per_cell,
+               "counts_md5" = digest(raw.data)),
+            .hspike = NULL)
+
         validate_infercnv_allele_obj(allele_object)
     }
     else{
-        raw.allele.data <- NULL
-        raw.coverage.data <- NULL
-        snps <- GRanges()
-        
-        allele_object <- new(Class = "infercnv_allele")
-    }
-    
-    object <- new(
-        Class = "infercnv",
-        expr.data = raw.data, 
-        count.data = raw.data,
-        gene_order = input_gene_order,
-        reference_grouped_cell_indices = ref_group_cell_indices,
-        observation_grouped_cell_indices = obs_group_cell_indices,
-        tumor_subclusters = NULL,
-        options = list("chr_exclude" = chr_exclude,
-                       "max_cells_per_group" = max_cells_per_group,
-                       "min_max_counts_per_cell" = min_max_counts_per_cell,
-                       "counts_md5" = digest(raw.data)),
-        .hspike = NULL,
-        .allele = allele_object)
 
-    validate_infercnv_obj(object)
+        object <- new(
+            Class = "infercnv",
+            expr.data = raw.data, 
+            count.data = raw.data,
+            gene_order = input_gene_order,
+            reference_grouped_cell_indices = ref_group_cell_indices,
+            observation_grouped_cell_indices = obs_group_cell_indices,
+            tumor_subclusters = NULL,
+            options = list("chr_exclude" = chr_exclude,
+                           "max_cells_per_group" = max_cells_per_group,
+                           "min_max_counts_per_cell" = min_max_counts_per_cell,
+                           "counts_md5" = digest(raw.data)),
+            .hspike = NULL)
+
+        validate_infercnv_obj(object)
+    }
+
     
     return(object)
 }

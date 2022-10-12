@@ -25,7 +25,8 @@ get_group_color_palette <- function(){
 #' @param chr_lengths A named list of chromsomes lengths to use when plot_chr_scale=TRUE, or else chromosome size is assumed to be the last chromosome's stop position + 10k bp
 #' @param k_obs_groups Number of groups to break observation into.
 #' @param contig_cex Contig text size. 
-#' @param x.center Value on which to center expression.
+#' @param mode options("expression", "allele"), determines if to plot the expression values or allele values (allele is only useful for HMM predictions).
+#' @param x.center Value on which to center expression. "auto" uses the mean.
 #' @param x.range vector containing the extreme values in the heatmap (ie. c(-3,4) )
 #' @param hclust_method Clustering method to use for hclust.
 #' @param custom_color_pal Specify a custom set of colors for the heatmap. 
@@ -97,7 +98,9 @@ plot_cnv <- function(infercnv_obj,
                      chr_lengths=NULL,
                      k_obs_groups = 3,
                      contig_cex=1,
-                     x.center=mean(infercnv_obj@expr.data),
+                     mode=c("expression", "allele"),
+                     # x.center=mean(infercnv_obj@expr.data),
+                     x.center="auto",
                      x.range="auto", #NA,
                      hclust_method='ward.D',
                      custom_color_pal=NULL,
@@ -122,8 +125,20 @@ plot_cnv <- function(infercnv_obj,
     if(!file.exists(out_dir)){
         dir.create(out_dir)
     }
+
+    mode = match.arg(mode)
     
-    plot_data = infercnv_obj@expr.data
+    if (mode == "expression") {
+        plot_data = infercnv_obj@expr.data
+        if (x.center == "auto") {
+            x.center=mean(infercnv_obj@expr.data)
+        }
+    } else {
+        plot_data = infercnv_obj@allele.expr.data
+        if (x.center == "auto") {
+            x.center=mean(infercnv_obj@allele.expr.data)
+        }
+    }
     
     flog.info(paste("::plot_cnv:Start", sep=""))
     flog.info(paste("::plot_cnv:Current data dimensions (r,c)=",
@@ -178,13 +193,19 @@ plot_cnv <- function(infercnv_obj,
         plot_data[plot_data < low_threshold] <- low_threshold
         plot_data[plot_data > high_threshold] <- high_threshold
         
-        infercnv_obj@expr.data <- plot_data  #because used again below...
+        # infercnv_obj@expr.data <- plot_data  #because used again below...
         
     }
     
     
     # Contigs
-    contigs = infercnv_obj@gene_order[[C_CHR]]
+    if (mode == "expression") {
+        contigs = infercnv_obj@gene_order[[C_CHR]]
+        gene_order = infercnv_obj@gene_order
+    } else {
+        contigs = infercnv_obj@allele.gene_order[[C_CHR]]
+        gene_order = infercnv_obj@allele.gene_order
+    }
     unique_contigs <- unique(contigs)
     n_contig <- length(unique_contigs)
     ct.colors <- get_group_color_palette()(n_contig)
@@ -235,8 +256,10 @@ plot_cnv <- function(infercnv_obj,
 
     
     # obs_annotations_groups: integer vec named by cells, set to index according to category name vec above.
-    obs_annotations_groups = rep(-1, length(colnames(infercnv_obj@expr.data))) # init
-    names(obs_annotations_groups) = colnames(infercnv_obj@expr.data)
+    # obs_annotations_groups = rep(-1, length(colnames(infercnv_obj@expr.data))) # init
+    # names(obs_annotations_groups) = colnames(infercnv_obj@expr.data)
+    obs_annotations_groups = rep(-1, length(colnames(plot_data))) # init
+    names(obs_annotations_groups) = colnames(plot_data)
     obs_index_groupings = infercnv_obj@observation_grouped_cell_indices
     counter <- 1
     for (obs_index_group in obs_index_groupings) {
@@ -309,7 +332,6 @@ plot_cnv <- function(infercnv_obj,
     ## Remove observation col names, too many to plot
     ## Will try and keep the reference names
     ## They are more informative anyway
-    obs_data <- infercnv_obj@expr.data
     if (!is.null(ref_idx)){
         obs_data <- plot_data[, -ref_idx, drop=FALSE]
         if (ncol(obs_data) == 1) {
@@ -317,6 +339,8 @@ plot_cnv <- function(infercnv_obj,
             plot_data <- cbind(obs_data, obs_data)
             names(obs_data) <- c("", names(obs_data)[1])
         }
+    } else {
+        obs_data = plot_data
     }
     
     obs_data <- t(obs_data)
@@ -327,7 +351,7 @@ plot_cnv <- function(infercnv_obj,
     updated_ref_groups <- list()
     current_ref_count <- 1
     current_grp_idx <- 1
-    plot_data <-infercnv_obj@expr.data
+    # plot_data <-infercnv_obj@expr.data
     ref_groups = infercnv_obj@reference_grouped_cell_indices
     for (ref_grp in ref_groups) {
         ref_data_t <- cbind(ref_data_t, plot_data[, ref_grp, drop=FALSE])
@@ -348,7 +372,7 @@ plot_cnv <- function(infercnv_obj,
     gene_position_breaks = NULL
     if (plot_chr_scale) {
         # gene table to heatmap width
-        chr_name_list = unique(infercnv_obj@gene_order[["chr"]])
+        chr_name_list = unique(gene_order[["chr"]])
         
         # get average distance for tail end? 
         # optionally give vector of chr lengths
@@ -356,11 +380,11 @@ plot_cnv <- function(infercnv_obj,
         if (is.null(chr_lengths)) {
             chr_lengths = c()
             for (chr_name in chr_name_list) {
-                chr_lengths = c(chr_lengths, max(infercnv_obj@gene_order$stop[which(infercnv_obj@gene_order$chr == chr_name)]) + 10000)
+                chr_lengths = c(chr_lengths, max(gene_order$stop[which(gene_order$chr == chr_name)]) + 10000)
             }
             names(chr_lengths) = chr_name_list
         }
-        gene_position_breaks = vector(mode="integer", length=(length(unlist(infercnv_obj@gene_order$chr)) + 1))
+        gene_position_breaks = vector(mode="integer", length=(length(unlist(gene_order$chr)) + 1))
 
         sum_previous_contigs = 0
         gene_position_breaks[1] = 1
@@ -368,12 +392,12 @@ plot_cnv <- function(infercnv_obj,
         col_sep_idx = 1
 
         for (chr_name in chr_name_list) {
-            index_pos = which(infercnv_obj@gene_order$chr == chr_name)
+            index_pos = which(gene_order$chr == chr_name)
             latest_position = 1
             if (length(index_pos) > 1) {
                 for (i in index_pos[2:length(index_pos)]) {
-                    gene_position_breaks[current_idx] = sum_previous_contigs + ((latest_position + infercnv_obj@gene_order$start[i]) / 2)
-                    latest_position = max(infercnv_obj@gene_order$stop[i], latest_position)
+                    gene_position_breaks[current_idx] = sum_previous_contigs + ((latest_position + gene_order$start[i]) / 2)
+                    latest_position = max(gene_order$stop[i], latest_position)
                     current_idx = current_idx + 1
                 }
             }
@@ -573,6 +597,8 @@ plot_cnv <- function(infercnv_obj,
     hcl_obs_annotations_groups <- vector()
     obs_seps <- c()
     sub_obs_seps <- c()  # never use at this time? available if we want to add splits in the heatmap for subclusters
+
+    ## below, infercnv_obj@expr.data is not affected by expression/allele mode as its only used to access cell names
 
     if (!is.null(infercnv_obj@tumor_subclusters)) {
         if (cluster_by_groups) {
@@ -985,6 +1011,8 @@ plot_cnv <- function(infercnv_obj,
     # If there is more than one reference group, visually break
     # up the groups with a row seperator. Also plot the rows in
     # order so the current groups are shown and seperated.
+
+    ## below, infercnv_obj@expr.data is not affected by expression/allele mode as its only used to access cell names
 
     ordered_names <- c()
     if (!is.null(infercnv_obj@tumor_subclusters$hc[["all_references"]])) {  # this allows runs made with some versions of infercnv to be plotted, but shouldn't be happening anymore
