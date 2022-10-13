@@ -224,6 +224,7 @@
 #'                                          denoise=TRUE,
 #'                                          HMM=FALSE,
 #'                                          num_threads=2,
+#'                                          analysis_mode="samples",
 #'                                          no_plot=TRUE)
 #'
 run <- function(infercnv_obj,

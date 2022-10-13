@@ -296,6 +296,7 @@ infercnv_object_example <- infercnv::run(infercnv_object_example,
                                          denoise=TRUE,
                                          HMM=FALSE,
                                          num_threads=2,
+                                         analysis_mode="samples",
                                          no_plot=TRUE)
 
 }
