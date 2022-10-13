@@ -72,7 +72,7 @@ cell line in the CNV.
 data(infercnv_data_example)
 data(infercnv_annots_example)
 data(infercnv_genes_example)
-data(HMM_states)
+data(infercnv_HMM_states_example)
 
 infercnv_object_example <- infercnv::CreateInfercnvObject(raw_counts_matrix=infercnv_data_example, 
                                                           gene_order_file=infercnv_genes_example,

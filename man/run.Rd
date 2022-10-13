@@ -8,6 +8,8 @@ run(
   infercnv_obj,
   cutoff = 1,
   min_cells_per_gene = 3,
+  snp_min_coverage = 0,
+  min_cells_per_snp = 3,
   out_dir = NULL,
   window_length = 101,
   smooth_method = c("pyramidinal", "runmeans", "coordinates"),

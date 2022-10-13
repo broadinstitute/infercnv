@@ -36,8 +36,8 @@ inferCNVCombinedBayesNet(). Will filter CNV's based on a user desired threshold 
 Any CNV with a probability of being normal above the threshold will be removed.
 }
 \examples{
-data(mcmc_obj_allele_gene)
-data(HMM_allele_gene_states)
+data(infercnv_mcmc_obj_allele_gene_example)
+data(infercnv_HMM_allele_gene_states_example)
 
 mcmc_combined_mod_list <- filterHighPNormals_allele(MCMC_inferCNV_obj = mcmc_obj_allele_gene,
                                                     HMM_states = HMM_allele_gene_states,

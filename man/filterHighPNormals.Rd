@@ -24,8 +24,8 @@ CNV's based on a user desired threshold probability. Any CNV with a probability 
 the threshold will be removed.
 }
 \examples{
-data(mcmc_obj)
-data(HMM_states)
+data(infercnv_mcmc_obj_example)
+data(infercnv_HMM_states_example)
 
 mcmc_obj_hmm_states_list <- infercnv::filterHighPNormals( MCMC_inferCNV_obj = mcmc_obj, 
                                           HMM_states        = HMM_states, 

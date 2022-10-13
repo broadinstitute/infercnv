@@ -8,7 +8,6 @@ Expression and Allele Data To Obtain Posterior Probabilities For HMM Predicted S
 inferCNVCombinedBayesNet(
   combined_file_path,
   combined_file_token,
-  infercnv_obj,
   infercnv_allele_obj,
   allele_mode = c("snp_level", "gene_level"),
   method = c("common", "union"),
@@ -22,8 +21,6 @@ inferCNVCombinedBayesNet(
 \item{combined_file_path}{Location of the directory of the combined HMM outputs.}
 
 \item{combined_file_token}{(string) String token that contains some info on settings used to name combined-based files.}
-
-\item{infercnv_obj}{InferCNV object.}
 
 \item{infercnv_allele_obj}{InferCNV allele object.}
 
@@ -40,6 +37,8 @@ while "common" removes those ones.}
 \item{output_path}{(string) Path to where the output file should be saved to.}
 
 \item{cores}{Option to run parallel by specifying the number of cores to be used. (Default: 5)}
+
+\item{infercnv_obj}{InferCNV object.}
 }
 \value{
 Returns a MCMC_infercnv_combined obj and posterior probability of being in one of three/six Copy Number Variation states

@@ -16,7 +16,8 @@ plot_cnv(
   chr_lengths = NULL,
   k_obs_groups = 3,
   contig_cex = 1,
-  x.center = mean(infercnv_obj@expr.data),
+  mode = c("expression", "allele"),
+  x.center = "auto",
   x.range = "auto",
   hclust_method = "ward.D",
   custom_color_pal = NULL,
@@ -53,7 +54,9 @@ plot_cnv(
 
 \item{contig_cex}{Contig text size.}
 
-\item{x.center}{Value on which to center expression.}
+\item{mode}{options("expression", "allele"), determines if to plot the expression values or allele values (allele is only useful for HMM predictions).}
+
+\item{x.center}{Value on which to center expression. "auto" uses the mean.}
 
 \item{x.range}{vector containing the extreme values in the heatmap (ie. c(-3,4) )}
 

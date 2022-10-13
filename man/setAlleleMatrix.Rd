@@ -7,8 +7,7 @@
 setAlleleMatrix(
   infercnv_allele_obj,
   snp_min_coverage = 0,
-  snp_filter = TRUE,
-  snp_min.cell = 3
+  min_cells_per_snp = 3
 )
 }
 \arguments{

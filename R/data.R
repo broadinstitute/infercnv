@@ -62,32 +62,32 @@
 #' @format An infercnv object containing HMM predictions
 #'
 #'
-"HMM_states_example"
+"infercnv_HMM_states_example"
 
 #' infercnv_allele object result of the processing of run() in the HMM example, to be used for other examples.
 #'
 #' @format An infercnv_allele object containing HMM predictions
 #'
 #'
-"HMM_allele_states_example"
+"infercnv_HMM_allele_states_example"
 
 #' infercnv_allele object result of the processing of run() in the HMM example, to be used for other examples.
 #'
 #' @format An infercnv_allele object containing HMM predictions (gene level)
 #'
 #'
-"HMM_allele_gene_states_example"
+"infercnv_HMM_allele_gene_states_example"
 
 #' infercnv object result of the processing of inferCNVBayesNet in the example, to be used for other examples.
 #'
 #' @format An infercnv object containing posterior probability of CNV states
 #'
 #'
-"mcmc_obj_example"
+"infercnv_mcmc_obj_example"
 
 #' infercnv_allele object result of the processing of inferCNVAlleleBayesNet in the example, to be used for other examples.
 #'
 #' @format An infercnv_allele object containing posterior probability of CNV states (gene level)
 #'
 #'
-"mcmc_obj_allele_gene_example"
+"infercnv_mcmc_obj_allele_gene_example"

@@ -422,12 +422,12 @@ inferCNVAlleleBayesNet <- function(file_path,
                      difftime(end_time, start_time, units = "min")[[1]], " Minutes"))
     
     flog.info("Retrieving the posterior probabilities of CNVs ")
-    MCMC_inferCNV_obj <- get_posterior_prob(obj = MCMC_inferCNV_obj, mcmc = mcmc)
+    MCMC_inferCNV_obj <- get_posterior_prob(MCMC_inferCNV_obj = MCMC_inferCNV_obj, mcmc = mcmc)
     
     saveRDS(MCMC_inferCNV_obj, file = file.path(output_path, "mcmc_allele.rds"))
     
     flog.info("Plotting the distribution of posterior probabilities")
-    plot_posterior_prob(obj = MCMC_inferCNV_obj, output_path)
+    plot_posterior_prob(MCMC_inferCNV_obj = MCMC_inferCNV_obj, output_path)
     
     flog.info("Plotting diagnostic statistics")
     plot_Diagnostics(mcmc = mcmc, output_path)
@@ -629,8 +629,8 @@ plot_mcmc <- function(samples,
 #' @export
 #' 
 #' @examples 
-#' data(mcmc_obj_allele_gene)
-#' data(HMM_allele_gene_states)
+#' data(infercnv_mcmc_obj_allele_gene_example)
+#' data(infercnv_HMM_allele_gene_states_example)
 #' 
 #' mcmc_combined_mod_list <- filterHighPNormals_allele(MCMC_inferCNV_obj = mcmc_obj_allele_gene,
 #'                                                     HMM_states = HMM_allele_gene_states,

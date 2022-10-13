@@ -4,15 +4,13 @@
 \alias{map2gene}
 \title{map2gene}
 \usage{
-map2gene(infercnv_allele_obj, gene_order)
+map2gene(infercnv_allele_obj)
 }
 \arguments{
-\item{infercnv_allele_obj}{infercnv_allele based obj}
-
-\item{gene_order}{data file containing the positions of each gene along each chromosome in the genome}
+\item{infercnv_allele_obj}{infercnv object}
 }
 \value{
-infercnv_allele
+infercnv object
 }
 \description{
 This function aims to map snp-based data back to gene-based data given the annotation file provided
@@ -23,7 +21,6 @@ data(infercnv_object_example)
 infercnv_object_allele_example <- infercnv::setAlleleMatrix(infercnv_object_example@.allele ,
                                                             snp_min_coverage = 0,
                                                             snp_min.cell = 2)
-infercnv_object_allele_example <- infercnv::map2gene(infercnv_object_allele_example,
-                                                     infercnv_object_example@gene_order )
+infercnv_object_allele_example <- infercnv::map2gene(infercnv_object)
 
 }

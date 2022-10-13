@@ -617,7 +617,6 @@ run <- function(infercnv_obj,
 
             if (plot_steps) {
                 plot_allele(infercnv_obj,
-                            initialized_method = "default",
                             allele_frequency_mode = F,
                             out_dir = out_dir,
                             output_filename = sprintf("infercnv.allele.%02d_map2gene", step_count),
@@ -654,7 +653,6 @@ run <- function(infercnv_obj,
 
             if (plot_steps) {
                 plot_allele(infercnv_obj,
-                            initialized_method = "default",
                             allele_frequency_mode = F,
                             out_dir = out_dir,
                             output_filename = sprintf("infercnv.allele.%02d_collapse2gene", step_count),

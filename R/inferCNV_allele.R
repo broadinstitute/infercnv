@@ -21,7 +21,7 @@ infercnv_allele <- methods::setClass("infercnv_allele",
                                                allele.count.data = "ANY",
                                                allele.alt.data = "ANY",
                                                allele.coverage.data = "ANY",
-                                               allele.gene_order
+                                               allele.gene_order = "data.frame",
                                                SNP_info = "GRanges"),
                                      contains = "infercnv"
 )
@@ -247,102 +247,6 @@ setAlleleMatrix <- function(infercnv_allele_obj,
     return(infercnv_allele_obj)
 }
 
-
-# #' @title setAlleleMatrix_HB -- deprecated
-# #' 
-# #' @description This function mimics the way the HoneyBadger does aiming to initialize the lesser allele fraction/count.
-# #' lesser allele fraction will be stored in the slot @expr.data. lesser allele count 
-# #' will be stored in the slot @count.data
-# #' 
-# #' @param infercnv_allele_obj infercnv_allele_object
-# #' 
-# #' @param snp_min_coverage the minimum number of threshold that each instance should have in allele/coverage data. 
-# #' Each instance that is less than this number will be replaced with 0. default = 0 (No action)
-# #' 
-# #' @param snp_filter a boolean value whether to do pre-filtering for allele matrix. default = TRUE
-# #' 
-# #' @param snp_het.deviance.threshold a threshold used to filter 
-# #' out non-hetergozous snps. default = 0.1
-# #' 
-# #' @param snp_min.cell a threshold used to filter out snps that express less than 
-# #' the minimum number of cells. default = 3
-# #' 
-# #' @return infercnv_allele
-# #' 
-# #' @export
-# setAlleleMatrix_HB <- function(infercnv_allele_obj,
-#                                snp_min_coverage = 0,
-#                                snp_filter = TRUE,
-#                                snp_het.deviance.threshold = 0.1, 
-#                                snp_min.cell = 3) {
-
-#     if (snp_min_coverage > 1) {
-#         flog.info(sprintf("Replacing allele/coverge instances that are less than %s with zero ...",
-#           snp_min_coverage))
-        
-#         infercnv_allele_obj@allele.data[infercnv_allele_obj@coverage.data < snp_min_coverage] <- 0 
-#         infercnv_allele_obj@coverage.data[infercnv_allele_obj@coverage.data < snp_min_coverage] <- 0
-        
-#         if(mean(rowSums(infercnv_allele_obj@coverage.data) == 0) > 0){
-#             infercnv_allele_obj <- infercnv:::remove_snps(infercnv_allele_obj, which(rowSums(infercnv_allele_obj@coverage.data) == 0))
-#         }
-#     }
-
-#     flog.info("Creating in-silico bulk ...")
-#     allele_bulk <- rowSums(infercnv_allele_obj@allele.data > 0)
-#     coverage_bulk <- rowSums(infercnv_allele_obj@coverage.data > 0)
-
-#     if (snp_filter) {
-#         E <- allele_bulk/coverage_bulk
-#         filter_index_het <- E > snp_het.deviance.threshold & E < 1-snp_het.deviance.threshold
-#         if(sum(filter_index_het) < 0.01*length(allele_bulk)) {
-#             flog.info("WARNING! CLONAL DELETION OR LOH POSSIBLE!")
-#         }
-#         filter_index_min <- rowSums(infercnv_allele_obj@coverage.data > 0) >= snp_min.cell
-#         flog.info(sprintf("%s heterozygous SNPs identified ...", sum(filter_index_het & filter_index_min)))
-
-#         if(sum(filter_index_het & filter_index_min) < length(allele_bulk)){
-#             infercnv_allele_obj <- remove_snps(infercnv_allele_obj, which(!(filter_index_het & filter_index_min)))
-#             allele_bulk <- allele_bulk[filter_index_het & filter_index_min]
-#             coverage_bulk <- coverage_bulk[filter_index_het & filter_index_min]
-#         }
-#     }
-
-#     flog.info("Setting composite lesser allele fraction ...")
-#     E <- allele_bulk/coverage_bulk
-#     thr_index <- E > 0.5
-
-#     lesser.allele.data <- infercnv_allele_obj@allele.data
-#     lesser.allele.data[thr_index,] <- infercnv_allele_obj@coverage.data[thr_index,] - infercnv_allele_obj@allele.data[thr_index,]
-#     lesser.allele.fraction <- lesser.allele.data/infercnv_allele_obj@coverage.data
-
-#     lesser.allele.fraction[is.na(lesser.allele.fraction)] <- 0 # omit no coverage
-#     lesser.allele.fraction[infercnv_allele_obj@allele.data == 0 & infercnv_allele_obj@coverage.data != 0] <- 0.001 # pseudo count for total coverage not 0
-#     #lesser.allele.fraction[infercnv_allele_obj@coverage.data <= 2] <- 0 # filter with the cutoff of 3 coverage
-
-#     infercnv_allele_obj@expr.data <- lesser.allele.fraction
-#     infercnv_allele_obj@count.data <- lesser.allele.data
-  
-#     # if (smooth_method == 'runmeans') {
-#     # 
-#     #   infercnv_allele_obj <- smooth_by_chromosome_runmeans(infercnv_allele_obj,
-#     #                                                        window_length)
-#     # } else if (smooth_method == 'pyramidinal') {
-#     # 
-#     #   infercnv_allele_obj <- smooth_by_chromosome(infercnv_allele_obj,
-#     #                                               window_length=window_length,
-#     #                                               smooth_ends=TRUE)
-#     # } else if (smooth_method == 'coordinates') {
-#     #   infercnv_allele_obj <- smooth_by_chromosome_coordinates(infercnv_allele_obj,
-#     #                                                           window_length=window_length)
-#     # } else {
-#     #   stop(sprintf("Error, don't recognize smoothing method: %s", smooth_method))
-#     # }
-
-#     validate_infercnv_allele_obj(infercnv_allele_obj)
-
-#     return(infercnv_allele_obj)
-# }
 
 
 #' @title map2gene
@@ -776,8 +680,6 @@ collapse_snp2gene_v2 <- function(infercnv_allele_obj,
 #' 
 #' @param infercnv_allele_obj infercnv_allele based obj
 #' 
-#' @param initialized_method The method used to initialize allele matrix. default = "default" as the same as setAlleleMatrix()
-#' 
 #' @param allele_frequency_mode (boolean) Whether to plot the distribution of snp data across chrs
 #' 
 #' @param output_filename The path/name used to save the plot
@@ -794,7 +696,7 @@ collapse_snp2gene_v2 <- function(infercnv_allele_obj,
 #' 
 #' @noRd
 plot_allele <- function(infercnv_allele_obj,
-                        initialized_method = c("default", "HB"),
+                        # initialized_method = c("default", "HB"),
                         allele_frequency_mode = F,
                         out_dir=".",
                         output_filename="infercnv.allele",
@@ -824,11 +726,11 @@ plot_allele <- function(infercnv_allele_obj,
         #flog.error("Please set allele matrix before plotting!")
         flog.info(sprintf("Setting allele matrix using %s way", initialized_method))
 
-        if(initialized_method == "default") {
+        # if(initialized_method == "default") {
             infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)
-        } else {
-            infercnv_allele_obj <- setAlleleMatrix_HB(infercnv_allele_obj)
-        }
+        # } else {
+            # infercnv_allele_obj <- setAlleleMatrix_HB(infercnv_allele_obj)
+        # }
 
     }
   

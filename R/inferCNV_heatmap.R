@@ -518,7 +518,7 @@ plot_cnv <- function(infercnv_obj,
 #' @param layout_lmat lmat values to use in layout.
 #' @param layout_lhei lhei values to use in layout.
 #' @param layout_lwid lwid values to use in layout.
-#
+#'
 #' @return Void.
 #'
 #' @keywords internal

@@ -514,12 +514,12 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
                      difftime(end_time, start_time, units = "min")[[1]], " Minutes"))
     
     flog.info("Retrieving the posterior probabilities of CNVs ")
-    MCMC_inferCNV_combined_obj <- get_posterior_prob(obj = MCMC_inferCNV_combined_obj, mcmc = mcmc)
+    MCMC_inferCNV_combined_obj <- get_posterior_prob(MCMC_inferCNV_obj = MCMC_inferCNV_combined_obj, mcmc = mcmc)
     
     saveRDS(MCMC_inferCNV_combined_obj, file = file.path(output_path, "MCMC_inferCNV_combined_obj.rds"))
     
     flog.info("Plotting the distribution of posterior probabilities")
-    plot_posterior_prob(obj = MCMC_inferCNV_combined_obj, output_path)
+    plot_posterior_prob(MCMC_inferCNV_obj = MCMC_inferCNV_combined_obj, output_path)
     
     flog.info("Plotting diagnostic statistics")
     plot_Diagnostics(mcmc = mcmc, output_path)

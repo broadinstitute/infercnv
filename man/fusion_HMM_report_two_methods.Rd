@@ -9,7 +9,6 @@ fusion_HMM_report_two_methods(
   expression_file_token,
   allele_file_path,
   allele_file_token,
-  infercnv_obj,
   infercnv_allele_obj,
   method = c("union", "common"),
   type = c("i6", "i3"),
@@ -28,8 +27,6 @@ fusion_HMM_report_two_methods(
 
 \item{allele_file_token}{(string) String token that contains some info on settings used to name allele-based files.}
 
-\item{infercnv_obj}{InferCNV object.}
-
 \item{infercnv_allele_obj}{InferCNV allele object.}
 
 \item{method}{The way integrating HMM boundaries from two methods: union/common.
@@ -45,6 +42,8 @@ while "common" removes those ones.}
 \item{HMM_report_by}{cell, consensus, subcluster (default: subcluster)}
 
 \item{...}{Additional parameters passed to infercnv::plot_cnv()}
+
+\item{infercnv_obj}{InferCNV object.}
 }
 \value{
 Returns an Infercnv hmm-based obj, and HMM states store in the slot of expr.data

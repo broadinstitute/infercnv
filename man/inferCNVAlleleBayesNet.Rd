@@ -11,7 +11,7 @@ inferCNVAlleleBayesNet(
   infercnv_allele_obj,
   allele_mode = c("snp_level", "gene_level"),
   output_path,
-  cores = 5
+  cores = 1
 )
 }
 \arguments{
