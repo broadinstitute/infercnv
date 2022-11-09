@@ -789,7 +789,7 @@ generate_cnv_region_reports <- function(infercnv_obj,
                                         by=c("consensus", "subcluster", "cell"),
                                         mode=c("expression", "allele")) {
 
-    mode = arg.match(mode)
+    mode = match.arg(mode)
 
     cnv_regions <- get_predicted_CNV_regions(infercnv_obj, by, mode)
 

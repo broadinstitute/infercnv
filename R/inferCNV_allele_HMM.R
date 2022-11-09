@@ -31,7 +31,7 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
     rownames(hmm.allele.data) <- rownames(lesser.data)
     colnames(hmm.allele.data) <- colnames(lesser.data)
 
-    tumor_subclusters <- unlist(infercnv_obj@tumor_subclusters[["subclusters"]], recursive=FALSE)
+    tumor_subclusters <- unlist(infercnv_allele_obj@tumor_subclusters[["subclusters"]], recursive=FALSE)
 
     HMM_output <- c()
     cell_index <- c()

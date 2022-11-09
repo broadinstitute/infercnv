@@ -715,6 +715,9 @@ plot_cnv <- function(infercnv_obj,
             }
             else {
                 data_to_cluster <- obs_data[cell_indices_in_group, hcl_group_indices, drop=FALSE]
+                if (!("matrix" %in% is(data_to_cluster))) {
+                    data_to_cluster = as.matrix(data_to_cluster)
+                }
                 flog.info(paste("group size being clustered: ", paste(dim(data_to_cluster), collapse=","), sep=" "))
                 group_obs_hcl <- hclust(parallelDist(data_to_cluster, threads=infercnv.env$GLOBAL_NUM_THREADS), method=hclust_method)
                 ordered_names <- c(ordered_names, group_obs_hcl$labels[group_obs_hcl$order])
@@ -750,6 +753,9 @@ plot_cnv <- function(infercnv_obj,
         # HCL with a inversely weighted euclidean distance.
         flog.info(paste("clustering observations via method: ", hclust_method, sep=""))
         if (nrow(obs_data) > 1) {
+            if (!("matrix" %in% is(obs_data))) {
+                obs_data = as.matrix(obs_data)
+            }
             obs_hcl <- hclust(parallelDist(obs_data[, hcl_group_indices], threads=infercnv.env$GLOBAL_NUM_THREADS), method=hclust_method)
                                             
             write.tree(as.phylo(obs_hcl),
@@ -768,7 +774,8 @@ plot_cnv <- function(infercnv_obj,
                 memb_file <- file(paste(file_base_name,
                                         paste(hcl_desc,"HCL",cut_group,"members.txt",sep="_"),
                                         sep=.Platform$file.sep))
-                write.table(as.matrix(obs_data[group_memb,]), memb_file)
+                # write.table(as.matrix(obs_data[group_memb,]), memb_file)
+                write.table(obs_data[group_memb,], memb_file)
                 # Record seperation
                 ordered_memb <- which(ordered_names %in% group_memb)
                 if (is.null(obs_seps)) {
@@ -1046,6 +1053,9 @@ plot_cnv <- function(infercnv_obj,
         ref_data <- ref_data[, ordered_names, drop=FALSE]
     }
     else {
+        if (!("matrix" %in% is(ref_data))) {
+            ref_data = as.matrix(ref_data)
+        }
         if(length(ref_groups) > 1){
             if (cluster_references) {
                 order_idx <- lapply(ref_groups, function(ref_grp) {

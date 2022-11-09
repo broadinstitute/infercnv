@@ -21,7 +21,8 @@ MCMC_infercnv_allele <- methods::setClass("MCMC_infercnv_allele",
                                                     cell_gene = "list",
                                                     cnv_probabilities = "list",
                                                     cell_probabilities = "list",
-                                                    cnv_regions = "factor"))#,
+                                                    cnv_regions = "factor",
+                                                    options = "list"))#,
                                           #contains = "infercnv_allele")
 
 # file_path the path to cnv_reports
@@ -60,6 +61,8 @@ initialize_allele_mcmc <- function(file_path,
                                               pred_cnv_genes_df, 
                                               cell_groups_df,
                                               mode = mode)
+    MCMC_inferCNV_obj@options = infercnv_allele_obj@options
+
     return(MCMC_inferCNV_obj)
 }
 

@@ -50,11 +50,11 @@ initialize_combined_mcmc <- function(infercnv_allele_obj,
                                      infercnv_obj_mu,
                                      infercnv_obj_sig,
                                      mode = c("snp_level", "gene_level"),
-                                     type = c("i6", "i3"),
+                                     HMM_type = c("i6", "i3"),
                                      enable_cnLOH = TRUE) {
   
     mode <- match.arg(mode)
-    type <- match.arg(type)
+    HMM_type <- match.arg(HMM_type)
     
     ## Load the files for cnv predictions
     cell_groups_df <- read.table(file.path(file_path, paste0(file_token,".cell_groupings")), 
@@ -82,7 +82,7 @@ initialize_combined_mcmc <- function(infercnv_allele_obj,
     #                       infercnv_obj_sig = infercnv_obj_sig,
     #                       infercnv_allele_obj = infercnv_allele_obj)
     
-    MCMC_inferCNV_combined_obj@bugs_model <- ifelse(type == "i6",
+    MCMC_inferCNV_combined_obj@bugs_model <- ifelse(HMM_type == "i6",
                                                     ifelse(mode == "snp_level",
                                                            ifelse(enable_cnLOH,
                                                                   system.file("BUGS_Combined_Model_i7", package = "infercnv"),
@@ -117,7 +117,7 @@ initialize_combined_mcmc <- function(infercnv_allele_obj,
     #                            infercnv_obj_mu = infercnv_obj_mu,
     #                            infercnv_obj_sig = infercnv_obj_sig,
     #                            infercnv_allele_obj = infercnv_allele_obj)
-    #   mcmc_combined_snp@bugs_model <- ifelse(type == "i6",
+    #   mcmc_combined_snp@bugs_model <- ifelse(HMM_type == "i6",
     #                                          system.file("BUGS_Combined_Model_i6",package = "infercnv"),
     #                                          system.file("BUGS_Combined_Model_i3",package = "infercnv"))
     #     
@@ -137,7 +137,7 @@ initialize_combined_mcmc <- function(infercnv_allele_obj,
     #                             infercnv_obj_mu = infercnv_obj_mu,
     #                             infercnv_obj_sig = infercnv_obj_sig,
     #                             infercnv_allele_obj = infercnv_allele_obj)
-    #   mcmc_combined_gene@bugs_model <- ifelse(type == "i6",
+    #   mcmc_combined_gene@bugs_model <- ifelse(HMM_type == "i6",
     #                                           system.file("BUGS_SNP2Gene_Combined_Model_i6",package = "infercnv"),
     #                                           system.file("BUGS_SNP2Gene_Combined_Model_i3",package = "infercnv"))
     # 
@@ -159,7 +159,7 @@ getGenesCells_combined <- function(MCMC_inferCNV_combined_obj,
                                    mode = c("snp_level", "gene_level")) {
     mode = match.arg(mode)
     
-    MCMC_inferCNV_combined_obj@cell_gene <- lapply(infercnv_allele_obj@cnv_regions, function(x) {
+    MCMC_inferCNV_combined_obj@cell_gene <- lapply(MCMC_inferCNV_combined_obj@cnv_regions, function(x) {
 
         current_cnv <- pred_cnv_genes_df[which(x == pred_cnv_genes_df$gene_region_name),]
         genes <- current_cnv$gene
@@ -292,7 +292,7 @@ getGenesCells_combined <- function(MCMC_inferCNV_combined_obj,
 #' "union" keeps those expression-specific gene that are not found in allele data during modeling,
 #' while "common" removes those ones.
 #' 
-#' @param type The type of combined model running in Bayesian Method. i6 or i3.
+#' @param HMM_type The type of combined model running in Bayesian Method. i6 or i3.
 #' 
 #' @param enable_cnLOH Option for detecting cnLOH events by adding one more state in Bayesian Method. (Default: True)
 #' 
@@ -348,7 +348,7 @@ getGenesCells_combined <- function(MCMC_inferCNV_combined_obj,
 #'                                                         infercnv_obj = infercnv_object_example,
 #'                                                         infercnv_allele_obj = infercnv_object_allele_gene_example,
 #'                                                         method = "common",
-#'                                                         type = "i6",
+#'                                                         HMM_type = "i6",
 #'                                                         cluster_by_groups=F,
 #'                                                         output_path = out_dir,
 #'                                                         output_prefix = "combined")
@@ -358,7 +358,7 @@ getGenesCells_combined <- function(MCMC_inferCNV_combined_obj,
 #'                                                     infercnv_allele_obj = infercnv_object_allele_gene_example,
 #'                                                     allele_mode = "gene_level",
 #'                                                     method = "common",
-#'                                                     type = "i6",
+#'                                                     HMM_type = "i6",
 #'                                                     enable_cnLOH = TRUE,
 #'                                                     output_path = file.path(out_dir,"bayesian_folder"))
 
@@ -368,21 +368,21 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
                                      infercnv_allele_obj,
                                      allele_mode = c("snp_level", "gene_level"),
                                      method = c("common", "union"),
-                                     type = c("i6", "i3"),
+                                     HMM_type = c("i6", "i3"),
                                      enable_cnLOH = TRUE,
                                      output_path,
                                      cores = 5) {
   
     allele_mode <- match.arg(allele_mode)
     method <- match.arg(method)
-    type <- match.arg(type)
+    HMM_type <- match.arg(HMM_type)
     
     if (!dir.exists(file.path(output_path))) {
         dir.create(file.path(output_path), recursive = T)
         flog.info(paste("Creating the following Directory:", output_path))
     }
     
-    if (type == "i6") {
+    if (HMM_type == "i6") {
         cnv_mean_sd <- get_spike_dists(infercnv_obj@.hspike)
         mean <- c(cnv_mean_sd[["cnv:0.01"]]$mean,
                   cnv_mean_sd[["cnv:0.5"]]$mean,
@@ -421,13 +421,13 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
                                                            infercnv_obj_mu = mean,
                                                            infercnv_obj_sig = sd,
                                                            mode = allele_mode,
-                                                           type = type,
+                                                           HMM_type = HMM_type,
                                                            enable_cnLOH = enable_cnLOH)
                                                          
     
     flog.info(paste("The number of affected regions:", length(MCMC_inferCNV_combined_obj@cell_gene)))
     
-    flog.info(sprintf("Start running Gibbs sampling in %s mode", type))
+    flog.info(sprintf("Start running Gibbs sampling in %s mode", HMM_type))
     
     flog.info(sprintf("Enable identifing cnLOH event: %s", enable_cnLOH))
     
@@ -442,11 +442,11 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
             #                                                   system.file("BUGS_Mixture_Model_i3_gene",package = "infercnv"))
             # } 
             samples <- run_combined_snp_mcmc(bugs = ifelse(is.null(x$r.array),
-                                                           ifelse(type == "i6",
+                                                           ifelse(HMM_type == "i6",
                                                                   system.file("BUGS_Mixture_Model_i6_gene",package = "infercnv"),
                                                                   system.file("BUGS_Mixture_Model_i3_gene",package = "infercnv")),
                                                            MCMC_inferCNV_combined_obj@bugs_model),
-                                             type = type,
+                                             HMM_type = HMM_type,
                                              enable_cnLOH = ifelse(is.null(x$r.array),
                                                                    FALSE,
                                                                    enable_cnLOH),
@@ -478,11 +478,11 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
             #                                                   system.file("BUGS_Mixture_Model_i3_gene_test",package = "infercnv"))
             # } 
             samples <- run_combined_gene_mcmc(bugs = ifelse(is.null(x$infercnv_allele_Genes),
-                                                            ifelse(type == "i6",
+                                                            ifelse(HMM_type == "i6",
                                                                    system.file("BUGS_Mixture_Model_i6_gene",package = "infercnv"),
                                                                    system.file("BUGS_Mixture_Model_i3_gene",package = "infercnv")),
                                                             MCMC_inferCNV_combined_obj@bugs_model),
-                                              type = type,
+                                              HMM_type = HMM_type,
                                               enable_cnLOH = ifelse(is.null(x$infercnv_allele_Genes),
                                                                     FALSE,
                                                                     enable_cnLOH),
@@ -528,7 +528,7 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
 }
 
 run_combined_snp_mcmc <- function(bugs,
-                                  type = c("i6", "i3"),
+                                  HMM_type = c("i6", "i3"),
                                   enable_cnLOH,
                                   r.array,
                                   n.sc.array,
@@ -544,7 +544,7 @@ run_combined_snp_mcmc <- function(bugs,
                                   pe = 0.1,
                                   mono = 0.7) {
   
-    type <- match.arg(type)
+    HMM_type <- match.arg(HMM_type)
     
     #browser()
     input <- list('r' = r.array,
@@ -564,7 +564,7 @@ run_combined_snp_mcmc <- function(bugs,
                   'pseudo' = pe,
                   'mono' = mono)
     
-    if (type == "i6") {
+    if (HMM_type == "i6") {
         if (enable_cnLOH) {
             inits <- list(list(epsilon = rep(1, input$K)),
                           list(epsilon = rep(2, input$K)),
@@ -613,7 +613,7 @@ run_combined_snp_mcmc <- function(bugs,
 }
 
 run_combined_gene_mcmc <- function(bugs,
-                                   type = c("i6","i3"),
+                                   HMM_type = c("i6","i3"),
                                    enable_cnLOH,
                                    r,
                                    n.sc,
@@ -626,7 +626,7 @@ run_combined_gene_mcmc <- function(bugs,
                                    pe = 0.1,
                                    mono = 0.7) {
   
-  type <- match.arg(type)
+  HMM_type <- match.arg(HMM_type)
   
   #browser()
   input <- list('r' = r,
@@ -645,7 +645,7 @@ run_combined_gene_mcmc <- function(bugs,
                 'pseudo' = pe,
                 'mono' = mono)
   
-  if(type == "i6"){
+  if(HMM_type == "i6"){
     if(enable_cnLOH){
       inits <- list(
         list(epsilon = rep(1, input$K)),
@@ -718,7 +718,7 @@ run_combined_gene_mcmc <- function(bugs,
 #' "union" keeps those expression-specific gene that are not found in allele data during modeling,
 #' while "common" removes those ones.
 #' 
-#' @param type The type of combined model running in Bayesian Method. i6 or i3.
+#' @param HMM_type The type of combined model running in Bayesian Method. i6 or i3.
 #' 
 #' @param output_path (string) Path to where the output file should be saved to.
 #' 
@@ -787,7 +787,7 @@ fusion_HMM_report_two_methods <- function(expression_file_path,
                                           # infercnv_obj,
                                           infercnv_allele_obj,
                                           method = c("union", "common"),
-                                          type = c("i6", "i3"),
+                                          HMM_type = c("i6", "i3"),
                                           output_path,
                                           output_prefix,
                                           HMM_report_by = 'subcluster',
@@ -795,7 +795,7 @@ fusion_HMM_report_two_methods <- function(expression_file_path,
   
     #allele_mode <- match.arg(allele_mode)
     method <- match.arg(method)
-    type <- match.arg(type)
+    HMM_type <- match.arg(HMM_type)
     
     flog.info("Loading candidate boundaries inferred from HMM ...")
     
@@ -815,7 +815,7 @@ fusion_HMM_report_two_methods <- function(expression_file_path,
                                         as.numeric(as.character(allele_cnv_regions_df[["end"  ]]))))
     allele_region_gr$state <- allele_cnv_regions_df$state
     
-    if (type == "i6") {
+    if (HMM_type == "i6") {
         allele_region_gr$state <- 2
     } else {
         allele_region_gr$state <- 1
@@ -857,19 +857,19 @@ fusion_HMM_report_two_methods <- function(expression_file_path,
         
         tmp_gr <- suppressWarnings(c(expression_region_gr[[x]], allele_region_gr[[x]])) %>% disjoin()
         
-        tmp_gr$allele_state <- ifelse(type == "i6",
+        tmp_gr$allele_state <- ifelse(HMM_type == "i6",
                                       3,
                                       2)
         allele_idx <- findOverlaps(tmp_gr, allele_region_gr[[x]])
         tmp_gr$allele_state[queryHits(allele_idx)] <- allele_region_gr[[x]]$state[subjectHits(allele_idx)]
         
-        tmp_gr$expression_state <- ifelse(type == "i6",
+        tmp_gr$expression_state <- ifelse(HMM_type == "i6",
                                           3,
                                           2)
         expression_idx <- findOverlaps(tmp_gr, expression_region_gr[[x]])
         tmp_gr$expression_state[queryHits(expression_idx)] <- expression_region_gr[[x]]$state[subjectHits(expression_idx)]
         
-        if (type == "i6") {
+        if (HMM_type == "i6") {
             
             tmp_gr$state <- ifelse(tmp_gr$allele_state == tmp_gr$expression_state,
                                    tmp_gr$allele_state,
@@ -909,7 +909,7 @@ fusion_HMM_report_two_methods <- function(expression_file_path,
     
     flog.info("Reassigning states estimated from combined boundaries ...")
     
-    infercnv_allele_obj@expr.data[,] <- ifelse(type == "i6",
+    infercnv_allele_obj@expr.data[,] <- ifelse(HMM_type == "i6",
                                                3,
                                                2)
     
@@ -945,10 +945,10 @@ fusion_HMM_report_two_methods <- function(expression_file_path,
     
     infercnv::plot_cnv(infercnv_allele_obj, 
                        out_dir = output_path,
-                       x.center = ifelse(type == "i6",
+                       x.center = ifelse(HMM_type == "i6",
                                          3,
                                          2),
-                       x.range = c(1,ifelse(type == "i6",
+                       x.range = c(1,ifelse(HMM_type == "i6",
                                           8,
                                           5)),
                        output_format = "png",
@@ -960,7 +960,7 @@ fusion_HMM_report_two_methods <- function(expression_file_path,
     infercnv:::generate_cnv_region_reports(infercnv_allele_obj,
                                            output_filename_prefix = output_prefix,
                                            out_dir = output_path,
-                                           ignore_neutral_state = ifelse(type == "i6", 3, 2),
+                                           ignore_neutral_state = ifelse(HMM_type == "i6", 3, 2),
                                            by = HMM_report_by)
     
     return(infercnv_allele_obj)

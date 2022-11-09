@@ -158,21 +158,37 @@ setAlleleMatrix <- function(infercnv_allele_obj,
 
     flog.info("Estimating allele frequency profiles ...")
 
-    allele_matrix <- infercnv_allele_obj@allele.alt.data/infercnv_allele_obj@allele.coverage.data
-    allele_matrix[is.na(allele_matrix)] <- 0 # omit no coverage
-    allele_matrix[infercnv_allele_obj@allele.alt.data == 0 & infercnv_allele_obj@allele.coverage.data != 0] <- 0.001 # pseudo count for total coverage not 0
+    coverage_reciprocal = infercnv_allele_obj@allele.coverage.data
+    coverage_reciprocal@x = 1/coverage_reciprocal@x
+
+    frac_matrix <- infercnv_allele_obj@allele.alt.data*coverage_reciprocal
+    frac_matrix@x = frac_matrix@x - 0.001  # remove pseudocount value to actual allele fraction values since we are doing an addition below to fill the pseudocounts
+    pseudocount_matrix  = infercnv_allele_obj@allele.coverage.data
+    pseudocount_matrix@x = rep(0.001, length(pseudocount_matrix@x)) # fill with pseudocounts all positions that have coverage 
+    frac_matrix = frac_matrix + pseudocount_matrix # populate the allele fraction matrix with the pseudocounts in all positions with coverages
 
     if (min_cells_per_snp > 0) {
 
         if (!is.null(unlist(infercnv_allele_obj@reference_grouped_cell_indices))) {
 
-            cells_w_ref_allele = rowSums(allele_matrix[, unlist(infercnv_allele_obj@reference_grouped_cell_indices)] != 0 & allele_matrix[, unlist(infercnv_allele_obj@reference_grouped_cell_indices)] < 0.5)
-            cells_w_alt_allele = rowSums(allele_matrix[, unlist(infercnv_allele_obj@reference_grouped_cell_indices)] != 0 & allele_matrix[, unlist(infercnv_allele_obj@reference_grouped_cell_indices)] > 0.5)
+            ref_frac_matrix = frac_matrix[, unlist(infercnv_allele_obj@reference_grouped_cell_indices)]
+            ref_frac_matrix_bool = as(ref_frac_matrix, "lgCMatrix")
+
+            ref_frac_matrix_bool@x = ref_frac_matrix@x < 0.5
+            cells_w_ref_allele = Matrix::rowSums(ref_frac_matrix_bool)
+
+            ref_frac_matrix_bool@x = ref_frac_matrix@x > 0.5
+            cells_w_alt_allele = Matrix::rowSums(ref_frac_matrix_bool)
 
         } else {
 
-            cells_w_ref_allele = rowSums(allele_matrix !=0 & allele_matrix < 0.5)
-            cells_w_alt_allele = rowSums(allele_matrix !=0 & allele_matrix > 0.5)
+            frac_matrix_bool = as(frac_matrix, "lgCMatrix")
+
+            frac_matrix_bool@x = frac_matrix@x < 0.5
+            cells_w_ref_allele = Matrix::rowSums(ref_frac_matrix_bool)
+
+            frac_matrix_bool@x = frac_matrix@x > 0.5
+            cells_w_alt_allele = Matrix::rowSums(ref_frac_matrix_bool)
 
         }
 
@@ -183,7 +199,7 @@ setAlleleMatrix <- function(infercnv_allele_obj,
         if (length(which(!snp_index)) != 0) {
 
             infercnv_allele_obj <- infercnv:::remove_snps(infercnv_allele_obj, which(!snp_index))
-            allele_matrix <- allele_matrix[snp_index,]
+            frac_matrix <- frac_matrix[snp_index,]
 
         }
     }
@@ -192,7 +208,7 @@ setAlleleMatrix <- function(infercnv_allele_obj,
 
     lesser_allele_index <- c()
     tumor_idx = unlist(infercnv_allele_obj@observation_grouped_cell_indices)
-    mAF_allele_matrix = apply(allele_matrix, 1, function(x) {
+    mAF_frac_matrix = apply(frac_matrix, 1, function(x) {
 
         ## focus allele selection based on the tumor cells only.
         nonzero_val_idx = which(x>0)
@@ -215,14 +231,14 @@ setAlleleMatrix <- function(infercnv_allele_obj,
         return(x)
     })
 
-    allele_matrix = t(mAF_allele_matrix)
+    frac_matrix = t(mAF_frac_matrix)
 
     thr_index <- lesser_allele_index > 0.5
 
     lesser.allele.data <- infercnv_allele_obj@allele.alt.data
     lesser.allele.data[thr_index,] <- infercnv_allele_obj@allele.coverage.data[thr_index,] - infercnv_allele_obj@allele.alt.data[thr_index,]
 
-    lesser.allele.fraction <- allele_matrix
+    lesser.allele.fraction <- frac_matrix
     infercnv_allele_obj@allele.expr.data <- lesser.allele.fraction
     infercnv_allele_obj@allele.count.data <- lesser.allele.data
 
@@ -279,7 +295,7 @@ map2gene <- function(infercnv_allele_obj) {
     gene_order_gr$gene <- infercnv_allele_obj@gene_order %>% rownames()
   
     snp2gene_index <- nearest(infercnv_allele_obj@SNP_info, gene_order_gr)
-    infercnv_allele_obj@SNP_info$gene <- infercnv_allele_obj@gene_order_gr$gene[snp2gene_index]
+    infercnv_allele_obj@SNP_info$gene <- gene_order_gr$gene[snp2gene_index]
   
     validate_infercnv_allele_obj(infercnv_allele_obj)
   
@@ -414,12 +430,12 @@ collapse_snp2gene <- function(infercnv_allele_obj,
     flog.info(sprintf("Using %s method to aggregrate snp into gene level", 
     collapse_method))
 
-    melt_data <- melt(infercnv_allele_obj@allele.coverage.data)
+    melt_data <- melt(as.matrix(infercnv_allele_obj@allele.coverage.data))
     colnames(melt_data) <- c("chrpos","cell","COV")
 
-    melt_data$ALT    <- melt(infercnv_allele_obj@allele.count.data)[,3]
-    melt_data$allele <- melt(infercnv_allele_obj@allele.alt.data)[,3]
-    melt_data$AF     <- melt(infercnv_allele_obj@allele.expr.data)[,3]
+    melt_data$ALT    <- as.numeric(infercnv_allele_obj@allele.count.data)
+    melt_data$allele <- as.numeric(infercnv_allele_obj@allele.alt.data)
+    melt_data$AF     <- as.numeric(infercnv_allele_obj@allele.expr.data)
 
     melt_data <- melt_data %>% dplyr::filter(COV > 0)
     melt_data$gene <- infercnv_allele_obj@SNP_info[melt_data$chrpos]$gene
@@ -505,36 +521,36 @@ collapse_snp2gene <- function(infercnv_allele_obj,
     allele.alt.data      <- allele.alt.data[     unique(infercnv_allele_obj@SNP_info$gene), colnames(infercnv_allele_obj@allele.expr.data)]
     allele.coverage.data <- allele.coverage.data[unique(infercnv_allele_obj@SNP_info$gene), colnames(infercnv_allele_obj@allele.expr.data)]
 
-    allele.gene_order <- infercnv_allele_obj@allele.gene_order[rownames(infercnv_allele_obj@allele.gene_order) %in% rownames(allele.expr.data),]
-    allele.gene_order_gr <- GenomicRanges::GRanges(allele.gene_order[[C_CHR]],
-                                                   IRanges::IRanges(allele.gene_order[[C_START]],
-                                                   allele.gene_order[[C_STOP]]))
-    names(allele.gene_order_gr) <- rownames(allele.gene_order)
-    allele.gene_order_gr <- allele.gene_order_gr %>% sortSeqlevels() %>%
-                                                     sort()
+    gene_order <- infercnv_allele_obj@gene_order[rownames(infercnv_allele_obj@gene_order) %in% rownames(allele.expr.data),]
+    gene_order_gr <- GenomicRanges::GRanges(gene_order[[C_CHR]],
+                                            IRanges::IRanges(gene_order[[C_START]],
+                                                             gene_order[[C_STOP]]))
+    names(gene_order_gr) <- rownames(gene_order)
+    gene_order_gr <- gene_order_gr %>% sortSeqlevels() %>%
+                                       sort()
 
-    allele.expr.data          <- allele.expr.data[    names(allele.gene_order_gr),]
-    allele.count.data         <- allele.count.data[   names(allele.gene_order_gr),]
-    allele.allele.data        <- allele.alt.data[     names(allele.gene_order_gr),]
-    allele.coverage.data      <- allele.coverage.data[names(allele.gene_order_gr),]
-    allele.gene_order         <- allele.gene_order[   names(allele.gene_order_gr),]
-    allele.gene_order_gr$gene <-                      names(allele.gene_order_gr)
+    allele.expr.data          <- allele.expr.data[    names(gene_order_gr),]
+    allele.count.data         <- allele.count.data[   names(gene_order_gr),]
+    allele.alt.data           <- allele.alt.data[     names(gene_order_gr),]
+    allele.coverage.data      <- allele.coverage.data[names(gene_order_gr),]
+    gene_order                <- gene_order[          names(gene_order_gr),]
+    gene_order_gr$gene        <-                      names(gene_order_gr)
 
-    names(allele.gene_order_gr) <- rownames(allele.expr.data) <- 
-                                   rownames(allele.count.data) <-
-                                   rownames(allele.alt.data) <-
-                                   rownames(allele.coverage.data) <-
-                                   rownames(allele.gene_order) <-
-                                   paste0(allele.gene_order[[C_CHR]], ":",
-                                          allele.gene_order[[C_START]], ":",
-                                          allele.gene_order[[C_STOP]])
+    names(gene_order_gr) <- rownames(allele.expr.data)     <- 
+                            rownames(allele.count.data)    <-
+                            rownames(allele.alt.data)      <-
+                            rownames(allele.coverage.data) <-
+                            rownames(gene_order)           <-
+                            paste0(gene_order[[C_CHR]], ":",
+                                   gene_order[[C_START]], ":",
+                                   gene_order[[C_STOP]])
    
-    infercnv_allele_obj@allele.expr.data <- allele.expr.data
-    infercnv_allele_obj@allele.count.data <- allele.count.data
-    infercnv_allele_obj@allele.data <- allele.alt.data
+    infercnv_allele_obj@allele.expr.data     <- allele.expr.data
+    infercnv_allele_obj@allele.count.data    <- allele.count.data
+    infercnv_allele_obj@allele.alt.data      <- allele.alt.data
     infercnv_allele_obj@allele.coverage.data <- allele.coverage.data
-    infercnv_allele_obj@SNP_info <- allele.gene_order_gr
-    infercnv_allele_obj@allele.gene_order <- allele.gene_order
+    infercnv_allele_obj@SNP_info             <- gene_order_gr
+    infercnv_allele_obj@allele.gene_order    <- gene_order
 
     validate_infercnv_allele_obj(infercnv_allele_obj)
 
@@ -703,12 +719,12 @@ plot_allele <- function(infercnv_allele_obj,
                         trend_smK = 31,
                         CELL_POINT_ALPHA = 0.6, dotsize=0.3, colorscheme = "BlueRed") {
 
-    initialized_method <- match.arg(initialized_method)
+    # initialized_method <- match.arg(initialized_method)
 
     # options(bitmapType = "cairo")
     ############# cell annotation
-    normal_cells = unlist(infercnv_allele_obj@reference_grouped_cell_indices)
-    malignant_cells = unlist(infercnv_allele_obj@observation_grouped_cell_indices)
+    normal_cells = colnames(infercnv_allele_obj@expr.data)[unlist(infercnv_allele_obj@reference_grouped_cell_indices)]
+    malignant_cells = colnames(infercnv_allele_obj@expr.data)[unlist(infercnv_allele_obj@observation_grouped_cell_indices)]
 
     num_normal_cells = length(normal_cells)
     #############
@@ -724,7 +740,8 @@ plot_allele <- function(infercnv_allele_obj,
     if(is.null(infercnv_allele_obj@allele.expr.data) | is.null(infercnv_allele_obj@allele.count.data)) {
 
         #flog.error("Please set allele matrix before plotting!")
-        flog.info(sprintf("Setting allele matrix using %s way", initialized_method))
+        # flog.info(sprintf("Setting allele matrix using %s way", initialized_method))
+        flog.info("Setting allele matrix")
 
         # if(initialized_method == "default") {
             infercnv_allele_obj <- setAlleleMatrix(infercnv_allele_obj)

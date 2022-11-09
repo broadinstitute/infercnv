@@ -401,6 +401,9 @@ run <- function(infercnv_obj,
     call_match$leiden_function = leiden_function
     # add argument needed to get relevant args list
     call_match$HMM = HMM
+    call_match$allele_mode = allele_mode
+    call_match$combined_method = combined_method
+    call_match$collapse_method = collapse_method
     call_match$z_score_filter = z_score_filter
     call_match$tumor_subcluster_pval = tumor_subcluster_pval
     call_match$k_nn = k_nn
@@ -416,6 +419,7 @@ run <- function(infercnv_obj,
     call_match$noise_filter = noise_filter
     call_match$sd_amplifier = sd_amplifier
     call_match$noise_logistic = noise_logistic
+    call_match$is_allele = ("infercnv_allele" %in% is(infercnv_obj))
 
     call_match$infercnv_obj = NULL
 
@@ -445,6 +449,14 @@ run <- function(infercnv_obj,
     skip_hmm = 0
     # skip_mcmc = 0
     skip_past = 0
+
+    # reloaded_hmm.infercnv_obj = 0
+    # reloaded_mcmc_obj
+    # reloaded_mcmc_allele_obj
+    # reloaded_common_obj
+    # reloaded_mcmc_combined
+
+    #### unlist relevant_args 1:19 for all HMM, then seperate 20-23 and 24-25,then 26-28 use all except bayesian filtering steps
     
     if (resume_mode) {
         flog.info("Checking for saved results.")
@@ -452,20 +464,8 @@ run <- function(infercnv_obj,
             if (file.exists(reload_info$expected_file_names[[i]])) {
                 flog.info(paste0("Trying to reload from step ", i))
                 # if ((i == 17 && skip_hmm == 0) || (i %in% (18:20))) {
-                if ((i == 20) || (i %in% seq(17, 19) && skip_hmm == 0) || (i == 17 && skip_hmm == 2)) {   # step 17 appears in two conditions because if last found step is 18, step 19 requires the results of both step 17 and 18 to run
-                    if (i == 18) {  # mcmc_obj
-                        mcmc_obj = readRDS(reload_info$expected_file_names[[i]])
-                        if (!.compare_args(infercnv_obj@options, unlist(reload_info$relevant_args[1:i]), mcmc_obj@options)) {
-                            rm(mcmc_obj)
-                            invisible(gc())
-                        }
-                        else {
-                            mcmc_obj@options = infercnv_obj@options
-                            skip_hmm = max(skip_hmm, i - 16)
-                            flog.info(paste0("Using backup MCMC from step ", i))
-                        }
-                    }
-                    else {
+                if ((i == 22) || (i %in% seq(19, 28) && skip_hmm == 0) || (i == 19 && skip_hmm == 2)) {   # step 19 appears in two conditions because if last found step is 20, step 21 requires the results of both step 19 and 20 to run
+                    if ((i == 19 || i == 21 || i == 22 || (i == 23 && ("infercnv_allele" %in% is(infercnv_obj)))) && !exists("hmm.infercnv_obj")) {
                         hmm.infercnv_obj = readRDS(reload_info$expected_file_names[[i]])
                         if (!.compare_args(infercnv_obj@options, unlist(reload_info$relevant_args[1:i]), hmm.infercnv_obj@options)) {
                             rm(hmm.infercnv_obj)
@@ -473,15 +473,87 @@ run <- function(infercnv_obj,
                         }
                         else {
                             hmm.infercnv_obj@options = infercnv_obj@options
-                            skip_hmm = max(skip_hmm, i - 16)  # max for case where step 18 is found, so can be skipped, but still needed to reload step 17 results to be able to run step 19
+                            skip_hmm = max(skip_hmm, i - 18)  # max for case where step 20 is found, so can be skipped, but still needed to reload step 19 results to be able to run step 21
                             flog.info(paste0("Using backup HMM from step ", i))
                         }
                     }
+                    else if (i == 20) {  # mcmc_obj
+                        mcmc_obj = readRDS(reload_info$expected_file_names[[i]])
+                        if (!.compare_args(infercnv_obj@options, unlist(reload_info$relevant_args[1:i]), mcmc_obj@options)) {
+                            rm(mcmc_obj)
+                            invisible(gc())
+                        }
+                        else {
+                            mcmc_obj@options = infercnv_obj@options
+                            skip_hmm = max(skip_hmm, i - 18)
+                            flog.info(paste0("Using backup MCMC from step ", i))
+                        }
+                    }
+                    else if (i == 24 && ("infercnv_allele" %in% is(infercnv_obj))) {
+                        mcmc_allele_obj = readRDS(reload_info$expected_file_names[[i]])
+                        if (!.compare_args(infercnv_obj@options, unlist(reload_info$relevant_args[1:i]), mcmc_allele_obj@options)) {
+                            rm(mcmc_allele_obj)
+                            invisible(gc())
+                        }
+                        else {
+                            mcmc_allele_obj@options = infercnv_obj@options
+                            skip_hmm = max(skip_hmm, i - 18)
+                            flog.info(paste0("Using backup MCMC allele from step ", i))
+                        }
+                    }
+                    else if (i == 25 && ("infercnv_allele" %in% is(infercnv_obj))) {
+                        hmm.infercnv_obj = readRDS(reload_info$expected_file_names[[i]])
+                        if (!.compare_args(infercnv_obj@options, unlist(reload_info$relevant_args[1:i]), hmm.infercnv_obj@options)) {
+                            rm(hmm.infercnv_obj)
+                            invisible(gc())
+                        }
+                        else {
+                            hmm.infercnv_obj@options = infercnv_obj@options
+                            skip_hmm = max(skip_hmm, i - 18)
+                            flog.info(paste0("Using backup MCMC allele from step ", i))
+                        }
+                    }
+                    else if (i == 26 && ("infercnv_allele" %in% is(infercnv_obj))) {
+                        common_obj = readRDS(reload_info$expected_file_names[[i]])
+                        if (!.compare_args(infercnv_obj@options, unlist(reload_info$relevant_args[1:i]), common_obj@options)) {
+                            rm(common_obj)
+                            invisible(gc())
+                        }
+                        else {
+                            common_obj@options = infercnv_obj@options
+                            skip_hmm = max(skip_hmm, i - 18)
+                            flog.info(paste0("Using backup common HMM from step ", i))
+                        }
+                    }
+                    else if (i == 27  && ("infercnv_allele" %in% is(infercnv_obj))) {
+                        mcmc_combined = readRDS(reload_info$expected_file_names[[i]])
+                        if (!.compare_args(infercnv_obj@options, unlist(reload_info$relevant_args[1:i]), mcmc_combined@options)) {
+                            rm(mcmc_combined)
+                            invisible(gc())
+                        }
+                        else {
+                            mcmc_combined@options = infercnv_obj@options
+                            skip_hmm = max(skip_hmm, i - 18)
+                            flog.info(paste0("Using backup MCMC combined from step ", i))
+                        }
+                    }
+                    else if (i == 28 && ("infercnv_allele" %in% is(infercnv_obj))) {
+                        mcmc_combined_mod_list = readRDS(reload_info$expected_file_names[[i]])
+                        if (!.compare_args(infercnv_obj@options, unlist(reload_info$relevant_args[1:i]), mcmc_combined_mod_list@options)) {
+                            rm(mcmc_combined_mod_list)
+                            invisible(gc())
+                        }
+                        else {
+                            mcmc_combined_mod_list@options = infercnv_obj@options
+                            skip_hmm = max(skip_hmm, i - 18)
+                            flog.info(paste0("Using backup MCMC combined from step ", i))
+                        }
+                    }
                 }
-                else if (!(i %in% 17:20)) {
+                else if (!(i %in% 19:28)) {
                     reloaded_infercnv_obj = readRDS(reload_info$expected_file_names[[i]])
                     if (skip_past > i) { # in case denoise was found
-                        if (21 > i) { # if 22/21 already found and checked HMM too, stop
+                        if (29 > i) { # if 22/21 already found and checked HMM too, stop
                             break
                         }
                         else { # if 22 denoise found, don't check 21 maskDE
@@ -489,7 +561,7 @@ run <- function(infercnv_obj,
                         }
                     }
                     if (.compare_args(infercnv_obj@options, unlist(reload_info$relevant_args[1:i]), reloaded_infercnv_obj@options)) {
-                        if (i ==  15 && per_chr_hmm_subclusters) {
+                        if (i ==  17 && per_chr_hmm_subclusters) {
                             tmp = nchar(reload_info$expected_file_names[[i]])
                             tmp = paste0(substr(reload_info$expected_file_names[[i]], 1, tmp-13), ".per_chr_subclusters", substr(reload_info$expected_file_names[[i]], tmp-12, tmp))
                             if (file.exists(tmp)) {
@@ -505,7 +577,7 @@ run <- function(infercnv_obj,
                         infercnv_obj@options = options_backup
                         skip_past = i
                         flog.info(paste0("Using backup from step ", i))
-                        if (i < 21) { # do not stop check right away if denoise was found to also allow to check for HMM
+                        if (i < 28) { # do not stop check right away if denoise was found to also allow to check for HMM
                             break
                         }
                     }
@@ -641,7 +713,7 @@ run <- function(infercnv_obj,
 
     if (skip_past < step_count) {
 
-        if ("infercnv_allele" %in% is(infercnv_obj)) {
+        if ("infercnv_allele" %in% is(infercnv_obj) && allele_mode == "gene_level") {
 
             flog.info(sprintf("\n\n\tSTEP %02d: mapping SNPs to genes\n", step_count))
 
@@ -1442,7 +1514,6 @@ run <- function(infercnv_obj,
             flog.info(sprintf("\n\n\tSTEP %02d: Filter HMM predicted CNVs based on the Bayesian Network Model results and BayesMaxPNormal\n", step_count))
             ## Filter CNV's by posterior Probabilities
             mcmc_obj_hmm_states_list <- infercnv::filterHighPNormals(MCMC_inferCNV_obj = mcmc_obj,
-                                                                     infercnv_obj = infercnv_obj,
                                                                      HMM_states = hmm.infercnv_obj@expr.data, 
                                                                      BayesMaxPNormal = BayesMaxPNormal)
             
@@ -1537,7 +1608,12 @@ run <- function(infercnv_obj,
         return(infercnv_obj)
     }
     step_count = step_count + 1 # 23
-    hmm_resume_file_token = paste0(resume_file_token, ".allele.hmm_mode-", analysis_mode)
+    if (allele_mode == "snp_level") {
+        hmm_allele_resume_file_token = paste0(resume_file_token, ".allele.", allele_mode, ".hmm_mode-", analysis_mode)
+    }
+    else { ## allele_mode == "gene_level"
+        hmm_allele_resume_file_token = paste0(resume_file_token, ".allele.", allele_mode, "-", collapse_method, ".hmm_mode-", analysis_mode)
+    }
     if (HMM && ("infercnv_allele" %in% is(infercnv_obj)) && ("infercnv_allele" %in% is(infercnv_obj))) {
 
         if (skip_hmm < 5) {
@@ -1569,10 +1645,11 @@ run <- function(infercnv_obj,
                                                                                                          trim = 0)
             }
             
+            #### collapse_method   allele_mode
             
             ## report predicted cnv regions:
             generate_cnv_region_reports(hmm.infercnv_obj,
-                                        output_filename_prefix=sprintf("%02d_HMM_allele_pred%s", step_count, hmm_resume_file_token),
+                                        output_filename_prefix=sprintf("%02d_HMM_allele_pred%s", step_count, hmm_allele_resume_file_token),
                                         out_dir=out_dir,
                                         ignore_neutral_state=2,
                                         by=HMM_report_by,
@@ -1599,8 +1676,8 @@ run <- function(infercnv_obj,
                          plot_chr_scale=plot_chr_scale,
                          chr_lengths=chr_lengths,
                          out_dir=out_dir,
-                         title=sprintf("%02d_HMM_preds",step_count),
-                         output_filename=sprintf("infercnv.%02d_HMM_allele_pred%s", step_count, hmm_resume_file_token),
+                         title=sprintf("%02d_HMM_allele_preds",step_count),
+                         output_filename=sprintf("infercnv.%02d_HMM_allele_pred%s", step_count, hmm_allele_resume_file_token),
                          output_format=output_format,
                          write_expr_matrix=write_expr_matrix,
                          x.center=hmm_center,
@@ -1627,11 +1704,11 @@ run <- function(infercnv_obj,
             flog.info(sprintf("\n\n\tSTEP %02d: Run allele based Bayesian Network Model on HMM predicted CNVs\n", step_count))
             
             ## the MCMC  object
-            mcmc_allele_obj <- infercnv::inferCNVAlleleBayesNet(file_path = file.path(out_dir, sprintf("BayesNetOutput.allele.%s", hmm_resume_file_token)),
-                                                                file_token = hmm_resume_file_token,
-                                                                infercnv_allele_obj = infercnv_allele_obj, ## allele-snp obj
+            mcmc_allele_obj <- infercnv::inferCNVAlleleBayesNet(file_path = out_dir,
+                                                                file_token = sprintf("%02d_HMM_allele_pred%s", step_count-1, hmm_allele_resume_file_token),
+                                                                infercnv_allele_obj = infercnv_obj, ## allele-snp obj
                                                                 allele_mode = allele_mode,
-                                                                output_path = file.path(out_paths_infercnv[i], paste0("allele_i2_bayesian_snp_",analysis_mode)), # define your path
+                                                                output_path = file.path(out_dir, paste0("allele_i2_bayesian_snp_", analysis_mode)), # define your path
                                                                 cores = num_threads)
 
 
@@ -1645,62 +1722,64 @@ run <- function(infercnv_obj,
         }
     }
 
-        ## ############################################################
-        ## Bayesian Filtering
-        ## ############################################################
+        # ############################################################
+        # Bayesian Filtering
+        # ############################################################
 
-    # if (up_to_step == step_count) {
-    #     flog.info("Reached up_to_step")
-    #     return(infercnv_obj)
-    # }
-    # step_count = step_count + 1 # 25
-    # if (skip_hmm < 3) {
-    #     if (HMM == TRUE && BayesMaxPNormal > 0 && length(unique(apply(hmm.infercnv_obj@expr.data,2,unique))) != 1 ) {
-    #         flog.info(sprintf("\n\n\tSTEP %02d: Filter HMM predicted CNVs based on the allele based Bayesian Network Model results and BayesMaxPNormal\n", step_count))
-    #         ## Filter CNV's by posterior Probabilities
-    #         mcmc_obj_hmm_states_list <- infercnv::filterHighPNormals(MCMC_inferCNV_obj = mcmc_allele_obj,
-    #                                                                  HMM_states = hmm.infercnv_obj@allele.expr.data, 
-    #                                                                  BayesMaxPNormal   = BayesMaxPNormal)
+    if (up_to_step == step_count) {
+        flog.info("Reached up_to_step")
+        return(infercnv_obj)
+    }
+    step_count = step_count + 1 # 25
+    if (skip_hmm < 7) {
+        if (HMM == TRUE && BayesMaxPNormal > 0 && length(unique(apply(hmm.infercnv_obj@allele.expr.data,2,unique))) != 1 ) {
+            flog.info(sprintf("\n\n\tSTEP %02d: Filter HMM predicted CNVs based on the allele based Bayesian Network Model results and BayesMaxPNormal\n", step_count))
+            ## Filter CNV's by posterior Probabilities
+            mcmc_obj_hmm_states_list <- infercnv::filterHighPNormals_allele(MCMC_inferCNV_obj = mcmc_allele_obj,
+                                                                            HMM_states = infercnv_obj@allele.expr.data,
+                                                                            BayesMaxPNormal = BayesMaxPNormal,
+                                                                            reassignCNVs = TRUE,
+                                                                            HMM_type = "i2") 
             
-    #         hmm_states_highPnormCNVsRemoved.matrix <- mcmc_obj_hmm_states_list[[2]]
+            hmm_states_highPnormCNVsRemoved.matrix <- mcmc_obj_hmm_states_list[[2]]
 
-    #         # replace states
-    #         hmm.infercnv_obj@expr.data <- hmm_states_highPnormCNVsRemoved.matrix
+            # replace states
+            hmm.infercnv_obj@allele.expr.data <- hmm_states_highPnormCNVsRemoved.matrix
             
-    #         ## Save the MCMC inferCNV object
-    #         if (save_rds) {
-    #             saveRDS(hmm.infercnv_obj, reload_info$expected_file_names[[step_count]])
-    #         }
-    #         invisible(gc())
+            ## Save the MCMC inferCNV object
+            if (save_rds) {
+                saveRDS(hmm.infercnv_obj, reload_info$expected_file_names[[step_count]])
+            }
+            invisible(gc())
             
-    #         if (! no_plot) {
-    #             ## Plot HMM pred img after cnv removal
-    #             plot_cnv(infercnv_obj=hmm.infercnv_obj,
-    #                      k_obs_groups=k_obs_groups,
-    #                      cluster_by_groups=cluster_by_groups,
-    #                      cluster_references=cluster_references,
-    #                      plot_chr_scale=plot_chr_scale,
-    #                      chr_lengths=chr_lengths,
-    #                      out_dir=out_dir,
-    #                      title=sprintf("%02d_HMM_preds_Bayes_Net",step_count),
-    #                      output_filename=sprintf("infercnv.%02d_HMM_pred.Bayes_Net.Pnorm_%g",step_count, BayesMaxPNormal),
-    #                      output_format=output_format,
-    #                      write_expr_matrix=write_expr_matrix,
-    #                      x.center=hmm_center,
-    #                      x.range=hmm_state_range,
-    #                      png_res=png_res,
-    #                      useRaster=useRaster
-    #                      )
-    #         }
-    #         ## write the adjusted CNV report files
-    #         ## report predicted cnv regions:
-    #         adjust_genes_regions_report(mcmc_obj_hmm_states_list[[1]],
-    #                                     # input_filename_prefix=sprintf("%02d_HMM_preds", (step_count-1)),
-    #                                     input_filename_prefix=sprintf("%02d_HMM_pred%s", (step_count-2), hmm_resume_file_token),
-    #                                     output_filename_prefix=sprintf("HMM_CNV_predictions.%s.Pnorm_%g", hmm_resume_file_token, BayesMaxPNormal),
-    #                                     out_dir=out_dir)
-    #     }
-    # }
+            if (! no_plot) {
+                ## Plot HMM pred img after cnv removal
+                plot_cnv(infercnv_obj=hmm.infercnv_obj,
+                         k_obs_groups=k_obs_groups,
+                         cluster_by_groups=cluster_by_groups,
+                         cluster_references=cluster_references,
+                         plot_chr_scale=plot_chr_scale,
+                         chr_lengths=chr_lengths,
+                         out_dir=out_dir,
+                         title=sprintf("%02d_HMM_allele_preds_Bayes_Net",step_count),
+                         output_filename=sprintf("infercnv.%02d_HMM_allele_pred.Bayes_Net.Pnorm_%g",step_count, BayesMaxPNormal),
+                         output_format=output_format,
+                         write_expr_matrix=write_expr_matrix,
+                         x.center=hmm_center,
+                         x.range=hmm_state_range,
+                         png_res=png_res,
+                         useRaster=useRaster
+                         )
+            }
+            ## write the adjusted CNV report files
+            ## report predicted cnv regions:
+            adjust_genes_regions_report(mcmc_obj_hmm_states_list[[1]],
+                                        # input_filename_prefix=sprintf("%02d_HMM_preds", (step_count-1)),
+                                        input_filename_prefix=sprintf("%02d_HMM_allele_pred%s", (step_count-2), hmm_allele_resume_file_token),
+                                        output_filename_prefix=sprintf("HMM_allele_CNV_predictions.%s.Pnorm_%g", hmm_allele_resume_file_token, BayesMaxPNormal),
+                                        out_dir=out_dir)
+        }
+    }
         
 
 
@@ -1710,26 +1789,29 @@ run <- function(infercnv_obj,
 
     ## define a path where you export the final outputs
     # gene level
-    combined_file_path <- file.path(out_dir, paste("HMM_Combined",type,combined_method, allele_mode, collapse_method, analysis_mode, sep = "_"))
+    combined_file_path <- file.path(out_dir, paste("HMM_Combined", HMM_type, combined_method, allele_mode, collapse_method, analysis_mode, sep = "_"))
+
     ## define a token
-    combined_file_token <- paste0("HMM_pred_", collapse_method)
+    combined_file_token <- paste0("HMM_pred_", combined_method, allele_mode, collapse_method)
 
     if (up_to_step == step_count) {
         flog.info("Reached up_to_step")
         return(infercnv_obj)
     }
-    step_count = step_count + 1 # 25
-    if (skip_hmm < 7) {
+    step_count = step_count + 1 # 26
+    if (skip_hmm < 8) {
         if (HMM && ("infercnv_allele" %in% is(infercnv_obj))) {
 
+            flog.info(sprintf("\n\n\tSTEP %02d: Combine boundaries of HMM predicted from expression and allele data\n", step_count))
+
             ## combine HMM boundaries from two methods
-            common_obj <- infercnv::fusion_HMM_report_two_methods(expression_file_path = file.path(out_paths_infercnv[i], paste0("gene_i6_", analysis_mode)), # the path you exported the expression-based HMM reports
-                                                                  expression_file_token = paste0("17_HMM_predHMMi6.leiden.hmm_mode-", analysis_mode),
-                                                                  allele_file_path = file.path(out_paths_infercnv[i], paste("HMM_Gene", collapse_method, analysis_mode, sep = "_")), # the path you exported the allele-based HMM reports
-                                                                  allele_file_token = paste0("HMM_pred_", collapse_method),
-                                                                  infercnv_allele_obj = infercnv_gene_allele_obj,
+            common_obj <- infercnv::fusion_HMM_report_two_methods(expression_file_path = out_dir, # the path you exported the expression-based HMM reports
+                                                                  expression_file_token = sprintf("%02d_HMM_pred%s", step_count-7, hmm_resume_file_token),  # update subcslutering method in filename
+                                                                  allele_file_path = out_dir, # the path you exported the allele-based HMM reports
+                                                                  allele_file_token = sprintf("%02d_HMM_allele_pred%s", step_count-3, hmm_allele_resume_file_token),
+                                                                  infercnv_allele_obj = infercnv_obj,
                                                                   method = combined_method,
-                                                                  type = HMM_type,
+                                                                  HMM_type = HMM_type,
                                                                   output_path = combined_file_path,
                                                                   output_prefix = combined_file_token,
                                                                   cluster_by_groups = cluster_by_groups,
@@ -1750,24 +1832,24 @@ run <- function(infercnv_obj,
         flog.info("Reached up_to_step")
         return(infercnv_obj)
     }
-    step_count = step_count + 1 # 26
-    if (skip_hmm < 8) {
-        if (HMM && ("infercnv_allele" %in% is(infercnv_obj))) {
+    step_count = step_count + 1 # 27
+    if (skip_hmm < 9) {
+        if (HMM && ("infercnv_allele" %in% is(infercnv_obj)) && (BayesMaxPNormal > 0) ) {
 
             ## bayesian model leveraging both expression and allele data
             bayesian_output <- file.path(out_dir, paste("combined",
                                                          combined_method,
                                                          analysis_mode,
                                                          allele_mode,
-                                                         type, 
+                                                         HMM_type, 
                                                          sep = "_")) # define your path to store output of bayesian model
 
             mcmc_combined <- infercnv::inferCNVCombinedBayesNet(combined_file_path = combined_file_path,
                                                                 combined_file_token = combined_file_token,
-                                                                infercnv_allele_obj = infercnv_gene_allele_obj,
+                                                                infercnv_allele_obj = infercnv_obj,
                                                                 allele_mode = allele_mode,
                                                                 method = combined_method,
-                                                                type = HMM_type,
+                                                                HMM_type = HMM_type,
                                                                 enable_cnLOH = TRUE,
                                                                 output_path = bayesian_output)
 
@@ -1786,10 +1868,10 @@ run <- function(infercnv_obj,
         flog.info("Reached up_to_step")
         return(infercnv_obj)
     }
-    step_count = step_count + 1 # 27
-    if (skip_hmm < 7) {
+    step_count = step_count + 1 # 28
+    if (skip_hmm < 10) {
 
-        if (HMM && ("infercnv_allele" %in% is(infercnv_obj))) {
+        if (HMM && ("infercnv_allele" %in% is(infercnv_obj)) && (BayesMaxPNormal > 0) ) {
 
             ## filter cnv by the threshold of normal state
             mcmc_combined_mod_list <- filterHighPNormals_allele(MCMC_inferCNV_obj = mcmc_combined,
@@ -1804,6 +1886,7 @@ run <- function(infercnv_obj,
             hmm.infercnv_obj@expr.data <- hmm_states_highPnormCNVsRemoved.matrix
 
             if (save_rds) {
+                # saveRDS(hmm.infercnv_obj, reload_info$expected_file_names[[step_count]])
                 saveRDS(mcmc_combined_mod_list, reload_info$expected_file_names[[step_count]])
             }
 
@@ -1823,7 +1906,7 @@ run <- function(infercnv_obj,
         flog.info("Reached up_to_step")
         return(infercnv_obj)
     }
-    step_count = step_count + 1 # 28
+    step_count = step_count + 1 # 29
     if (mask_nonDE_genes) {
         
         if (!has_reference_cells(infercnv_obj)) {
@@ -1872,7 +1955,7 @@ run <- function(infercnv_obj,
         flog.info("Reached up_to_step")
         return(infercnv_obj)
     }
-    step_count = step_count + 1 # 29
+    step_count = step_count + 1 # 30
     if (denoise) {
         
         ## ##############################
@@ -3070,9 +3153,11 @@ get_average_bounds <- function (infercnv_obj) {
 log2xplus1 <- function(infercnv_obj) {
     
     flog.info("transforming log2xplus1()")
-    
-    infercnv_obj@expr.data <- log2(infercnv_obj@expr.data + 1)
-    
+    if ("dgCMatrix" %in% is(infercnv_obj@expr.data)) {
+        infercnv_obj@expr.data@x <- log2(infercnv_obj@expr.data@x + 1)
+    } else {
+        infercnv_obj@expr.data <- log2(infercnv_obj@expr.data + 1)
+    }
     if (! is.null(infercnv_obj@.hspike)) {
         flog.info("-mirroring for hspike")
         infercnv_obj@.hspike <- log2xplus1(infercnv_obj@.hspike)
@@ -3621,8 +3706,8 @@ compareNA <- function(v1,v2) {
     run_arguments = list(...)
 
     # creation args  ## add check for matrix size, col/row names, and ref/obs indices
-    relevant_args = vector("list", 21) # 21 = max steps
-    expected_file_names = vector("character", 21)
+    relevant_args = vector("list", 29) # 21 = max steps
+    expected_file_names = vector("character", 29)
     step_i = 1
 
     # 1 _incoming_data.infercnv_obj
@@ -3653,7 +3738,12 @@ compareNA <- function(v1,v2) {
     step_i = step_i + 1
 
     # 5 _snps_collapsed2gene%s.infercnv_obj
-    relevant_args[[step_i]] = c("collapse_method")
+    if (run_arguments$is_allele) {
+        relevant_args[[step_i]] = c("allele_mode")
+        if (run_arguments$allele_mode == "gene_level") {
+            relevant_args[[step_i]] = c(relevant_args[[step_i]], "collapse_method")
+        }
+    }
     expected_file_names[[step_i]] = file.path(run_arguments$out_dir, sprintf("%02d_collapse2gene%s.infercnv_obj", step_i, resume_file_token))
     step_i = step_i + 1
 
@@ -3766,7 +3856,7 @@ compareNA <- function(v1,v2) {
         else {
             relevant_args[[step_i]] = c(relevant_args[[step_i]], "HMM_i3_pval", "HMM_i3_use_KS")
         }
-        expected_file_names[[step_i]] = hmm.infercnv_obj_file = file.path(run_arguments$out_dir, sprintf("%02d_HMM_pred%s.infercnv_obj", step_i, hmm_resume_file_token))
+        expected_file_names[[step_i]] = file.path(run_arguments$out_dir, sprintf("%02d_HMM_pred%s.infercnv_obj", step_i, hmm_resume_file_token))
     }
     step_i = step_i + 1
 
@@ -3801,23 +3891,32 @@ compareNA <- function(v1,v2) {
     }
     step_i = step_i + 1
 
-    # 23 _allele_HMM_pred%s.infercnv_obj
+    # 23 _HMM_allele_pred%s.infercnv_obj
     relevant_args[[step_i]] = c("HMM")
     if (run_arguments$HMM) {
         relevant_args[[step_i]] = c(relevant_args[[step_i]])
-        expected_file_names[[step_i]] = file.path(run_arguments$out_dir, sprintf("%02d_allele_HMM_pred%s.infercnv_obj", step_i, hmm_resume_file_token))
+        expected_file_names[[step_i]] = file.path(run_arguments$out_dir, sprintf("%02d_HMM_allele_pred%s.infercnv_obj", step_i, hmm_resume_file_token))
     }
     step_i = step_i + 1
 
-    # 24 _allele_HMM_pred.Bayes_Net%s.mcmc_obj
+    # 24 _HMM_allele_pred.Bayes_Net%s.mcmc_obj
     relevant_args[[step_i]] = c("HMM", "allele_mode")
     if (run_arguments$HMM) {
         relevant_args[[step_i]] = c(relevant_args[[step_i]])
-        expected_file_names[[step_i]] = file.path(run_arguments$out_dir, sprintf("%02d_allele_HMM_pred.Bayes_Net%s.mcmc_obj", step_i, hmm_resume_file_token))
+        expected_file_names[[step_i]] = file.path(run_arguments$out_dir, sprintf("%02d_HMM_allele_pred.Bayes_Net%s.mcmc_obj", step_i, hmm_resume_file_token))
     }
     step_i = step_i + 1
 
-    # 25 _fusion_HMM_pred.%s.infercnv_obj
+    # 25 _HMM_allele_pred.repr_intensities%s.Pnorm_%g.infercnv_obj
+    relevant_args[[step_i]] = c("HMM")
+    if (run_arguments$HMM) {
+        relevant_args[[step_i]] = c(relevant_args[[step_i]], "BayesMaxPNormal")
+        # hmm.infercnv_obj_file = file.path(out_dir, sprintf("%02d_HMM_pred.repr_intensities%s.Pnorm_%g.infercnv_obj", step_i, hmm_resume_file_token, BayesMaxPNormal))
+        expected_file_names[[step_i]] = file.path(run_arguments$out_dir, sprintf("%02d_HMM_allele_pred.repr_intensities%s.Pnorm_%g.infercnv_obj", step_i, hmm_resume_file_token, run_arguments$BayesMaxPNormal))
+    }
+    step_i = step_i + 1
+
+    # 26 _fusion_HMM_pred.%s.infercnv_obj
     relevant_args[[step_i]] = c("HMM", "combined_method")
     if (run_arguments$HMM) {
         relevant_args[[step_i]] = c(relevant_args[[step_i]])
@@ -3825,7 +3924,7 @@ compareNA <- function(v1,v2) {
     }
     step_i = step_i + 1
 
-    # 26 _combined_HMM_pred.Bayes_Net%s.mcmc_obj
+    # 27 _combined_HMM_pred.Bayes_Net%s.mcmc_obj
     relevant_args[[step_i]] = c("HMM", "allele_method", "combined_method")
     if (run_arguments$HMM) {
         relevant_args[[step_i]] = c(relevant_args[[step_i]])
@@ -3833,15 +3932,15 @@ compareNA <- function(v1,v2) {
     }
     step_i = step_i + 1
 
-    # 27 _combined_HMM_pred.Bayes_Net%s.mcmc_obj
+    # 28 _combined_HMM_pred.Bayes_Net%s.mcmc_obj
     relevant_args[[step_i]] = c("HMM", "BayesMaxPNormal")
     if (run_arguments$HMM) {
         relevant_args[[step_i]] = c(relevant_args[[step_i]])
-        expected_file_names[[step_i]] = file.path(run_arguments$out_dir, sprintf("%02d_combined_HMM_pred.Bayes_Net%s.mcmc_obj", step_i, hmm_resume_file_token))
+        expected_file_names[[step_i]] = file.path(run_arguments$out_dir, sprintf("%02d_combined_HMM_pred.Bayes_Net%s.Pnorm_%g.mcmc_obj", step_i, hmm_resume_file_token, run_arguments$BayesMaxPNormal))
     }
     step_i = step_i + 1
 
-    # 28 _mask_nonDE%s.infercnv_obj
+    # 29 _mask_nonDE%s.infercnv_obj
     relevant_args[[step_i]] = c("mask_nonDE_genes")
     if (run_arguments$mask_nonDE_genes) {
         relevant_args[[step_i]] = c(relevant_args[[step_i]], "require_DE_all_normals", "test.use", "mask_nonDE_pval")
@@ -3849,7 +3948,7 @@ compareNA <- function(v1,v2) {
     }
     step_i = step_i + 1
 
-    # 29 _denoise%s.NF_%s.SD_%g.NL_%s.infercnv_obj
+    # 30 _denoise%s.NF_%s.SD_%g.NL_%s.infercnv_obj
     relevant_args[[step_i]] = c("denoise")
     if (run_arguments$denoise) {
         relevant_args[[step_i]] = c(relevant_args[[step_i]], "noise_filter", "sd_amplifier", "noise_logistic")

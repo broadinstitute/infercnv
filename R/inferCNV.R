@@ -204,9 +204,9 @@ CreateInfercnvObject <- function(raw_counts_matrix,
             stop("CreateInfercnvObject:: Error, please specifiy the parameter: snp_split_by to indicate the string used
                  for splitting the rownames of allele matrix")
         }
-        raw.allele.data <- .read_count_matrix(matrix = raw_allele_matrix, delim = delim)
-        raw.coverage.data <- .read_count_matrix(matrix = raw_coverage_matrix, delim = delim)
-        .allele_precheck(raw.allele.data, raw.coverage.data, raw.data)
+        raw.allele.alt.data <- .read_count_matrix(matrix = raw_allele_matrix, delim = delim)
+        raw.allele.coverage.data <- .read_count_matrix(matrix = raw_coverage_matrix, delim = delim)
+        .allele_precheck(raw.allele.alt.data, raw.allele.coverage.data, raw.data)
     } else if(!is.null(raw_counts_matrix)) {
         flog.info("CreateInfercnvObject:: Only Leveraging expression data")
         raw.data <- .read_count_matrix(matrix = raw_counts_matrix, delim = delim)
@@ -340,6 +340,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     ref_group_cell_indices = list()
     for (name_group in ref_group_names) {
         cell_indices = which(input_classifications[,1] == name_group)
+        names(cell_indices) = rownames(input_classifications)[cell_indices]
         
         if (length(cell_indices) == 0 ) {
             stop(sprintf("Error, not identifying cells with classification %s", name_group))
@@ -356,6 +357,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     obs_group_cell_indices = list()
     for (name_group in obs_group_names) {
         cell_indices = which(input_classifications[,1] == name_group)
+        names(cell_indices) = rownames(input_classifications)[cell_indices]
         obs_group_cell_indices[[ toString(name_group) ]] <- cell_indices
     }
 
@@ -366,20 +368,20 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     }
     
     ## allele data if provided
-    if (exists("raw.allele.data") & exists("raw.coverage.data")){
-        raw.allele.data <- raw.allele.data[, colnames(raw.data)]
-        raw.coverage.data <- raw.coverage.data[, colnames(raw.data)]
+    if (exists("raw.allele.alt.data") & exists("raw.allele.coverage.data")){
+        raw.allele.alt.data <- raw.allele.alt.data[, colnames(raw.data)]
+        raw.allele.coverage.data <-raw.allele.coverage.data[, colnames(raw.data)]
         
-        processed_allele_data <- .allele_preprocess(raw.allele.data, raw.coverage.data)
-        raw.allele.data <- processed_allele_data$allele.data
-        raw.coverage.data <- processed_allele_data$coverage.data
+        processed_allele_data <- .allele_preprocess(raw.allele.alt.data, raw.allele.coverage.data)
+        raw.allele.alt.data <- processed_allele_data$allele.data
+        raw.allele.coverage.data <- processed_allele_data$coverage.data
         
-        order_ret_allele <- .order_reduce_allele(raw.allele.data,
-                                                 raw.coverage.data,
+        order_ret_allele <- .order_reduce_allele(raw.allele.alt.data,
+                                                 raw.allele.coverage.data,
                                                  snp_split_by,
                                                  input_gene_order)
-        raw.allele.data <- order_ret_allele$allele.data
-        raw.coverage.data <- order_ret_allele$coverage.data
+        raw.allele.alt.data <- order_ret_allele$allele.data
+        raw.allele.coverage.data <- order_ret_allele$coverage.data
         snps <- order_ret_allele$snps
         
         object <- new(
@@ -390,8 +392,8 @@ CreateInfercnvObject <- function(raw_counts_matrix,
             reference_grouped_cell_indices = ref_group_cell_indices,
             observation_grouped_cell_indices = obs_group_cell_indices,
             tumor_subclusters = NULL,
-            allele.expr.data = raw.allele.data,
-            allele.coverage.data = raw.coverage.data,
+            allele.alt.data = raw.allele.alt.data,
+            allele.coverage.data = raw.allele.coverage.data,
             SNP_info = snps,
             allele.gene_order = order_ret_allele$gene_order,
             options = list("chr_exclude" = chr_exclude,
@@ -400,7 +402,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
                "counts_md5" = digest(raw.data)),
             .hspike = NULL)
 
-        validate_infercnv_allele_obj(allele_object)
+        validate_infercnv_allele_obj(object)
     }
     else{
 
@@ -418,8 +420,8 @@ CreateInfercnvObject <- function(raw_counts_matrix,
                            "counts_md5" = digest(raw.data)),
             .hspike = NULL)
 
-        validate_infercnv_obj(object)
     }
+    validate_infercnv_obj(object)
 
     
     return(object)
@@ -438,23 +440,26 @@ CreateInfercnvObject <- function(raw_counts_matrix,
     if (Reduce("|", is(matrix) == "character")) {
         flog.info(sprintf("Parsing matrix: %s ...", matrix)) 
         if (substr(matrix, nchar(matrix)-2, nchar(matrix)) == ".gz") {
-            raw.data <- read.table(connection <- gzfile(matrix, 'rt'), sep=delim, header=TRUE, row.names=1, check.names=FALSE) %>% as.matrix()
+            raw.data <- read.table(connection <- gzfile(matrix, 'rt'), sep=delim, header=TRUE, row.names=1, check.names=FALSE) %>% as.matrix() %>% Matrix(sparse=T)
             close(connection)
-            return(raw.data)
+            return(Matrix(raw.data, sparse=T))
         }
         else if(substr(matrix, nchar(matrix)-3, nchar(matrix)) == ".rds") {
             return(readRDS(matrix))
         }
         else {
-            raw.data <- read.table(matrix, sep=delim, header=TRUE, row.names=1, check.names=FALSE) %>% as.matrix()
-            return(raw.data)
+            raw.data <- read.table(matrix, sep=delim, header=TRUE, row.names=1, check.names=FALSE) %>% as.matrix() %>% Matrix(sparse=T)
+            return(Matrix(raw.data, sparse=T))
         }
     } 
-    else if (Reduce("|", is(matrix) %in% c("dgCMatrix", "matrix"))) {
+    else if (Reduce("|", is(matrix) %in% c("matrix"))) {
+        return(Matrix(matrix, sparse=T))
+    }
+    else if (Reduce("|", is(matrix) %in% c("dgCMatrix"))) {
         return(matrix)
-    } 
+    }
     else if (Reduce("|", is(matrix) %in% c("data.frame"))) {
-        return(as.matrix(matrix))
+        return(Matrix(as.matrix(matrix), sparse=T))
     } 
     else {
         stop(sprintf("CreateInfercnvObject:: Error, %s isn't recognized as a matrix, data.frame, or filename",
@@ -481,14 +486,18 @@ CreateInfercnvObject <- function(raw_counts_matrix,
 }
 
 .allele_preprocess <- function(allele.data, coverage.data){
-    if(mean(allele.data > 0 & allele.data < 1) > 0){
-        allele.data[allele.data > 0 & allele.data < 1] <- 0 
+    to_remove = allele.data@x < 1
+    if (any(to_remove)) {
+        allele.data@x[to_remove] = 0
+        allele.data = drop0(allele.data)
     }
-    if(mean(rowSums(coverage.data)==0) != 0){
-        len <- sum(rowSums(coverage.data) == 0)
-        filter_index <- rowSums(coverage.data) != 0
-        flog.info(sprintf("WARNING! %s SNPs with zero coverage will be removed", len))
-        
+
+
+    filter_index <- Matrix::rowSums(coverage.data) != 0
+    remove_len = nrow(coverage.data) - length(filter_index)
+
+    if(remove_len > 0){
+        flog.info(sprintf("WARNING! %s SNPs with zero coverage will be removed", remove_len))
         allele.data <- allele.data[filter_index,]
         coverage.data <- coverage.data[filter_index,]
     }
