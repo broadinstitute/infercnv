@@ -383,7 +383,7 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
     }
     
     if (HMM_type == "i6") {
-        cnv_mean_sd <- get_spike_dists(infercnv_obj@.hspike)
+        cnv_mean_sd <- get_spike_dists(infercnv_allele_obj@.hspike)
         mean <- c(cnv_mean_sd[["cnv:0.01"]]$mean,
                   cnv_mean_sd[["cnv:0.5"]]$mean,
                   cnv_mean_sd[["cnv:1"]]$mean,
@@ -945,12 +945,15 @@ fusion_HMM_report_two_methods <- function(expression_file_path,
     
     infercnv::plot_cnv(infercnv_allele_obj, 
                        out_dir = output_path,
-                       x.center = ifelse(HMM_type == "i6",
-                                         3,
-                                         2),
-                       x.range = c(1,ifelse(HMM_type == "i6",
-                                          8,
-                                          5)),
+                       preset = ifelse(HMM_type == "i6",
+                                         "HMM_i6_combined",
+                                         "HMM_i3_combined"),
+                       # x.center = ifelse(HMM_type == "i6",
+                       #                   3,
+                       #                   2),
+                       # x.range = c(1,ifelse(HMM_type == "i6",
+                       #                    8,
+                       #                    5)),
                        output_format = "png",
                        output_filename = "fusion",
                        png_res = 300,

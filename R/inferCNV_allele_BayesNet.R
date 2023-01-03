@@ -686,9 +686,9 @@ removeCNV_allele <- function(MCMC_inferCNV_obj,
     normalID <- ifelse(HMM_type == 'i6', 3, 2)
     
     cnv_means <- sapply(MCMC_inferCNV_obj@cnv_probabilities, function(i) colMeans(i))
+    # cnv_means = do.call(rbind, cnv_means)
     
     futile.logger::flog.info(paste("Attempting to removing CNV(s) with a probability of being normal above ", BayesMaxPNormal))
-    futile.logger::flog.info(paste("Removing ", length(which(cnv_means[normalID,] > BayesMaxPNormal)), " CNV(s) identified by the HMM."))
     
     # If no CNV's need to be removed, stop running function and return the object and HMM_states 
     if (length(which(cnv_means[normalID,] > BayesMaxPNormal)) == 0) { 
@@ -697,6 +697,7 @@ removeCNV_allele <- function(MCMC_inferCNV_obj,
     
     # check if any CNVs with probability of being normal greater than threshold
     if (any(cnv_means[normalID,] > BayesMaxPNormal)) {
+        futile.logger::flog.info(paste("Removing ", length(which(cnv_means[normalID,] > BayesMaxPNormal)), " CNV(s) identified by the HMM."))
       
         # 1.
         remove_cnv <- which(cnv_means[normalID,] > BayesMaxPNormal)
@@ -767,7 +768,7 @@ reassignCNV_allele <- function(MCMC_inferCNV_obj,
     
     futile.logger::flog.info("Reassigning CNVs based on state probabilities.")
     # Assign state that represents normal based on the HMM method 
-    normalID <- ifelse(HMM_type == 'i6', 3, 2)
+    # normalID <- ifelse(HMM_type == 'i6', 3, 2)
     
     # 1.
     # get probabilities for each cnv

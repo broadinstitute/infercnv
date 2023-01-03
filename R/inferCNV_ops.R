@@ -281,9 +281,12 @@ run <- function(infercnv_obj,
                 tumor_subcluster_partition_method=c('leiden', 'random_trees', 'qnorm', 'pheight', 'qgamma', 'shc'),
                 tumor_subcluster_pval=0.1,
                 k_nn=20,
-                leiden_resolution=0.05,
                 leiden_method=c("PCA", "simple"),
                 leiden_function = c("CPM", "modularity"),
+                leiden_resolution=0.05,
+                leiden_method_per_chr=c("simple", "PCA"),
+                leiden_function_per_chr = c("modularity", "CPM"),
+                leiden_resolution_per_chr = 1,
                 per_chr_hmm_subclusters=TRUE,
                 z_score_filter = 0.8,
 
@@ -354,6 +357,7 @@ run <- function(infercnv_obj,
     }
 
     leiden_function = match.arg(leiden_function)
+    leiden_function_per_chr = match.arg(leiden_function_per_chr)
     HMM_report_by = match.arg(HMM_report_by)
     analysis_mode = match.arg(analysis_mode)
     if(analysis_mode == "cells" && HMM_report_by != "cell") {
@@ -363,6 +367,7 @@ run <- function(infercnv_obj,
     }
     tumor_subcluster_partition_method = match.arg(tumor_subcluster_partition_method)
     leiden_method = match.arg(leiden_method)
+    leiden_method_per_chr = match.arg(leiden_method_per_chr)
     if (tumor_subcluster_partition_method != "leiden") {
         per_chr_hmm_subclusters = FALSE
     }
@@ -1198,7 +1203,10 @@ run <- function(infercnv_obj,
                                                    k_nn = k_nn,
                                                    leiden_resolution = leiden_resolution,
                                                    leiden_method = leiden_method,
-                                                   leiden_function=leiden_function,
+                                                   leiden_function = leiden_function,
+                                                   leiden_method_per_chr = leiden_method_per_chr,
+                                                   leiden_function_per_chr = leiden_function_per_chr,
+                                                   leiden_resolution_per_chr = leiden_resolution_per_chr,
                                                    hclust_method = hclust_method,
                                                    cluster_by_groups = cluster_by_groups,
                                                    partition_method = tumor_subcluster_partition_method,
@@ -1440,6 +1448,7 @@ run <- function(infercnv_obj,
                 ## Plot HMM pred img
                 plot_cnv(infercnv_obj=hmm.infercnv_obj,
                          k_obs_groups=k_obs_groups,
+                         preset=paste0("HMM_", HMM_type),
                          cluster_by_groups=cluster_by_groups,
                          cluster_references=cluster_references,
                          plot_chr_scale=plot_chr_scale,
@@ -1449,8 +1458,8 @@ run <- function(infercnv_obj,
                          output_filename=sprintf("infercnv.%02d_HMM_pred%s", step_count, hmm_resume_file_token),
                          output_format=output_format,
                          write_expr_matrix=write_expr_matrix,
-                         x.center=hmm_center,
-                         x.range=hmm_state_range,
+                         #x.center=hmm_center,
+                         #x.range=hmm_state_range,
                          png_res=png_res,
                          useRaster=useRaster
                          )
@@ -1532,6 +1541,7 @@ run <- function(infercnv_obj,
                 ## Plot HMM pred img after cnv removal
                 plot_cnv(infercnv_obj=hmm.infercnv_obj,
                          k_obs_groups=k_obs_groups,
+                         preset=paste0("HMM_", HMM_type),
                          cluster_by_groups=cluster_by_groups,
                          cluster_references=cluster_references,
                          plot_chr_scale=plot_chr_scale,
@@ -1541,8 +1551,8 @@ run <- function(infercnv_obj,
                          output_filename=sprintf("infercnv.%02d_HMM_pred.Bayes_Net.Pnorm_%g",step_count, BayesMaxPNormal),
                          output_format=output_format,
                          write_expr_matrix=write_expr_matrix,
-                         x.center=hmm_center,
-                         x.range=hmm_state_range,
+                         #x.center=hmm_center,
+                         #x.range=hmm_state_range,
                          png_res=png_res,
                          useRaster=useRaster
                          )
@@ -1584,6 +1594,7 @@ run <- function(infercnv_obj,
             if (! no_plot) {
                 plot_cnv(infercnv_obj=hmm.infercnv_obj,
                          k_obs_groups=k_obs_groups,
+                         preset=paste0("HMM_", HMM_type, "_representative"),
                          cluster_by_groups=cluster_by_groups,
                          cluster_references=cluster_references,
                          plot_chr_scale=plot_chr_scale,
@@ -1594,7 +1605,9 @@ run <- function(infercnv_obj,
                          output_format=output_format,
                          write_expr_matrix=write_expr_matrix,
                          x.center=1,
-                         x.range=c(-1,3),
+                         x.range=c(0,3),
+                         custom_color_pal=color.palette(c("darkblue", "white", "darkred"), c(1,3)),
+                         breaks=8,
                          png_res=png_res,
                          useRaster=useRaster
                          )
@@ -1620,7 +1633,7 @@ run <- function(infercnv_obj,
             flog.info(sprintf("\n\n\tSTEP %02d: allele-based HMM CNV prediction\n", step_count))
             
             if (analysis_mode == 'subclusters') {
-
+########## Add version of tumor subclustering that uses per chromosome subclusters instead of overall subclusters?
                 # if (tumor_subcluster_partition_method == "leiden" && per_chr_hmm_subclusters) {
 
                 #     hmm.infercnv_obj <- predict_CNV_via_HMM_on_tumor_subclusters_per_chr(infercnv_obj = infercnv_obj, 
@@ -1663,7 +1676,6 @@ run <- function(infercnv_obj,
             if (save_rds) {
                 saveRDS(hmm.infercnv_obj, reload_info$expected_file_names[[step_count]])
             }
-
             invisible(gc())
                         
             if (! no_plot) {
@@ -1671,6 +1683,7 @@ run <- function(infercnv_obj,
                 plot_cnv(infercnv_obj=hmm.infercnv_obj,
                          k_obs_groups=k_obs_groups,
                          mode="allele",
+                         preset="HMM_i2_allele",
                          cluster_by_groups=cluster_by_groups,
                          cluster_references=cluster_references,
                          plot_chr_scale=plot_chr_scale,
@@ -1680,8 +1693,8 @@ run <- function(infercnv_obj,
                          output_filename=sprintf("infercnv.%02d_HMM_allele_pred%s", step_count, hmm_allele_resume_file_token),
                          output_format=output_format,
                          write_expr_matrix=write_expr_matrix,
-                         x.center=hmm_center,
-                         x.range=hmm_state_range,
+                         #x.center=hmm_center,
+                         #x.range=hmm_state_range,
                          png_res=png_res,
                          useRaster=useRaster
                          )
@@ -1719,6 +1732,7 @@ run <- function(infercnv_obj,
                 # saveRDS(mcmc_obj, file=mcmc_obj_file)
                 saveRDS(mcmc_allele_obj, reload_info$expected_file_names[[step_count]])
             }
+            invisible(gc())
         }
     }
 
@@ -1756,6 +1770,8 @@ run <- function(infercnv_obj,
                 ## Plot HMM pred img after cnv removal
                 plot_cnv(infercnv_obj=hmm.infercnv_obj,
                          k_obs_groups=k_obs_groups,
+                         mode="allele",
+                         preset="HMM_i2_allele_filtered",
                          cluster_by_groups=cluster_by_groups,
                          cluster_references=cluster_references,
                          plot_chr_scale=plot_chr_scale,
@@ -1765,8 +1781,8 @@ run <- function(infercnv_obj,
                          output_filename=sprintf("infercnv.%02d_HMM_allele_pred.Bayes_Net.Pnorm_%g",step_count, BayesMaxPNormal),
                          output_format=output_format,
                          write_expr_matrix=write_expr_matrix,
-                         x.center=hmm_center,
-                         x.range=hmm_state_range,
+                         #x.center=hmm_center,
+                         #x.range=hmm_state_range,
                          png_res=png_res,
                          useRaster=useRaster
                          )
@@ -1820,6 +1836,11 @@ run <- function(infercnv_obj,
             if (save_rds) {
                 saveRDS(common_obj, reload_info$expected_file_names[[step_count]])
             }
+            invisible(gc())
+
+################################################ PLOT?
+        # plot_posterior_prob <- function(MCMC_inferCNV_obj, output_path)
+
         }
     }
 
@@ -1835,6 +1856,8 @@ run <- function(infercnv_obj,
     step_count = step_count + 1 # 27
     if (skip_hmm < 9) {
         if (HMM && ("infercnv_allele" %in% is(infercnv_obj)) && (BayesMaxPNormal > 0) ) {
+
+            flog.info(sprintf("\n\n\tSTEP %02d: Run Comined Bayesian Network Model on combined HMM predictions from expression and allele data\n", step_count))
 
             ## bayesian model leveraging both expression and allele data
             bayesian_output <- file.path(out_dir, paste("combined",
@@ -1856,6 +1879,7 @@ run <- function(infercnv_obj,
             if (save_rds) {
                 saveRDS(mcmc_combined, reload_info$expected_file_names[[step_count]])
             }
+            invisible(gc())
         }
     }
 
@@ -1886,13 +1910,32 @@ run <- function(infercnv_obj,
             hmm.infercnv_obj@expr.data <- hmm_states_highPnormCNVsRemoved.matrix
 
             if (save_rds) {
-                # saveRDS(hmm.infercnv_obj, reload_info$expected_file_names[[step_count]])
-                saveRDS(mcmc_combined_mod_list, reload_info$expected_file_names[[step_count]])
+                saveRDS(hmm.infercnv_obj, reload_info$expected_file_names[[step_count]])
+                # saveRDS(mcmc_combined_mod_list, reload_info$expected_file_names[[step_count]])
             }
+            invisible(gc())
 
 ###################################### PLOT
-
-
+            if (! no_plot) {
+                plot_cnv(infercnv_obj=hmm.infercnv_obj,
+                         k_obs_groups=k_obs_groups,
+                         mode="expression",  # for the combined results, we use the expression data slot
+                         preset="HMM_combined",
+                         cluster_by_groups=cluster_by_groups,
+                         cluster_references=cluster_references,
+                         plot_chr_scale=plot_chr_scale,
+                         chr_lengths=chr_lengths,
+                         out_dir=out_dir,
+                         title=sprintf("%02d_HMM_combined_preds",step_count),
+                         output_filename=sprintf("infercnv.%02d_HMM_combined_pred.Bayes_Net.Pnorm_%g", step_count, BayesMaxPNormal),
+                         output_format=output_format,
+                         write_expr_matrix=write_expr_matrix,
+                         #x.center=hmm_center,
+                         #x.range=hmm_state_range,
+                         png_res=png_res,
+                         useRaster=useRaster
+                         )
+            }
         }
     }
 
@@ -1934,6 +1977,7 @@ run <- function(infercnv_obj,
                 
                 plot_cnv(infercnv_obj,
                          k_obs_groups=k_obs_groups,
+                         preset="residual",
                          cluster_by_groups=cluster_by_groups,
                          cluster_references=cluster_references,
                          plot_chr_scale=plot_chr_scale,
@@ -1995,6 +2039,7 @@ run <- function(infercnv_obj,
             if (plot_steps) {
                 plot_cnv(infercnv_obj,
                          k_obs_groups=k_obs_groups,
+                         preset="residual",
                          cluster_by_groups=cluster_by_groups,
                          cluster_references=cluster_references,
                          plot_chr_scale=plot_chr_scale,
@@ -2029,6 +2074,7 @@ run <- function(infercnv_obj,
         invisible(gc())
         plot_cnv(infercnv_obj,
                  k_obs_groups=k_obs_groups,
+                 preset="residual",
                  cluster_by_groups=cluster_by_groups,
                  cluster_references=cluster_references,
                  plot_chr_scale=plot_chr_scale,
