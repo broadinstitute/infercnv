@@ -110,6 +110,9 @@ define_signif_tumor_subclusters <- function(infercnv_obj,
         if (!is.null(outliers)) {
             tumor_expr_data = infercnv_obj@expr.data[-outliers, , drop=FALSE]
         }
+        else {
+            tumor_expr_data = infercnv_obj@expr.data
+        }
         subclusters_per_chr <- .whole_dataset_leiden_subclustering_per_chr(expr_data = tumor_expr_data,
                                                                            chrs = chrs,
                                                                            k_nn = k_nn,
@@ -729,31 +732,43 @@ define_signif_tumor_subclusters <- function(infercnv_obj,
         if (!(c %in% unique(chrs))) {
             subclusters_per_chr[[c]] = list()
             subclusters_per_chr[[c]][["all_cells"]] = seq_len(ncol(expr_data))
-            names(subclusters_per_chr[[c]][["all_cells"]]) = colnames(c_data)[seq_len(ncol(expr_data))]  # the [] shouldn't matter
+            names(subclusters_per_chr[[c]][["all_cells"]]) = colnames(expr_data)[seq_len(ncol(expr_data))]  # the [] shouldn't matter
         }
         else {
             c_data = expr_data[which(chrs == c), , drop=FALSE]
 
-            partition = .leiden_seurat_preprocess_routine(expr_data=c_data, k_nn=k_nn, resolution_parameter=leiden_resolution, objective_function=leiden_function)
+            if (ncol(c_data) < 3) {
+                flog.info(paste0("Too few cells in group ", tumor_group, " for any per chr (sub)clustering. Keeping as is."))
+                subclusters_per_chr[[c]][["all_cells"]] = seq_len(ncol(expr_data))
+                names(subclusters_per_chr[[c]][["all_cells"]]) = colnames(expr_data)[seq_len(ncol(expr_data))]
+            }
+            else if (k_nn >= ncol(c_data)) {
+                flog.info(paste0("Less cells in group ", tumor_group, " than k_nn setting. Keeping as a single per chr subcluster."))
+                subclusters_per_chr[[c]][["all_cells"]] = seq_len(ncol(expr_data))
+                names(subclusters_per_chr[[c]][["all_cells"]]) = colnames(expr_data)[seq_len(ncol(expr_data))]
+            }
+            else {
+                partition = .leiden_seurat_preprocess_routine(expr_data=c_data, k_nn=k_nn, resolution_parameter=leiden_resolution, objective_function=leiden_function)
 
-            # seurat_obs = CreateSeuratObject(c_data, "assay" = "infercnv", project = "infercnv", names.field = 1)
-            # seurat_obs = FindVariableFeatures(seurat_obs) # , selection.method = "vst", nfeatures = 2000
+                # seurat_obs = CreateSeuratObject(c_data, "assay" = "infercnv", project = "infercnv", names.field = 1)
+                # seurat_obs = FindVariableFeatures(seurat_obs) # , selection.method = "vst", nfeatures = 2000
 
-            # all.genes <- rownames(seurat_obs)
-            # seurat_obs <- ScaleData(seurat_obs, features = all.genes)
+                # all.genes <- rownames(seurat_obs)
+                # seurat_obs <- ScaleData(seurat_obs, features = all.genes)
 
-            # seurat_obs = RunPCA(seurat_obs)
-            # seurat_obs = FindNeighbors(seurat_obs, k.param=k_nn)
+                # seurat_obs = RunPCA(seurat_obs)
+                # seurat_obs = FindNeighbors(seurat_obs, k.param=k_nn)
 
-            # graph_obj = graph_from_adjacency_matrix(seurat_obs@graphs$infercnv_snn, mode="min", weighted=TRUE)
-            # partition_obj = cluster_leiden(graph_obj, resolution_parameter=(leiden_resolution/10))
-            # partition = partition_obj$membership
+                # graph_obj = graph_from_adjacency_matrix(seurat_obs@graphs$infercnv_snn, mode="min", weighted=TRUE)
+                # partition_obj = cluster_leiden(graph_obj, resolution_parameter=(leiden_resolution/10))
+                # partition = partition_obj$membership
 
-            subclusters_per_chr[[c]] = list()
-            # no HClust on these subclusters as they may mix both ref and obs cells
-            for (i in unique(partition[grouping(partition)])) {  # grouping() is there to make sure we do not start looking at a one cell cluster since it cannot be added to a phylo object
-                subclusters_per_chr[[c]][[ paste("all_cells", i, sep="_s") ]] = which(partition == i)
-                names(subclusters_per_chr[[c]][[ paste("all_cells", i, sep="_s") ]]) = colnames(c_data)[which(partition == i)]
+                subclusters_per_chr[[c]] = list()
+                # no HClust on these subclusters as they may mix both ref and obs cells
+                for (i in unique(partition[grouping(partition)])) {  # grouping() is there to make sure we do not start looking at a one cell cluster since it cannot be added to a phylo object
+                    subclusters_per_chr[[c]][[ paste("all_cells", i, sep="_s") ]] = which(partition == i)
+                    names(subclusters_per_chr[[c]][[ paste("all_cells", i, sep="_s") ]]) = colnames(c_data)[which(partition == i)]
+                }
             }
         }
     }
