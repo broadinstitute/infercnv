@@ -423,7 +423,7 @@ run <- function(infercnv_obj,
         dir.create(out_dir)
     }
 
-    infercnv_obj@options = c(infercnv_obj@options, current_args)
+    infercnv_obj@options = c(current_args, infercnv_obj@options)
 
     #run_call <- match.call()
     call_match[[1]] <- as.symbol(".get_relevant_args_list")
@@ -443,7 +443,7 @@ run <- function(infercnv_obj,
                 flog.info(paste0("Trying to reload from step ", i))
                 # if ((i == 17 && skip_hmm == 0) || (i %in% (18:20))) {
                 if ((i == 20) || (i %in% seq(17, 19) && skip_hmm == 0) || (i == 17 && skip_hmm == 2)) {   # step 17 appears in two conditions because if last found step is 18, step 19 requires the results of both step 17 and 18 to run
-                    if (i == 18) {  # mcmc_obj
+                    if (i == 18 && BayesMaxPNormal > 0) {  # mcmc_obj
                         mcmc_obj = readRDS(reload_info$expected_file_names[[i]])
                         if (!.compare_args(infercnv_obj@options, unlist(reload_info$relevant_args[1:i]), mcmc_obj@options)) {
                             rm(mcmc_obj)
@@ -3389,7 +3389,7 @@ compareNA <- function(v1,v2) {
     step_i = step_i + 1
 
     # 18 _HMM_pred.Bayes_Net%s.mcmc_obj
-    relevant_args[[step_i]] = c("HMM", "BayesMaxPNormal")
+    relevant_args[[step_i]] = c("HMM")
     if (run_arguments$HMM == TRUE & run_arguments$BayesMaxPNormal > 0) {
         relevant_args[[step_i]] = c(relevant_args[[step_i]], "diagnostics", "reassignCNVs")
         # mcmc_obj_file = file.path(run_arguments$out_dir, sprintf("%02d_HMM_pred.Bayes_Net%s.mcmc_obj", step_i, hmm_resume_file_token))
