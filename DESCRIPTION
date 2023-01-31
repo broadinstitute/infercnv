@@ -12,7 +12,7 @@ License: BSD_3_clause + file LICENSE
 LazyData: TRUE
 VignetteBuilder: knitr
 Suggests: BiocStyle, knitr, rmarkdown, testthat
-RoxygenNote: 7.2.0
+RoxygenNote: 7.2.3
 NeedsCompilation: no
 SystemRequirements: JAGS 4.x.y
 Imports: graphics, grDevices, RColorBrewer, gplots, futile.logger, stats, utils, methods, ape, phyclust, Matrix, fastcluster, parallelDist, dplyr, HiddenMarkov, ggplot2, edgeR, coin, caTools, digest, RANN, igraph, reshape2, rjags, fitdistrplus, future, foreach, doParallel, Seurat, BiocGenerics, SummarizedExperiment, SingleCellExperiment, tidyr, parallel, coda, gridExtra, argparse

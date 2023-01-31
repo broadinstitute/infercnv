@@ -265,8 +265,68 @@ define_signif_tumor_subclusters <- function(infercnv_obj,
 #    
 #    return(grps)
 #}
-        
 
+#' @description Formats the data and sends it for plotting.
+#'
+#' @title Plot a heatmap of the data in the infercnv object with the subclusters being displayed as annotations.
+#'
+#' @param infercnv_obj infercnv object
+#' @param out_dir Directory in which to output.
+#' @param output_filename Filename to save the figure to.
+#'
+#' @export
+#'
+#' @examples
+#' # data(infercnv_data_example)
+#' # data(infercnv_annots_example)
+#' # data(infercnv_genes_example)
+#'
+#' # infercnv_object_example <- infercnv::CreateInfercnvObject(raw_counts_matrix=infercnv_data_example, 
+#' #                                                           gene_order_file=infercnv_genes_example,
+#' #                                                           annotations_file=infercnv_annots_example,
+#' #                                                           ref_group_names=c("normal"))
+#'
+#' # infercnv_object_example <- infercnv::run(infercnv_object_example,
+#' #                                          cutoff=1,
+#' #                                          out_dir=tempfile(), 
+#' #                                          cluster_by_groups=TRUE, 
+#' #                                          denoise=TRUE,
+#' #                                          HMM=FALSE,
+#' #                                          num_threads=2,
+#' #                                          no_plot=TRUE)
+#'
+#' data(infercnv_object_example)
+#'
+#' plot_subclusters(infercnv_object_example,
+#'                  out_dir=tempfile(),
+#'                  output_filename="subclusters_as_annotations"
+#'                  )
+#'
+
+plot_subclusters = function(infercnv_obj, out_dir, output_filename = "subcluster_as_annotations") {
+    subcluster_obj = infercnv_obj
+    subcluster_obj@reference_grouped_cell_indices = list()
+    for (grp in names(infercnv_obj@reference_grouped_cell_indices)) {
+        for (grp2 in names(infercnv_obj@tumor_subclusters$subclusters[[grp]])) {
+            subcluster_obj@reference_grouped_cell_indices[[grp2]] = infercnv_obj@tumor_subclusters$subclusters[[grp]][[grp2]]
+        }
+    }
+    
+    subcluster_obj@observation_grouped_cell_indices = list()
+    for (grp in names(infercnv_obj@tumor_subclusters$subclusters)) {
+        for (grp2 in names(infercnv_obj@tumor_subclusters$subclusters[[grp]])) {
+            subcluster_obj@observation_grouped_cell_indices[[grp2]] = infercnv_obj@tumor_subclusters$subclusters[[grp]][[grp2]]
+        }
+    }
+
+    subcluster_obj@tumor_subclusters = NULL
+    
+    plot_cnv(subcluster_obj,
+             cluster_by_groups=TRUE,
+             output_filename = output_filename,
+             out_dir=out_dir,
+             write_expr_matrix=FALSE)
+}
 
 
 .find_DE_stat_significance <- function(normal_matrix, tumor_matrix) {
