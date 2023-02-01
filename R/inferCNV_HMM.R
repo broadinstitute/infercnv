@@ -466,9 +466,22 @@ predict_CNV_via_HMM_on_tumor_subclusters_per_chr  <- function(infercnv_obj,
     })
     
     infercnv_obj@expr.data <- hmm.data
+    flog.info("-done predicting CNV based on per chromosome subclusters")
 
-    flog.info("-done predicting CNV based on initial tumor subclusters")
-        
+    flog.info("-calculating initial tumor subclusters CNV consensus based on per chromosome predictions")
+
+    ret = get_predicted_CNV_regions(infercnv_obj, by="subcluster")
+    for (i in seq_along(ret)) {
+        for (region in ret[[i]]$gene_regions) {
+            if (length(unique(region$state)) != 1) {
+                flog.error("error, all states are not equal")
+            }
+            else {
+                infercnv_obj@expr.data[region$gene, ret[[i]]$cells] = rep(region$state[1], length(region$gene)*length(ret[[i]]$cells))
+            }
+        }    
+    }
+
     return(infercnv_obj)
     
 }
