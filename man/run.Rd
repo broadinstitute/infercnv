@@ -37,7 +37,7 @@ run(
   leiden_resolution = 0.05,
   leiden_method = c("PCA", "simple"),
   leiden_function = c("CPM", "modularity"),
-  per_chr_hmm_subclusters = TRUE,
+  per_chr_hmm_subclusters = FALSE,
   z_score_filter = 0.8,
   denoise = FALSE,
   noise_filter = NA,

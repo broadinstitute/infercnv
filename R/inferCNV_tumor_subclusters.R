@@ -8,7 +8,7 @@ define_signif_tumor_subclusters <- function(infercnv_obj,
                                             hclust_method="ward.D2",
                                             cluster_by_groups=TRUE,
                                             partition_method="leiden",
-                                            per_chr_hmm_subclusters=TRUE,
+                                            per_chr_hmm_subclusters=FALSE,
                                             z_score_filter=0.8,
                                             restrict_to_DE_genes=FALSE) 
 {
@@ -486,194 +486,12 @@ define_signif_tumor_subclusters <- function(infercnv_obj,
         return(res)
     }
 
-    # if (leiden_method == "intersect_chr") {
-    #     partition = NULL
-    #     for (c in unique(chrs)) {
-    #         c_data = tumor_expr_data[which(chrs == c), , drop=FALSE]
-    #         c_snn = nn2(t(c_data), k=k_nn)$nn.idx
-    #         c_sparse_adjacency_matrix <- sparseMatrix(
-    #             i = rep(seq_len(ncol(tumor_expr_data)), each=k_nn), 
-    #             j = t(c_snn),
-    #             x = rep(1, ncol(tumor_expr_data) * k_nn),
-    #             dims = c(ncol(tumor_expr_data), ncol(tumor_expr_data)),
-    #             dimnames = list(colnames(tumor_expr_data), colnames(tumor_expr_data))
-    #         )
-    #         c_graph_obj = graph_from_adjacency_matrix(c_sparse_adjacency_matrix, mode="undirected")
-    #         c_partition_obj = cluster_leiden(c_graph_obj, resolution_parameter=leiden_resolution)
-    #         partition = paste(partition, c_partition_obj$membership)
-    #     }
-
-    #     flog.info(paste0("Group ", tumor_group, " was subdivided into ", length(unique(partition)), " clusters."))
-    # }
-    # else if (leiden_method == "per_chr") {
-    #     combined_snn = NULL
-    #     for (c in unique(chrs)) {
-    #         c_data = tumor_expr_data[which(chrs == c), , drop=FALSE]
-    #         c_snn = nn2(t(c_data), k=k_nn)$nn.idx
-    #         combined_snn = cbind(combined_snn, c_snn)
-    #     }
-
-    #     snn_table = apply(combined_snn, 1, table, simplify=FALSE)
-    #     snn_table_lengths = lapply(snn_table, length)
-    #     snn_neighbors = as.integer(names(unlist(snn_table)))
-    #     snn_weights = unlist(snn_table)
-    #     # rep(seq_len(ncol(tumor_expr_data)), times=snn_table_lengths)
-
-    #     sparse_adjacency_matrix <- sparseMatrix(
-    #         i = rep(seq_len(ncol(tumor_expr_data)), times=snn_table_lengths),
-    #         j = snn_neighbors,
-    #         x = snn_weights,
-    #         dims = c(ncol(tumor_expr_data), ncol(tumor_expr_data)),
-    #         dimnames = list(colnames(tumor_expr_data), colnames(tumor_expr_data))
-    #     )
-
-    #     graph_obj = graph_from_adjacency_matrix(sparse_adjacency_matrix, mode="min", weighted=TRUE)
-    #     partition_obj = cluster_leiden(graph_obj, resolution_parameter=leiden_resolution)
-    #     partition = partition_obj$membership
-
-    #     flog.info(paste0("Group ", tumor_group, " was subdivided into ", partition_obj$nb_clusters, 
-    #        " clusters with a partition quality score of ", partition_obj$quality))
-    # }
-    # else if (leiden_method == "per_chr_dist") {
-    #     combined_snn_idx = NULL
-    #     combined_snn_dist = NULL
-    #     for (c in unique(chrs)) {
-    #         c_data = tumor_expr_data[which(chrs == c), , drop=FALSE]
-    #         c_snn = nn2(t(c_data), k=k_nn)
-    #         combined_snn_idx = cbind(combined_snn_idx, c_snn$nn.idx[, 2:ncol(c_snn$nn.idx)])
-    #         combined_snn_dist = cbind(combined_snn_dist, c_snn$nn.dists[, 2:ncol(c_snn$nn.dist)])
-    #     }
-        
-    #     #combined_snn_dist = ceiling(max(combined_snn_dist)) - combined_snn_dist
-    #     combined_snn_dist = 2 - combined_snn_dist
-    #     combined_snn_dist[which(combined_snn_dist < 0)] = 0
-
-
-    #     snn_table = apply(combined_snn_idx, 1, table, simplify=FALSE)
-    #     snn_order = apply(combined_snn_dist, 1, order, simplify=FALSE)
-    #     snn_table_lengths = lapply(snn_table, length)
-    #     snn_neighbors = as.integer(names(unlist(snn_table)))
-
-    #     snn_weights = vector(mode="double", length=length(snn_neighbors))
-
-    #     # apply(combined_snn_idx, order, simplify=FALSE)
-
-    #     k = 1
-    #     for (cell in seq_len(nrow(combined_snn_dist))) {
-    #         j = 1
-    #         for (i in seq_len(length(snn_table[[cell]]))) {
-    #             #which(snn_order == names(snn_table)[i])
-    #             snn_weights[k] = sum(combined_snn_dist[cell , snn_order[[cell]][j:(j + snn_table[[cell]][i] - 1 )]])
-    #             k = k + 1
-    #             j = j + snn_table[[cell]][i]
-    #         }
-    #     }
-
-    #     sparse_adjacency_matrix <- sparseMatrix(
-    #         i = rep(seq_len(ncol(tumor_expr_data)), times=snn_table_lengths),
-    #         j = snn_neighbors,
-    #         x = snn_weights,
-    #         dims = c(ncol(tumor_expr_data), ncol(tumor_expr_data)),
-    #         dimnames = list(colnames(tumor_expr_data), colnames(tumor_expr_data))
-    #     )
-
-    #     graph_obj = graph_from_adjacency_matrix(sparse_adjacency_matrix, mode="min", weighted=TRUE)
-    #     partition_obj = cluster_leiden(graph_obj, resolution_parameter=NULL)#leiden_resolution)
-    #     partition = partition_obj$membership
-
-    #     flog.info(paste0("Group ", tumor_group, " was subdivided into ", partition_obj$nb_clusters, 
-    #        " clusters with a partition quality score of ", partition_obj$quality))
-    # }
-    # else if (leiden_method == "per_select_chr") {
-    #     combined_snn = NULL
-    #     for (c in select_chr) {
-    #         c_data = tumor_expr_data[which(chrs == c), , drop=FALSE]
-    #         c_snn = nn2(t(c_data), k=k_nn)$nn.idx
-    #         combined_snn = cbind(combined_snn, c_snn)#[, 2:ncol(c_snn)])
-    #     }
-
-    #     snn_table = apply(combined_snn, 1, table, simplify=FALSE)
-    #     snn_table_lengths = lapply(snn_table, length)
-    #     snn_weights = unlist(snn_table)
-    #     snn_neighbors = as.integer(names(snn_weights))
-        
-    #     # rep(seq_len(ncol(tumor_expr_data)), times=snn_table_lengths)
-
-    #     sparse_adjacency_matrix <- sparseMatrix(
-    #         i = rep(seq_len(ncol(tumor_expr_data)), times=snn_table_lengths),
-    #         j = snn_neighbors,
-    #         x = snn_weights,
-    #         dims = c(ncol(tumor_expr_data), ncol(tumor_expr_data)),
-    #         dimnames = list(colnames(tumor_expr_data), colnames(tumor_expr_data))
-    #     )
-
-    #     graph_obj = graph_from_adjacency_matrix(sparse_adjacency_matrix, mode="min", weighted=TRUE)
-    #     partition_obj = cluster_leiden(graph_obj, resolution_parameter=NULL)#leiden_resolution)
-    #     partition = partition_obj$membership
-
-    #     flog.info(paste0("Group ", tumor_group, " was subdivided into ", partition_obj$nb_clusters, 
-    #        " clusters with a partition quality score of ", partition_obj$quality))
-    # }
-    # else if (leiden_method == "seurat") {
-    #     snn_seurat = Seurat::FindNeighbors(t(tumor_expr_data), k.param=k_nn)
-    #     graph_obj = graph_from_adjacency_matrix(snn_seurat$snn, mode="min", weighted=TRUE)
-    #     # igraph::plot.igraph(graph_obj)
-    #     partition_obj = cluster_leiden(graph_obj, resolution_parameter=leiden_resolution)
-    #     partition = partition_obj$membership
-    # }
     if (leiden_method == "PCA") {
-        # seurat_obs = CreateSeuratObject(tumor_expr_data, "assay" = "infercnv", project = "infercnv", names.field = 1)
-        # seurat_obs = FindVariableFeatures(seurat_obs) # , selection.method = "vst", nfeatures = 2000
-
-        # all.genes <- rownames(seurat_obs)
-        # seurat_obs <- ScaleData(seurat_obs, features = all.genes)
-
-        # seurat_obs = RunPCA(seurat_obs)
-        # seurat_obs = FindNeighbors(seurat_obs, k.param=k_nn)
-
-        # graph_obj = graph_from_adjacency_matrix(seurat_obs@graphs$infercnv_snn, mode="min", weighted=TRUE)
-        # partition_obj = cluster_leiden(graph_obj, resolution_parameter=leiden_resolution, objective_function=leiden_function)
-        # partition = partition_obj$membership
         partition = .leiden_seurat_preprocess_routine(expr_data=tumor_expr_data, k_nn=k_nn, resolution_parameter=leiden_resolution, objective_function=leiden_function)
     }
     else { # "simple"
         partition = .leiden_simple_snn(tumor_expr_data, k_nn, leiden_resolution, leiden_function)
-        # snn <- nn2(t(tumor_expr_data), k=k_nn)$nn.idx
-
-        # sparse_adjacency_matrix <- sparseMatrix(
-        #    i = rep(seq_len(ncol(tumor_expr_data)), each=k_nn), 
-        #    j = t(snn),
-        #    x = rep(1, ncol(tumor_expr_data) * k_nn),
-        #    dims = c(ncol(tumor_expr_data), ncol(tumor_expr_data)),
-        #    dimnames = list(colnames(tumor_expr_data), colnames(tumor_expr_data))
-        # )
-        
-        # graph_obj = graph_from_adjacency_matrix(sparse_adjacency_matrix, mode="undirected")
-        # partition_obj = cluster_leiden(graph_obj, resolution_parameter=leiden_resolution, objective_function=leiden_function)
-        # partition = partition_obj$membership
-
-        #flog.info(paste0("Group ", tumor_group, " was subdivided into ", partition_obj$nb_clusters, 
-        #   " clusters with a partition quality score of ", partition_obj$quality))
-
-        #flog.info("If this score is too low and you observe too much fragmentation, try decreasing the leiden resolution parameter")
-        #flog.info("If this score is too low and you observe clusters that are still too diverse, try increasing the leiden resolution parameter")
-
-        #subcluster_graph = igraph::graph_from_adj_list(snn, mode="all")
-        #tst2 =igraph::cluster_leiden(subcluster_graph)
-
-        #partition = leiden(sparse_adjacency_matrix, resolution_parameter=leiden_resolution)    
     }
-
-    # adjacency_matrix <- matrix(0L, ncol(tumor_expr_data), ncol(tumor_expr_data))
-    # rownames(adjacency_matrix) <- colnames(adjacency_matrix) <- colnames(tumor_expr_data)
-    # for(ii in seq_len(ncol(tumor_expr_data))) {
-    #     adjacency_matrix[ii, colnames(tumor_expr_data)[snn[ii, ]]] <- 1L
-    # }
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
-    # check that rows add to k_nn
-    # sum(adjacency_matrix[1,]) == k_nn
-    # table(apply(adjacency_matrix, 1, sum))
-    # partition <- leiden(adjacency_matrix, resolution_parameter=leiden_resolution)
 
     tmp_full_phylo = NULL
     added_height = 1
@@ -723,10 +541,7 @@ define_signif_tumor_subclusters <- function(infercnv_obj,
 .whole_dataset_leiden_subclustering_per_chr <- function(expr_data, chrs, k_nn, leiden_resolution, leiden_function) {
     # z score filtering over all the data based on refs, done in calling method
 
-    # subclusters_per_chr = vector(mode="list", length=length(unique(chrs)))
     subclusters_per_chr = list()
-    
-    # per_chr_partition = vector(mode="list", length=length(unique(chrs)))
 
     for (c in levels(chrs)) {
         if (!(c %in% unique(chrs))) {
