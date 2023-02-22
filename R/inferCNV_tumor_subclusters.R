@@ -126,16 +126,21 @@ define_signif_tumor_subclusters <- function(infercnv_obj,
 
     if (! is.null(infercnv_obj@.hspike)) {
         flog.info("-mirroring for hspike")
+        # partition method is set to none because the hspike does not need subclustering, which might lead to reducing the expected noise level when looking at the observations later
         infercnv_obj@.hspike = define_signif_tumor_subclusters(infercnv_obj@.hspike,
-                                                               p_val=p_val,
-                                                               k_nn=k_nn,
-                                                               leiden_resolution=leiden_resolution,
-                                                               leiden_method="simple",
-                                                               hclust_method=hclust_method,
-                                                               cluster_by_groups=cluster_by_groups,
-                                                               partition_method=partition_method,
-                                                               per_chr_hmm_subclusters=FALSE,
-                                                               restrict_to_DE_genes=restrict_to_DE_genes)[[1]]
+                                                               cluster_by_groups = TRUE,
+                                                               partition_method = "none")[[1]]
+
+        # infercnv_obj@.hspike = define_signif_tumor_subclusters(infercnv_obj@.hspike,
+        #                                                        p_val=p_val,
+        #                                                        k_nn=k_nn,
+        #                                                        leiden_resolution=leiden_resolution,
+        #                                                        leiden_method="simple",
+        #                                                        hclust_method=hclust_method,
+        #                                                        cluster_by_groups=cluster_by_groups,
+        #                                                        partition_method=partition_method,
+        #                                                        per_chr_hmm_subclusters=FALSE,
+        #                                                        restrict_to_DE_genes=restrict_to_DE_genes)[[1]]
     }
         
     #browser()
