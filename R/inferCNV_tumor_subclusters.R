@@ -500,8 +500,7 @@ define_signif_tumor_subclusters <- function(infercnv_obj,
 
     tmp_full_phylo = NULL
     added_height = 1
-    # find a way to sort partition by size to make sure not to start with a single cell partition
-    for (i in unique(partition[grouping(partition)])) {  # grouping() is there to make sure we do not start looking at a one cell cluster since it cannot be added to a phylo object
+    for (i in names(sort(table(partition), decreasing=TRUE))) { # reverse sort of table() is there to make sure we start with the biggest cluster to avoid looking at a one cell cluster since it cannot be added to a phylo object
         res$subclusters[[ paste(tumor_group, i, sep="_s") ]] = tumor_group_idx[which(partition == i)]  # this should transfer names as well
         # names(res$subclusters[[ paste(tumor_group, i, sep="_s") ]]) = tumor_group_idx[which(partition == i)]
 
