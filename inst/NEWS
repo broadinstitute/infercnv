@@ -1,3 +1,12 @@
+Changes in 1.14.1 (2023-02-24)
++ Fix per chromosome subclustering to use all the data and not only the data from the last annotation group when there are no outliers filtered by z_score (which would always happen when no references are defined).
++ Apply per subcluster consensus on HMM predictions on the object directly when running with per chromosome subclustering enabled, rather than only running it before writting txt outputs and figure. This makes the infercnv_obj also contain the same values plotted.
++ Disable per chromosome subclustering by default. The option remains available.
++ Change how the subclustering is run on the hspike to avoid issues with Leiden settings tuning. Now simply keep the structure of how the fake cells are generated.
++ Fix to order in which Leiden partition is made into an hclust/dendrogram to avoid issues with singleton (as long as there are non singletons).
++ Fix options stored in backup infercnv objects not being updated properly updated when changing the settings on a rerun.
++ Fix to properly restart past the Bayesian network step if it has already been run and only the BayesMaxPNormal filter has been changed.
+
 Changes in 1.13.1 (2022-10-17)
 + Updated how the Leiden subclustering is run to use igraph instead of the Python implementation called through reticulate, and to run a PCA before building neighboring graph.
 + Added option to run a second round of subclustering that is per chromosome (for the HMM predictions).
