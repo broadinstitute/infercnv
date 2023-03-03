@@ -51,6 +51,7 @@ run(
   debug = FALSE,
   num_threads = 4,
   plot_steps = FALSE,
+  inspect_subclusters = TRUE,
   resume_mode = TRUE,
   png_res = 300,
   plot_probabilities = TRUE,
@@ -220,6 +221,8 @@ Will preferentially use outlier_lower_bounda and outlier_upper_bound if set.}
 \item{num_threads}{(int) number of threads for parallel steps (default: 4)}
 
 \item{plot_steps}{If true, saves infercnv objects and plots data at the intermediate steps.}
+
+\item{inspect_subclusters}{If true, plot subclusters as annotations after the subclustering step to easily see if the subclustering options are good. (default = TRUE)}
 
 \item{resume_mode}{leverage pre-computed and stored infercnv objects where possible. (default=TRUE)}
 
