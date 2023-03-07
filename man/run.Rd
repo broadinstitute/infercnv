@@ -15,7 +15,7 @@ run(
   smooth_method = c("pyramidinal", "runmeans", "coordinates"),
   num_ref_groups = NULL,
   ref_subtract_use_mean_bounds = TRUE,
-  cluster_by_groups = FALSE,
+  cluster_by_groups = TRUE,
   cluster_references = TRUE,
   k_obs_groups = 1,
   hclust_method = "ward.D2",
@@ -36,10 +36,14 @@ run(
     "qgamma", "shc"),
   tumor_subcluster_pval = 0.1,
   k_nn = 20,
-  leiden_resolution = 0.05,
   leiden_method = c("PCA", "simple"),
   leiden_function = c("CPM", "modularity"),
-  per_chr_hmm_subclusters = TRUE,
+  leiden_resolution = 0.05,
+  leiden_method_per_chr = c("simple", "PCA"),
+  leiden_function_per_chr = c("modularity", "CPM"),
+  leiden_resolution_per_chr = 1,
+  per_chr_hmm_subclusters = FALSE,
+  per_chr_hmm_subclusters_references = FALSE,
   z_score_filter = 0.8,
   denoise = FALSE,
   noise_filter = NA,
@@ -53,6 +57,7 @@ run(
   debug = FALSE,
   num_threads = 4,
   plot_steps = FALSE,
+  inspect_subclusters = TRUE,
   resume_mode = TRUE,
   png_res = 300,
   plot_probabilities = TRUE,
@@ -171,14 +176,22 @@ qnorm: defines tree height based on the quantile defined by the tumor_subcluster
 
 \item{k_nn}{number k of nearest neighbors to search for when using the Leiden partition method for subclustering (default: 20)}
 
-\item{leiden_resolution}{resolution parameter for the Leiden algorithm using the CPM quality score (default: 0.05)}
-
-\item{leiden_method}{Method used to generate the graph on which the Leiden algorithm is applied (default: "PCA")}
+\item{leiden_method}{Method used to generate the graph on which the Leiden algorithm is applied, one of "PCA" or "simple". (default: "PCA")}
 
 \item{leiden_function}{Whether to use the Constant Potts Model (CPM) or modularity in igraph. Must be either "CPM" or "modularity". (default: "CPM")}
 
+\item{leiden_resolution}{resolution parameter for the Leiden algorithm using the CPM quality score (default: 0.05)}
+
+\item{leiden_method_per_chr}{Method used to generate the graph on which the Leiden algorithm is applied for the per chromosome subclustering, one of "PCA" or "simple". (default: "simple")}
+
+\item{leiden_function_per_chr}{Whether to use the Constant Potts Model (CPM) or modularity in igraph for the per chromosome subclustering. Must be either "CPM" or "modularity". (default: "modularity")}
+
+\item{leiden_resolution_per_chr}{resolution parameter for the Leiden algorithm for the per chromosome subclustering (default: 1)}
+
 \item{per_chr_hmm_subclusters}{Run subclustering per chromosome over all cells combined to run the HMM on those subclusters instead. Only applicable when using Leiden subclustering.
-This should provide enough definition in the predictions while avoiding subclusters that are too small thus providing less evidence to work with. (default: TRUE)}
+This should provide enough definition in the predictions while avoiding subclusters that are too small thus providing less evidence to work with. (default: FALSE)}
+
+\item{per_chr_hmm_subclusters_references}{Whether the per chromosome subclustering should also be done on references, which should not have as much variation as observations. (default = FALSE)}
 
 \item{z_score_filter}{Z-score used as a treshold to filter genes used for subclustering. 
                       Applied based on reference genes to automatically ignore genes with high expression variability such as MHC genes. (default: 0.8)
@@ -222,6 +235,8 @@ Will preferentially use outlier_lower_bounda and outlier_upper_bound if set.}
 \item{num_threads}{(int) number of threads for parallel steps (default: 4)}
 
 \item{plot_steps}{If true, saves infercnv objects and plots data at the intermediate steps.}
+
+\item{inspect_subclusters}{If true, plot subclusters as annotations after the subclustering step to easily see if the subclustering options are good. (default = TRUE)}
 
 \item{resume_mode}{leverage pre-computed and stored infercnv objects where possible. (default=TRUE)}
 

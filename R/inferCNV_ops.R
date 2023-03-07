@@ -98,16 +98,24 @@
 #'
 #' @param k_nn number k of nearest neighbors to search for when using the Leiden partition method for subclustering (default: 20)
 #'
-#' @param leiden_resolution resolution parameter for the Leiden algorithm using the CPM quality score (default: 0.05)
-#'
-#' @param leiden_method Method used to generate the graph on which the Leiden algorithm is applied (default: "PCA")
+#' @param leiden_method Method used to generate the graph on which the Leiden algorithm is applied, one of "PCA" or "simple". (default: "PCA")
 #'
 #' @param leiden_function Whether to use the Constant Potts Model (CPM) or modularity in igraph. Must be either "CPM" or "modularity". (default: "CPM")
 #'
+#' @param leiden_resolution resolution parameter for the Leiden algorithm using the CPM quality score (default: 0.05)
+#'
+#' @param leiden_method_per_chr Method used to generate the graph on which the Leiden algorithm is applied for the per chromosome subclustering, one of "PCA" or "simple". (default: "simple")
+#'
+#' @param leiden_function_per_chr Whether to use the Constant Potts Model (CPM) or modularity in igraph for the per chromosome subclustering. Must be either "CPM" or "modularity". (default: "modularity")
+#'
+#' @param leiden_resolution_per_chr resolution parameter for the Leiden algorithm for the per chromosome subclustering (default: 1)
+#'
 #' @param per_chr_hmm_subclusters Run subclustering per chromosome over all cells combined to run the HMM on those subclusters instead. Only applicable when using Leiden subclustering.
-#'                                This should provide enough definition in the predictions while avoiding subclusters that are too small thus providing less evidence to work with. (default: TRUE)
+#'                                This should provide enough definition in the predictions while avoiding subclusters that are too small thus providing less evidence to work with. (default: FALSE)
 #'
+#' @param per_chr_hmm_subclusters_references Whether the per chromosome subclustering should also be done on references, which should not have as much variation as observations. (default = FALSE)
 #'
+#' 
 #' @param z_score_filter Z-score used as a treshold to filter genes used for subclustering. 
 #'                       Applied based on reference genes to automatically ignore genes with high expression variability such as MHC genes. (default: 0.8)
 #'
@@ -148,6 +156,8 @@
 #' @param num_threads (int) number of threads for parallel steps (default: 4)
 #'
 #' @param plot_steps If true, saves infercnv objects and plots data at the intermediate steps.
+#'
+#' @param inspect_subclusters If true, plot subclusters as annotations after the subclustering step to easily see if the subclustering options are good. (default = TRUE)
 #'
 #' @param resume_mode  leverage pre-computed and stored infercnv objects where possible. (default=TRUE)
 #'
@@ -247,7 +257,7 @@ run <- function(infercnv_obj,
                 ref_subtract_use_mean_bounds=TRUE,
 
                 # observation cell clustering settings
-                cluster_by_groups=FALSE,
+                cluster_by_groups=TRUE,
                 cluster_references=TRUE,
                 k_obs_groups=1,
 
@@ -287,7 +297,8 @@ run <- function(infercnv_obj,
                 leiden_method_per_chr=c("simple", "PCA"),
                 leiden_function_per_chr = c("modularity", "CPM"),
                 leiden_resolution_per_chr = 1,
-                per_chr_hmm_subclusters=TRUE,
+                per_chr_hmm_subclusters=FALSE,
+                per_chr_hmm_subclusters_references=FALSE,
                 z_score_filter = 0.8,
 
 
@@ -308,6 +319,7 @@ run <- function(infercnv_obj,
                 debug=FALSE, #for debug level logging
                 num_threads = 4,
                 plot_steps=FALSE,
+                inspect_subclusters = TRUE,
                 resume_mode=TRUE,
                 png_res=300,
                 plot_probabilities = TRUE,
@@ -442,7 +454,7 @@ run <- function(infercnv_obj,
         dir.create(out_dir)
     }
 
-    infercnv_obj@options = c(infercnv_obj@options, current_args)
+    infercnv_obj@options = c(current_args, infercnv_obj@options)
 
     #run_call <- match.call()
     call_match[[1]] <- as.symbol(".get_relevant_args_list")
@@ -482,7 +494,7 @@ run <- function(infercnv_obj,
                             flog.info(paste0("Using backup HMM from step ", i))
                         }
                     }
-                    else if (i == 20) {  # mcmc_obj
+                    else if (i == 20 && BayesMaxPNormal > 0) {  # mcmc_obj
                         mcmc_obj = readRDS(reload_info$expected_file_names[[i]])
                         if (!.compare_args(infercnv_obj@options, unlist(reload_info$relevant_args[1:i]), mcmc_obj@options)) {
                             rm(mcmc_obj)
@@ -886,6 +898,12 @@ run <- function(infercnv_obj,
                          useRaster=useRaster)
                 
             }
+
+            if (inspect_subclusters) {
+                plot_subclusters(infercnv_obj,
+                                 out_dir=out_dir,
+                                 output_filename="infercnv_subclusters")
+            }
         }
     }
     
@@ -1243,7 +1261,12 @@ run <- function(infercnv_obj,
                          png_res=png_res,
                          useRaster=useRaster)
             }
-            
+
+            if (inspect_subclusters) {
+                plot_subclusters(infercnv_obj,
+                                 out_dir=out_dir,
+                                 output_filename="infercnv_subclusters")
+            }
         }
     }
     else if (analysis_mode != 'subclusters') {
@@ -1496,7 +1519,8 @@ run <- function(infercnv_obj,
                                                    HMM_type          = HMM_type,
                                                    k_obs_groups      = k_obs_groups,
                                                    cluster_by_groups = cluster_by_groups,
-                                                   reassignCNVs      = reassignCNVs)
+                                                   reassignCNVs      = reassignCNVs,
+                                                   useRaster         = useRaster)
 
             # mcmc_obj_file = file.path(out_dir, sprintf("%02d_HMM_pred.Bayes_Net%s.mcmc_obj",
             #                                        step_count, hmm_resume_file_token))
@@ -1522,9 +1546,10 @@ run <- function(infercnv_obj,
         if (HMM == TRUE && BayesMaxPNormal > 0 && length(unique(apply(hmm.infercnv_obj@expr.data, 2, unique))) != 1 ) {
             flog.info(sprintf("\n\n\tSTEP %02d: Filter HMM predicted CNVs based on the Bayesian Network Model results and BayesMaxPNormal\n", step_count))
             ## Filter CNV's by posterior Probabilities
-            mcmc_obj_hmm_states_list <- infercnv::filterHighPNormals(MCMC_inferCNV_obj = mcmc_obj,
-                                                                     HMM_states = hmm.infercnv_obj@expr.data, 
-                                                                     BayesMaxPNormal = BayesMaxPNormal)
+            mcmc_obj_hmm_states_list <- infercnv::filterHighPNormals( MCMC_inferCNV_obj = mcmc_obj,
+                                                                     HMM_states         = hmm.infercnv_obj@expr.data, 
+                                                                     BayesMaxPNormal    = BayesMaxPNormal,
+                                                                     useRaster          = useRaster)
             
             hmm_states_highPnormCNVsRemoved.matrix <- mcmc_obj_hmm_states_list[[2]]
 
@@ -3868,7 +3893,7 @@ compareNA <- function(v1,v2) {
     relevant_args[[step_i]] = c("analysis_mode", "tumor_subcluster_partition_method", "z_score_filter")
     if (run_arguments$analysis_mode == 'subclusters' & run_arguments$tumor_subcluster_partition_method != 'random_trees') {
         resume_file_token = paste0(resume_file_token, '.', run_arguments$tumor_subcluster_partition_method)
-        relevant_args[[step_i]] = c(relevant_args[[step_i]], "k_nn", "leiden_resolution", "tumor_subcluster_pval", "leiden_method", "leiden_function", "per_chr_hmm_subclusters", "hclust_method", "cluster_by_groups")
+        relevant_args[[step_i]] = c(relevant_args[[step_i]], "k_nn", "leiden_resolution", "tumor_subcluster_pval", "leiden_method", "leiden_function", "leiden_method_per_chr", "leiden_function_per_chr", "leiden_resolution_per_chr", "per_chr_hmm_subclusters", "per_chr_hmm_subclusters_references", "hclust_method", "cluster_by_groups") 
         expected_file_names[[step_i]] = file.path(run_arguments$out_dir, sprintf("%02d_tumor_subclusters%s.infercnv_obj", step_i, resume_file_token))
     }
     else if (run_arguments$analysis_mode != 'subclusters') {
@@ -3907,7 +3932,7 @@ compareNA <- function(v1,v2) {
     step_i = step_i + 1
 
     # 20 _HMM_pred.Bayes_Net%s.mcmc_obj
-    relevant_args[[step_i]] = c("HMM", "BayesMaxPNormal")
+    relevant_args[[step_i]] = c("HMM")
     if (run_arguments$HMM == TRUE & run_arguments$BayesMaxPNormal > 0) {
         relevant_args[[step_i]] = c(relevant_args[[step_i]], "diagnostics", "reassignCNVs")
         # mcmc_obj_file = file.path(run_arguments$out_dir, sprintf("%02d_HMM_pred.Bayes_Net%s.mcmc_obj", step_i, hmm_resume_file_token))

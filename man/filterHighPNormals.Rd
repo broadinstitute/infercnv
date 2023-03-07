@@ -5,7 +5,7 @@
 \title{filterHighPNormals: Filter the HMM identified CNV's by the CNV's posterior probability
 of belonging to a normal state.}
 \usage{
-filterHighPNormals(MCMC_inferCNV_obj, HMM_states, BayesMaxPNormal)
+filterHighPNormals(MCMC_inferCNV_obj, HMM_states, BayesMaxPNormal, useRaster)
 }
 \arguments{
 \item{MCMC_inferCNV_obj}{MCMC infernCNV object.}
@@ -13,6 +13,8 @@ filterHighPNormals(MCMC_inferCNV_obj, HMM_states, BayesMaxPNormal)
 \item{HMM_states}{InferCNV object with HMM states in expression data.}
 
 \item{BayesMaxPNormal}{Option to filter CNV or cell lines by some probability threshold.}
+
+\item{useRaster}{Option to use rasterization when plotting}
 }
 \value{
 Returns a list of (MCMC_inferCNV_obj, HMM_states) With removed CNV's.

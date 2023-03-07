@@ -747,7 +747,7 @@ setMethod(f="runMCMC",
 #' @keywords internal
 #' @noRd
 setGeneric(name="postProbNormal",
-           def=function(obj, PNormal, title, output_filename)
+           def=function(obj, PNormal, title, output_filename, useRaster)
            { standardGeneric("postProbNormal") }
 )
 
@@ -756,7 +756,7 @@ setGeneric(name="postProbNormal",
 #' @noRd
 setMethod(f="postProbNormal",
           signature="MCMC_inferCNV",
-          definition=function(obj, PNormal, title, output_filename)
+          definition=function(obj, PNormal, title, output_filename, useRaster)
           {
               if (getArgs(obj)$plotingProbs == TRUE){
                   # get probability of the cnv's belonging to each state
@@ -780,7 +780,8 @@ setMethod(f="postProbNormal",
                                      output_filename       = output_filename,
                                      write_expr_matrix     = FALSE,
                                      x.center              = 0,
-                                     x.range               = c(0,1)
+                                     x.range               = c(0,1),
+                                     useRaster             = useRaster
                   )
               }
           }
@@ -1109,7 +1110,7 @@ run_gibb_sampling <- function(gene_exp,
 plot_cell_prob <- function(df, title, HMM_type){
     # i3 or i6 HMM method, need to determine the number of columns on the graph
     df$mag = seq_len(ifelse(HMM_type == "i6", 6, 3))
-    long_data <- reshape::melt(df, id = "mag")
+    long_data <- melt(df, id = "mag")
     long_data$mag <- as.factor(long_data$mag)
     ggplot2::ggplot(long_data, ggplot2::aes_string(x = 'variable', y = 'value', fill = 'mag'))+
         ggplot2::geom_bar(stat="identity", width = 1) +
@@ -1189,6 +1190,7 @@ plot_cnv_prob <- function(df, title, HMM_type){
 #' @param reassignCNVs (boolean) Given the CNV associated probability of belonging to each possible state, 
 #'                            reassign the state assignments made by the HMM to the state that has the highest probability. (default: TRUE)
 #' @param no_plot (boolean) Option set by infercnv::run() for producing visualizations.
+#' @param useRaster Option to use rasterization when plotting
 #'
 #' @return Returns a MCMC_inferCNV_obj and posterior probability of being in one of six Copy Number Variation states
 #' (states: 0, 0.5, 1, 1.5, 2, 3) for CNV's identified by inferCNV's HMM.
@@ -1210,8 +1212,9 @@ plot_cnv_prob <- function(df, title, HMM_type){
 #' infercnv_object_example <- infercnv::run(infercnv_object_example,
 #'                                          cutoff=1,
 #'                                          out_dir=out_dir, 
-#'                                          cluster_by_groups=TRUE, 
-#'                                          denoise=FALSE,
+#'                                          cluster_by_groups=TRUE,
+#'                                          analysis_mode="samples",
+#'                                          denoise=TRUE,
 #'                                          HMM=TRUE,
 #'                                          num_threads=2,
 #'                                          no_plot=TRUE)
@@ -1231,22 +1234,23 @@ plot_cnv_prob <- function(df, title, HMM_type){
 #'                                        reassignCNVs      = FALSE,
 #'                                        no_plot           = TRUE)
 #'                               
-inferCNVBayesNet <- function(file_dir,
-                             infercnv_obj,
-                             HMM_states,
-                             out_dir,
-                             resume_file_token,
-                             model_file        = NULL,
-                             CORES             = 1,
-                             postMcmcMethod    = NULL,
-                             plotingProbs      = TRUE,
-                             quietly           = TRUE,
-                             diagnostics       = FALSE,
-                             HMM_type          = HMM_type,
-                             k_obs_groups      = k_obs_groups,
-                             cluster_by_groups = cluster_by_groups,
-                             reassignCNVs      = TRUE,
-                             no_plot           = no_plot) {
+inferCNVBayesNet <- function( file_dir,
+                              infercnv_obj,
+                              HMM_states,
+                              out_dir,
+                              resume_file_token,
+                              model_file        = NULL,
+                              CORES             = 1,
+                              postMcmcMethod    = NULL,
+                              plotingProbs      = TRUE,
+                              quietly           = TRUE,
+                              diagnostics       = FALSE,
+                              HMM_type          = HMM_type,
+                              k_obs_groups      = k_obs_groups,
+                              cluster_by_groups = cluster_by_groups,
+                              reassignCNVs      = TRUE,
+                              no_plot           = no_plot,
+                              useRaster) {
     
     ################
     # CHECK INPUTS #
@@ -1353,7 +1357,8 @@ inferCNVBayesNet <- function(file_dir,
     postProbNormal(MCMC_inferCNV_obj,
                    PNormal = NULL,
                    title = title,
-                   output_filename = output_filename)
+                   output_filename = output_filename,
+                   useRaster = useRaster)
     
     return(MCMC_inferCNV_obj)
 }
@@ -1372,6 +1377,7 @@ inferCNVBayesNet <- function(file_dir,
 #' @param MCMC_inferCNV_obj MCMC infernCNV object.
 #' @param HMM_states InferCNV object with HMM states in expression data.
 #' @param BayesMaxPNormal Option to filter CNV or cell lines by some probability threshold.
+#' @param useRaster Option to use rasterization when plotting
 #'
 #' @return Returns a list of (MCMC_inferCNV_obj, HMM_states) With removed CNV's.
 #'
@@ -1388,7 +1394,8 @@ inferCNVBayesNet <- function(file_dir,
 
 filterHighPNormals <- function( MCMC_inferCNV_obj,
                                 HMM_states,
-                                BayesMaxPNormal) {
+                                BayesMaxPNormal,
+                                useRaster) {
     # Add threshold to the MCMC_object
     MCMC_inferCNV_obj <- setBayesMaxPNormal( obj             = MCMC_inferCNV_obj,
                                              BayesMaxPNormal = BayesMaxPNormal )
@@ -1427,7 +1434,8 @@ filterHighPNormals <- function( MCMC_inferCNV_obj,
     postProbNormal(MCMC_inferCNV_obj,
                    PNormal = TRUE,
                    title = title,
-                   output_filename = output_filename)
+                   output_filename = output_filename,
+                   useRaster = useRaster)
     
     return(list(MCMC_inferCNV_obj, HMM_states))
 }

@@ -17,7 +17,7 @@ infercnv.env$GLOBAL_NUM_THREADS <- 1  # default is single-threaded.
 #' @importFrom grDevices col2rgb colorRampPalette dev.off pdf png rgb
 #' @importFrom graphics abline axis boxplot hist image layout lines mtext par plot points rect text title legend
 #' @importFrom stats as.dendrogram as.dist as.hclust cutree density dist filter median order.dendrogram quantile reorder sd complete.cases cor t.test p.adjust predict rnorm runif smooth.spline var wilcox.test dnorm ecdf ks.test lm nls pnorm qgamma qnorm rbinom rchisq rgamma rlnorm rnbinom rpois shapiro.test update
-#' @importFrom utils flush.console read.table write.table tail read.csv head
+#' @importFrom utils flush.console read.table write.table tail read.csv head capture.output
 #' @import futile.logger
 #' @importFrom methods setClass new is
 #' @importFrom gplots bluered

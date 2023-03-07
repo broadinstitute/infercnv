@@ -1,8 +1,8 @@
 Package: infercnv
 Type: Package
 Title: Infer Copy Number Variation from Single-Cell RNA-Seq Data
-Version: 1.13.0
-Date: 2022-04-11
+Version: 1.15.1
+Date: 2023-02-24
 Authors@R: c( person("Timothy", "Tickle", email = "ttickle@broadinstitute.org", role = "aut"), person("Itay", "Tirosh", email = "tirosh@broadinstitute.org", role = "aut"), person("Christophe", "Georgescu", email = "cgeorges@broadinstitute.org", role = c("aut", "cre")), person("Maxwell", "Brown", email = "mbrown@broadinstitute.org", role = "aut"), person("Brian", "Haas", email = "bhaas@broadinstitute.org", role = "aut")) 
 BugReports: https://github.com/broadinstitute/inferCNV/issues
 Description: Using single-cell RNA-Seq expression to visualize CNV in cells.
@@ -12,7 +12,7 @@ License: BSD_3_clause + file LICENSE
 LazyData: TRUE
 VignetteBuilder: knitr
 Suggests: BiocStyle, knitr, rmarkdown, testthat
-RoxygenNote: 7.2.0
+RoxygenNote: 7.2.3
 NeedsCompilation: no
 SystemRequirements: JAGS 4.x.y
 Imports: graphics, grDevices, RColorBrewer, gplots, futile.logger, stats, utils, methods, ape, phyclust, Matrix, fastcluster, parallelDist, dplyr, HiddenMarkov, ggplot2, edgeR, coin, caTools, digest, RANN, igraph, reshape2, rjags, fitdistrplus, future, foreach, doParallel, BiocGenerics, SummarizedExperiment, SingleCellExperiment, tidyr, parallel, coda, gridExtra, argparse, cowplot, GenomeInfoDb, GenomicRanges, IRanges, S4Vectors, stringr

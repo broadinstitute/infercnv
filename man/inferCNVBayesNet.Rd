@@ -20,7 +20,8 @@ inferCNVBayesNet(
   k_obs_groups = k_obs_groups,
   cluster_by_groups = cluster_by_groups,
   reassignCNVs = TRUE,
-  no_plot = no_plot
+  no_plot = no_plot,
+  useRaster
 )
 }
 \arguments{
@@ -57,6 +58,8 @@ of cells will be clustered separately. (default=FALSE, instead will use k_obs_gr
 reassign the state assignments made by the HMM to the state that has the highest probability. (default: TRUE)}
 
 \item{no_plot}{(boolean) Option set by infercnv::run() for producing visualizations.}
+
+\item{useRaster}{Option to use rasterization when plotting}
 }
 \value{
 Returns a MCMC_inferCNV_obj and posterior probability of being in one of six Copy Number Variation states
@@ -83,8 +86,9 @@ out_dir = tempfile()
 infercnv_object_example <- infercnv::run(infercnv_object_example,
                                          cutoff=1,
                                          out_dir=out_dir, 
-                                         cluster_by_groups=TRUE, 
-                                         denoise=FALSE,
+                                         cluster_by_groups=TRUE,
+                                         analysis_mode="samples",
+                                         denoise=TRUE,
                                          HMM=TRUE,
                                          num_threads=2,
                                          no_plot=TRUE)
