@@ -1,3 +1,6 @@
+Changes in 1.14.2 (2023-03-08)
++ Add "infercnv_subclusters" plot after subclustering step in run() that displays the subclusters. Can be disabled with the exisiting no_plot argument.
+
 Changes in 1.14.1 (2023-02-24)
 + Fix per chromosome subclustering to use all the data and not only the data from the last annotation group when there are no outliers filtered by z_score (which would always happen when no references are defined).
 + Apply per subcluster consensus on HMM predictions on the object directly when running with per chromosome subclustering enabled, rather than only running it before writting txt outputs and figure. This makes the infercnv_obj also contain the same values plotted.
