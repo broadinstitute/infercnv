@@ -4,7 +4,7 @@ define_signif_tumor_subclusters <- function(infercnv_obj,
                                             k_nn=20,
                                             leiden_method=c("PCA", "simple"),
                                             leiden_function = c("CPM", "modularity"),
-                                            leiden_resolution=0.05,
+                                            leiden_resolution="auto",
                                             leiden_method_per_chr=c("simple", "PCA"),
                                             leiden_function_per_chr = c("modularity", "CPM"),
                                             leiden_resolution_per_chr = 1,
@@ -583,11 +583,20 @@ plot_subclusters = function(infercnv_obj, out_dir, output_filename = "subcluster
         return(res)
     }
 
+    used_leiden_resolution = 0
+    if (leiden_resolution == "auto") {
+        used_leiden_resolution = (11.98/ncol(tumor_expr_data))^(1/1.165)
+        flog.info(sprintf("Setting auto leiden resolution for %s to %g", tumor_group, used_leiden_resolution))
+    }
+    else {
+        used_leiden_resolution = leiden_resolution
+    }
+
     if (leiden_method == "PCA") {
-        partition = .leiden_seurat_preprocess_routine(expr_data=tumor_expr_data, k_nn=k_nn, resolution_parameter=leiden_resolution, objective_function=leiden_function)
+        partition = .leiden_seurat_preprocess_routine(expr_data=tumor_expr_data, k_nn=k_nn, resolution_parameter=used_leiden_resolution, objective_function=leiden_function)
     }
     else { # "simple"
-        partition = .leiden_simple_snn(tumor_expr_data, k_nn, leiden_resolution, leiden_function)
+        partition = .leiden_simple_snn(tumor_expr_data, k_nn, used_leiden_resolution, leiden_function)
     }
 
     tmp_full_phylo = NULL
@@ -658,11 +667,20 @@ plot_subclusters = function(infercnv_obj, out_dir, output_filename = "subcluster
                     subclusters_per_chr[[c]][[tumor_group]] = tumor_groups[[tumor_group]]
                 }
                 else {
+                    used_leiden_resolution = 0
+                    if (leiden_resolution == "auto") {
+                        used_leiden_resolution = (11.98/ncol(c_data))^(1/1.165)
+                        flog.info(sprintf("Setting auto leiden resolution for %s to %g", tumor_group, used_leiden_resolution))
+                    }
+                    else {
+                        used_leiden_resolution = leiden_resolution
+                    }
+
                     if (leiden_method == "PCA") {
-                        partition = .leiden_seurat_preprocess_routine(expr_data=c_data, k_nn=k_nn, resolution_parameter=leiden_resolution, objective_function=leiden_function)
+                        partition = .leiden_seurat_preprocess_routine(expr_data=c_data, k_nn=k_nn, resolution_parameter=used_leiden_resolution, objective_function=leiden_function)
                     }
                     else { # "simple"
-                        partition = .leiden_simple_snn(expr_data=c_data, k_nn=k_nn, resolution_parameter=leiden_resolution, objective_function=leiden_function) 
+                        partition = .leiden_simple_snn(expr_data=c_data, k_nn=k_nn, resolution_parameter=used_leiden_resolution, objective_function=leiden_function) 
                     }
 
                     # no HClust on these subclusters as they may mix both ref and obs cells

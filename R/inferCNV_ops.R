@@ -102,7 +102,7 @@
 #'
 #' @param leiden_function Whether to use the Constant Potts Model (CPM) or modularity in igraph. Must be either "CPM" or "modularity". (default: "CPM")
 #'
-#' @param leiden_resolution resolution parameter for the Leiden algorithm using the CPM quality score (default: 0.05)
+#' @param leiden_resolution resolution parameter for the Leiden algorithm using the CPM quality score (default: auto)
 #'
 #' @param leiden_method_per_chr Method used to generate the graph on which the Leiden algorithm is applied for the per chromosome subclustering, one of "PCA" or "simple". (default: "simple")
 #'
@@ -288,7 +288,7 @@ run <- function(infercnv_obj,
                 k_nn=20,
                 leiden_method=c("PCA", "simple"),
                 leiden_function = c("CPM", "modularity"),
-                leiden_resolution=0.05,
+                leiden_resolution="auto",
                 leiden_method_per_chr=c("simple", "PCA"),
                 leiden_function_per_chr = c("modularity", "CPM"),
                 leiden_resolution_per_chr = 1,
