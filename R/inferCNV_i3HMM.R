@@ -325,11 +325,12 @@ i3HMM_predict_CNV_via_HMM_on_tumor_subclusters  <- function(infercnv_obj,
 
 
 i3HMM_predict_CNV_via_HMM_on_whole_tumor_samples  <- function(infercnv_obj,
-                                                        i3_p_val=0.05,
-                                                        sd_trend=.i3HMM_get_sd_trend_by_num_cells_fit(infercnv_obj, i3_p_val),
-                                                        t=1e-6,
-                                                        use_KS=TRUE
-                                                        ) {
+                                                              cluster_by_groups,
+                                                              i3_p_val=0.05,
+                                                              sd_trend=.i3HMM_get_sd_trend_by_num_cells_fit(infercnv_obj, i3_p_val),
+                                                              t=1e-6,
+                                                              use_KS=TRUE
+                                                              ) {
     
     
     flog.info("predict_CNV_via_HMM_on_whole_tumor_samples")
@@ -343,8 +344,12 @@ i3HMM_predict_CNV_via_HMM_on_whole_tumor_samples  <- function(infercnv_obj,
     hmm.data[,] = -1 #init to invalid state
 
     ## add the normals, so they get predictions too:
-    tumor_samples <- c(infercnv_obj@observation_grouped_cell_indices, infercnv_obj@reference_grouped_cell_indices)
-    
+    if (cluster_by_groups == TRUE) {
+        tumor_samples = c(infercnv_obj@observation_grouped_cell_indices, infercnv_obj@reference_grouped_cell_indices)
+    } else {
+        tumor_samples = c(all_observations = unlist(infercnv_obj@observation_grouped_cell_indices), infercnv_obj@reference_grouped_cell_indices)
+    }
+
     ## run through each chr separately
     lapply(chrs, function(chr) {
         chr_gene_idx = which(gene_order$chr == chr)

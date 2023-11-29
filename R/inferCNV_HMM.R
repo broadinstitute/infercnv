@@ -507,6 +507,7 @@ predict_CNV_via_HMM_on_tumor_subclusters_per_chr  <- function(infercnv_obj,
 
 
 predict_CNV_via_HMM_on_whole_tumor_samples  <- function(infercnv_obj,
+                                                        cluster_by_groups,
                                                         cnv_mean_sd=get_spike_dists(infercnv_obj@.hspike),
                                                         cnv_level_to_mean_sd_fit=get_hspike_cnv_mean_sd_trend_by_num_cells_fit(infercnv_obj@.hspike),
                                                         t=1e-6
@@ -525,7 +526,11 @@ predict_CNV_via_HMM_on_whole_tumor_samples  <- function(infercnv_obj,
     hmm.data[,] = -1 #init to invalid state
 
     ## add the normals, so they get predictions too:
-    tumor_samples <- c(infercnv_obj@observation_grouped_cell_indices, infercnv_obj@reference_grouped_cell_indices)
+    if (cluster_by_groups == TRUE) {
+        tumor_samples = c(infercnv_obj@observation_grouped_cell_indices, infercnv_obj@reference_grouped_cell_indices)
+    } else {
+        tumor_samples = c(all_observations = unlist(infercnv_obj@observation_grouped_cell_indices), infercnv_obj@reference_grouped_cell_indices)
+    }
     
     ## run through each chr separately
     lapply(chrs, function(chr) {

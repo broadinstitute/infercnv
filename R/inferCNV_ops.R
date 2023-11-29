@@ -1292,17 +1292,20 @@ run <- function(infercnv_obj,
                 ## samples mode
                 
                 if (HMM_type == 'i6') {
-                    hmm.infercnv_obj <- predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_obj, t=HMM_transition_prob)
+                    hmm.infercnv_obj <- predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_obj,
+                                                                                   cluster_by_groups=cluster_by_groups,
+                                                                                   t=HMM_transition_prob)
                 } else if (HMM_type == 'i3') {
-                    hmm.infercnv_obj <- i3HMM_predict_CNV_via_HMM_on_tumor_subclusters(infercnv_obj,
-                                                                                       i3_p_val=HMM_i3_pval,
-                                                                                       t=HMM_transition_prob,
-                                                                                       use_KS=HMM_i3_use_KS
-                                                                                       )
+                    hmm.infercnv_obj <- i3HMM_predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_obj,
+                                                                                         cluster_by_groups=cluster_by_groups,
+                                                                                         i3_p_val=HMM_i3_pval,
+                                                                                         t=HMM_transition_prob,
+                                                                                         use_KS=HMM_i3_use_KS
+                                                                                         )
                 } else {
                     stop("Error, not recognizing HMM_type")
                 }
-                
+
             }
             
             
