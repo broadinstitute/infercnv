@@ -19,6 +19,7 @@ plot_per_group(
   save_objects = FALSE,
   png_res = 300,
   dynamic_resize = 0,
+  useRaster = TRUE,
   out_dir
 )
 }
