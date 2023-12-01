@@ -472,6 +472,8 @@ sample_object <- function(infercnv_obj,
 #'
 #' @param on_references  boolean (default=TRUE), plot references (normal cells).
 #'
+#' @param useRaster Whether to use rasterization for drawing heatmap. Only disable if it produces an error as it is much faster than not using it.
+#' 
 #' @return void
 #'
 #' @export

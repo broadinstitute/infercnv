@@ -58,6 +58,8 @@ Will be followed by OBS/REF to indidate the type of the group, and the group nam
 heatmap and the overall plot based on how many cells there are.
 Default is 0, which disables the scaling. Try 1 first if you want to enable. (Default: 0)}
 
+\item{useRaster}{Whether to use rasterization for drawing heatmap. Only disable if it produces an error as it is much faster than not using it.}
+
 \item{out_dir}{Directory in which to save plots and other outputs.}
 }
 \value{
