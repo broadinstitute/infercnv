@@ -1,4 +1,4 @@
-Changes in 1.16.1 (2023-12-01)
+Changes in 1.18.1 (2023-12-01)
 + Update to work with Seurat v5 object changes.
 + New default setting for leiden_resolution now set to "auto" which will very roughly set a resolution value that scales with the number of cells to avoid over splitting subclusters when the number of cells increases.
 + Fix for plotting with dynamic_resolution enabled when the png size limit of cairo is hit to not have parts of the plot that try to be plotted outside the limit.
