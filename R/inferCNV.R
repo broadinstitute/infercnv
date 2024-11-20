@@ -259,7 +259,7 @@ CreateInfercnvObject <- function(raw_counts_matrix,
 
     orig_ref_group_names = ref_group_names
     ref_group_names <- ref_group_names[ ref_group_names %in% unique(input_classifications[,1]) ]
-    if (! all.equal(ref_group_names, orig_ref_group_names)) {
+    if (! isTRUE(all.equal(ref_group_names, orig_ref_group_names))){
         flog.warn(sprintf("-warning, at least one reference group has been removed due to cells lacking: %s",
                           orig_ref_group_names[! orig_ref_group_names %in% ref_group_names ] ))
     }
