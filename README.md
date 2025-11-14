@@ -1,6 +1,6 @@
 
 ***********************************************
->InferCNV is no longer supported. Please explore alternatives such as InferCNA (https://jlaffy.github.io/infercna/)[https://jlaffy.github.io/infercna/), (copykat)[https://github.com/navinlabcode/copykat], and [numbat](https://github.com/kharchenkolab/numbat) 
+>InferCNV is no longer supported. Please explore alternatives such as InferCNA (https://jlaffy.github.io/infercna/)[https://jlaffy.github.io/infercna/], CopyKAT (https://github.com/navinlabcode/copykat)[https://github.com/navinlabcode/copykat], and Numbat (https://github.com/kharchenkolab/numbat)[https://github.com/kharchenkolab/numbat]
 ***********************************************
 
 # Subclustering
