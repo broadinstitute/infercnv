@@ -1,3 +1,8 @@
+
+***********************************************
+>InferCNV is no longer supported. Please explore a newer tool: InferCNA (https://jlaffy.github.io/infercna/)[https://jlaffy.github.io/infercna/)
+***********************************************
+
 # Subclustering
 
 Subclustering resolution is one of the primary settings that will need to be adjusted in most runs to avoid oversplitting. The tutorial below explains how it works and details about it can also be found on the [wiki](https://github.com/broadinstitute/infercnv/wiki/infercnv-tumor-subclusters#tumor-subclustering-by-leiden-clustering-preferred).
