@@ -25,13 +25,14 @@ get_group_color_palette <- function(){
 #' @param chr_lengths A named list of chromsomes lengths to use when plot_chr_scale=TRUE, or else chromosome size is assumed to be the last chromosome's stop position + 10k bp
 #' @param k_obs_groups Number of groups to break observation into.
 #' @param contig_cex Contig text size. 
-#' @param x.center Value on which to center expression.
+#' @param mode options("expression", "allele"), determines if to plot the expression values or allele values (allele is only useful for HMM predictions).
+#' @param x.center Value on which to center expression. "auto" uses the mean.
 #' @param x.range vector containing the extreme values in the heatmap (ie. c(-3,4) )
 #' @param hclust_method Clustering method to use for hclust.
-#' @param custom_color_pal Specify a custom set of colors for the heatmap. 
+#' @param custom_color_palette Specify a custom set of colors for the heatmap. 
 #'                         Has to be in the shape color.palette(c("darkblue", "white", "darkred"),
 #'                                                              c(2, 2))
-#' @param color_safe_pal Logical indication of using a color blindness safe palette.
+#' @param color_safe_palette Logical indication of using a color blindness safe palette.
 #' @param output_filename Filename to save the figure to.
 #' @param output_format format for heatmap image file (default: 'png'), options('png', 'pdf', NA)
 #'                      If set to NA, will print graphics natively
@@ -98,10 +99,15 @@ plot_cnv <- function(infercnv_obj,
                      chr_lengths=NULL,
                      k_obs_groups = 1,
                      contig_cex=1,
-                     x.center=mean(infercnv_obj@expr.data),
+                     mode=c("expression", "allele"),
+                     # x.center=mean(infercnv_obj@expr.data),
+                     preset=c("residual","HMM_i6","HMM_i3","HMM_i6_representative", "HMM_i3_representative", "HMM_i2_allele", "HMM_i2_allele_filtered", "HMM_i3_combined", "HMM_i6_combined", "none"),
+                     x.center="auto",
                      x.range="auto", #NA,
                      hclust_method='ward.D',
-                     custom_color_pal=NULL,
+                     breaks=NULL, # 16
+                     custom_color_palette=NULL,
+                     custom_colors=NULL,
                      color_safe_pal=FALSE,
                      output_filename="infercnv",
                      output_format="png", #pdf, png, NA
@@ -124,9 +130,106 @@ plot_cnv <- function(infercnv_obj,
     if(!file.exists(out_dir)){
         dir.create(out_dir)
     }
+
+    mode = match.arg(mode)
+    preset = match.arg(preset)
     
-    plot_data = infercnv_obj@expr.data
-    
+
+    # Select color palette
+    if (color_safe_pal) {
+        default_color_palette_range = c("purple3", "white", "darkorange2")
+    }
+    else {
+        default_color_palette_range = c("darkblue", "white", "darkred")
+    }
+    loh_color = "#b4c98c" # add option? find color_safe_pal version?
+    conflict_color = "#dddddd"
+
+    if (!is.null(custom_color_palette)) {
+        custom_pal = custom_color_palette
+    } else {
+        custom_pal <- color.palette(default_color_palette_range,
+                                    c(2, 2))
+    }
+
+    # include "mode" arg as part of preset?
+    if (preset == "residual") {
+        x.center = "auto"
+        x.range = "auto"
+        custom_pal = color.palette(default_color_palette_range,
+                                   c(2, 2))
+        breaks=16
+    }
+    else if (preset == "HMM_i6") {
+        x.center = 3
+        x.range = c(1, 6)
+        custom_pal = color.palette(default_color_palette_range,
+                                   c(1, 2))
+        breaks = c(0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5)
+    }
+    else if (preset == "HMM_i3") {
+        x.center = 2
+        x.range = c(1, 3)
+        custom_pal = color.palette(default_color_palette_range,
+                                   c(1, 1))
+        breaks = c(0.5, 1.5, 2.5, 3.5)
+    }
+    else if (preset == "HMM_i6_representative") {  # filtered also has representative intensities, so states are turned into copy multipliers
+        x.center = 1
+        x.range = c(0, 3)
+        custom_pal = color.palette(default_color_palette_range,
+                                   c(1, 2))
+        breaks = c(0, 0.25, 0.75, 1.25, 1.75, 2.5, 3)
+    }
+    else if (preset == "HMM_i3_representative") {
+        x.center = 1
+        x.range = c(0, 2)
+        custom_pal = color.palette(default_color_palette_range,
+                                   c(1, 1))
+        breaks = c(0.25, 0.75, 1.25, 1.75)
+    }
+    else if (preset == "HMM_i2_allele") {
+        x.center = 1.5
+        x.range = c(1, 2)
+        custom_colors = c(loh_color, "#ffffff")
+        breaks = c(0.5, 1.5, 2.5)
+    }
+    else if (preset == "HMM_i2_allele_filtered") {
+        x.center = 0.5
+        x.range = c(0, 1)
+        custom_colors = c("#ffffff", loh_color)
+        breaks = c(-0.5, 0.5, 1.5)
+    }
+    else if (preset == "HMM_i3_combined") {
+        x.center = 2
+        x.range = c(1, 5)
+        custom_colors = c(color.palette(default_color_palette_range,
+                                        c(1, 1))(3),
+                          loh_color, conflict_color)
+        breaks = c(0.5, 1.5, 2.5, 3.5, 4.5, 5.5)
+    }
+    else if (preset == "HMM_i6_combined") {
+        x.center = 3
+        x.range = c(1, 8)
+        custom_colors = c(color.palette(default_color_palette_range,
+                                        c(1, 2))(6),
+                          loh_color, conflict_color)
+        breaks = c(0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5)
+    }
+
+
+    if (mode == "expression") {
+        plot_data = infercnv_obj@expr.data
+        if (x.center == "auto") {
+            x.center=mean(infercnv_obj@expr.data)
+        }
+    } else {
+        plot_data = infercnv_obj@allele.expr.data
+        if (x.center == "auto") {
+            x.center=mean(infercnv_obj@allele.expr.data)
+        }
+    }
+
     flog.info(paste("::plot_cnv:Start", sep=""))
     flog.info(paste("::plot_cnv:Current data dimensions (r,c)=",
                            paste(dim(plot_data), collapse=","),
@@ -149,59 +252,56 @@ plot_cnv <- function(infercnv_obj,
         
     }
     
-    if (! any(is.na(x.range))) {
+    # if (! any(is.na(x.range))) {
 
 
-        if ( (length(x.range) == 1) & (x.range[1] == "auto") ) {
+    if ( is.na(x.range) || (length(x.range) == 1) & (x.range[1] == "auto") ) {
 
-            # examine distribution of data that's off-center, since much of the center could
-            # correspond to a mass of data that has been wiped out during noise reduction
-            quantiles = quantile(plot_data[plot_data != x.center], c(0.01, 0.99))
+        # examine distribution of data that's off-center, since much of the center could
+        # correspond to a mass of data that has been wiped out during noise reduction
+        quantiles = quantile(plot_data[plot_data != x.center], c(0.01, 0.99), na.rm = T)
 
-            # determine max distance from the center.
-            delta = max( abs( c(x.center - quantiles[1],  quantiles[2] - x.center) ) )
-            low_threshold = x.center - delta
-            high_threshold = x.center + delta
-            x.range = c(low_threshold, high_threshold)
-            
-            flog.info(sprintf("plot_cnv(): auto thresholding at: (%f , %f)", low_threshold, high_threshold))
-            
-        } else {
+        # determine max distance from the center.
+        delta = max( abs( c(x.center - quantiles[1],  quantiles[2] - x.center) ) )
+        low_threshold = x.center - delta
+        high_threshold = x.center + delta
+        x.range = c(low_threshold, high_threshold)
         
-            # use defined values
-            low_threshold = x.range[1]
-            high_threshold = x.range[2]
-            
-            if (low_threshold > x.center | high_threshold < x.center | low_threshold >= high_threshold) {
-                stop(paste("Error, problem with relative values of x.range: ", x.range, ", and x.center: ", x.center))
-            }
+        flog.info(sprintf("plot_cnv(): auto thresholding at: (%f , %f)", low_threshold, high_threshold))
+        
+    } else {
+    
+        # use defined values
+        low_threshold = x.range[1]
+        high_threshold = x.range[2]
+        
+        if (low_threshold > x.center | high_threshold < x.center | low_threshold >= high_threshold) {
+            stop(paste("Error, problem with relative values of x.range: ", x.range, ", and x.center: ", x.center))
         }
-
-        plot_data[plot_data < low_threshold] <- low_threshold
-        plot_data[plot_data > high_threshold] <- high_threshold
-        
-        infercnv_obj@expr.data <- plot_data  #because used again below...
-        
     }
+
+    plot_data[plot_data < low_threshold] <- low_threshold
+    plot_data[plot_data > high_threshold] <- high_threshold
+        
+        # infercnv_obj@expr.data <- plot_data  #because used again below...
+        
+    # }
     
     
     # Contigs
-    contigs = infercnv_obj@gene_order[[C_CHR]]
+    if (mode == "expression") {
+        contigs = infercnv_obj@gene_order[[C_CHR]]
+        gene_order = infercnv_obj@gene_order
+    } else {
+        contigs = infercnv_obj@allele.gene_order[[C_CHR]]
+        gene_order = infercnv_obj@allele.gene_order
+    }
     unique_contigs <- unique(contigs)
     n_contig <- length(unique_contigs)
     ct.colors <- get_group_color_palette()(n_contig)
     names(ct.colors) <- unique_contigs
 
-    # Select color palette
-    if (!is.null(custom_color_pal)) {
-        custom_pal = custom_color_pal
-    } else if (color_safe_pal == FALSE){
-        custom_pal <- color.palette(c("darkblue", "white", "darkred"),
-                                    c(2, 2))
-    } else {
-        custom_pal <- color.palette(c("purple3", "white", "darkorange2"),
-                                    c(2, 2))
-    }
+
 
     
     ## Row separation based on reference
@@ -237,8 +337,10 @@ plot_cnv <- function(infercnv_obj,
 
     
     # obs_annotations_groups: integer vec named by cells, set to index according to category name vec above.
-    obs_annotations_groups = rep(-1, length(colnames(infercnv_obj@expr.data))) # init
-    names(obs_annotations_groups) = colnames(infercnv_obj@expr.data)
+    # obs_annotations_groups = rep(-1, length(colnames(infercnv_obj@expr.data))) # init
+    # names(obs_annotations_groups) = colnames(infercnv_obj@expr.data)
+    obs_annotations_groups = rep(-1, length(colnames(plot_data))) # init
+    names(obs_annotations_groups) = colnames(plot_data)
     obs_index_groupings = infercnv_obj@observation_grouped_cell_indices
     counter <- 1
     for (obs_index_group in obs_index_groupings) {
@@ -312,7 +414,6 @@ plot_cnv <- function(infercnv_obj,
     ## Remove observation col names, too many to plot
     ## Will try and keep the reference names
     ## They are more informative anyway
-    obs_data <- infercnv_obj@expr.data
     if (!is.null(ref_idx)){
         obs_data <- plot_data[, -ref_idx, drop=FALSE]
         if (ncol(obs_data) == 1) {
@@ -320,6 +421,8 @@ plot_cnv <- function(infercnv_obj,
             plot_data <- cbind(obs_data, obs_data)
             names(obs_data) <- c("", names(obs_data)[1])
         }
+    } else {
+        obs_data = plot_data
     }
     
     obs_data <- t(obs_data)
@@ -330,7 +433,7 @@ plot_cnv <- function(infercnv_obj,
     updated_ref_groups <- list()
     current_ref_count <- 1
     current_grp_idx <- 1
-    plot_data <-infercnv_obj@expr.data
+    # plot_data <-infercnv_obj@expr.data
     ref_groups = infercnv_obj@reference_grouped_cell_indices
     for (ref_grp in ref_groups) {
         ref_data_t <- cbind(ref_data_t, plot_data[, ref_grp, drop=FALSE])
@@ -340,18 +443,20 @@ plot_cnv <- function(infercnv_obj,
     }
     ref_groups <- updated_ref_groups
     
-    nb_breaks <- 16
+    # nb_breaks <- 16
     # breaksList_t <-
     #     seq(min(min(obs_data, na.rm=TRUE), min(ref_data_t, na.rm=TRUE)),
     #     max(max(obs_data,na.rm=TRUE), max(ref_data_t, na.rm=TRUE)),
     #     length.out=nb_breaks)
-    breaksList_t <- seq(x.range[1], x.range[2], length.out=nb_breaks)
+    if (is.null(breaks)) {
+        breaksList <- seq(x.range[1], x.range[2], length.out=breaks)
+    }
 
 
     gene_position_breaks = NULL
     if (plot_chr_scale) {
         # gene table to heatmap width
-        chr_name_list = unique(infercnv_obj@gene_order[["chr"]])
+        chr_name_list = unique(gene_order[["chr"]])
         
         # get average distance for tail end? 
         # optionally give vector of chr lengths
@@ -359,11 +464,11 @@ plot_cnv <- function(infercnv_obj,
         if (is.null(chr_lengths)) {
             chr_lengths = c()
             for (chr_name in chr_name_list) {
-                chr_lengths = c(chr_lengths, max(infercnv_obj@gene_order$stop[which(infercnv_obj@gene_order$chr == chr_name)]) + 10000)
+                chr_lengths = c(chr_lengths, max(gene_order$stop[which(gene_order$chr == chr_name)]) + 10000)
             }
             names(chr_lengths) = chr_name_list
         }
-        gene_position_breaks = vector(mode="integer", length=(length(unlist(infercnv_obj@gene_order$chr)) + 1))
+        gene_position_breaks = vector(mode="integer", length=(length(unlist(gene_order$chr)) + 1))
 
         sum_previous_contigs = 0
         gene_position_breaks[1] = 1
@@ -371,12 +476,12 @@ plot_cnv <- function(infercnv_obj,
         col_sep_idx = 1
 
         for (chr_name in chr_name_list) {
-            index_pos = which(infercnv_obj@gene_order$chr == chr_name)
+            index_pos = which(gene_order$chr == chr_name)
             latest_position = 1
             if (length(index_pos) > 1) {
                 for (i in index_pos[2:length(index_pos)]) {
-                    gene_position_breaks[current_idx] = sum_previous_contigs + ((latest_position + infercnv_obj@gene_order$start[i]) / 2)
-                    latest_position = max(infercnv_obj@gene_order$stop[i], latest_position)
+                    gene_position_breaks[current_idx] = sum_previous_contigs + ((latest_position + gene_order$start[i]) / 2)
+                    latest_position = max(gene_order$stop[i], latest_position)
                     current_idx = current_idx + 1
                 }
             }
@@ -413,6 +518,7 @@ plot_cnv <- function(infercnv_obj,
                           contig_labels=contig_labels,
                           contig_names=contig_names,
                           col_pal=custom_pal,
+                          custom_colors=custom_colors,
                           contig_seps=col_sep,
                           num_obs_groups=k_obs_groups,
                           obs_annotations_groups=obs_annotations_groups,
@@ -422,9 +528,10 @@ plot_cnv <- function(infercnv_obj,
                           cnv_title=title,
                           cnv_obs_title=obs_title,
                           contig_lab_size=contig_cex,
-                          breaksList=breaksList_t,
+                          breaksList=breaks,
                           gene_position_breaks=gene_position_breaks,
                           x.center=x.center,
+                          x.range=x.range,
                           hclust_method=hclust_method,
                           layout_lmat=force_layout[["lmat"]],
                           layout_lhei=force_layout[["lhei"]],
@@ -441,18 +548,22 @@ plot_cnv <- function(infercnv_obj,
                             hclust_method=hclust_method,
                             grouping_key_coln=grouping_key_coln[2],
                             col_pal=custom_pal,
+                            custom_colors=custom_colors,
                             contig_seps=col_sep,
                             file_base_name=out_dir,
                             do_plot=!is.na(output_format),
                             write_expr_matrix=write_expr_matrix,
                             output_filename_prefix=output_filename,
                             cnv_ref_title=ref_title,
-                            breaksList=breaksList_t,
+                            breaksList=breaks,
                             gene_position_breaks=gene_position_breaks,
                             x.center=x.center,
+                            x.range=x.range,
                             layout_add=TRUE,
                             useRaster=useRaster)
     }
+    
+    ###if()
     if (! is.na(output_format)) {
         dev.off()
     }
@@ -496,7 +607,7 @@ plot_cnv <- function(infercnv_obj,
 #' @param layout_lmat lmat values to use in layout.
 #' @param layout_lhei lhei values to use in layout.
 #' @param layout_lwid lwid values to use in layout.
-#
+#'
 #' @return Void.
 #'
 #' @keywords internal
@@ -506,6 +617,7 @@ plot_cnv <- function(infercnv_obj,
 .plot_cnv_observations <- function(infercnv_obj,
                                   obs_data,
                                   col_pal,
+                                  custom_colors,
                                   contig_colors,
                                   contig_labels,
                                   contig_names,
@@ -528,6 +640,7 @@ plot_cnv <- function(infercnv_obj,
                                   breaksList,
                                   gene_position_breaks,
                                   x.center,
+                                  x.range,
                                   hclust_method="ward.D",
                                   testing=FALSE,
                                   layout_lmat=NULL,
@@ -577,6 +690,8 @@ plot_cnv <- function(infercnv_obj,
     hcl_obs_annotations_groups <- vector()
     obs_seps <- c()
     sub_obs_seps <- c()  # never use at this time? available if we want to add splits in the heatmap for subclusters
+
+    ## below, infercnv_obj@expr.data is not affected by expression/allele mode as its only used to access cell names
 
     if (!is.null(infercnv_obj@tumor_subclusters)) {
         if (cluster_by_groups) {
@@ -715,6 +830,9 @@ plot_cnv <- function(infercnv_obj,
             }
             else {
                 data_to_cluster <- obs_data[cell_indices_in_group, hcl_group_indices, drop=FALSE]
+                if (!("matrix" %in% is(data_to_cluster))) {
+                    data_to_cluster = as.matrix(data_to_cluster)
+                }
                 flog.info(paste("group size being clustered: ", paste(dim(data_to_cluster), collapse=","), sep=" "))
                 group_obs_hcl <- hclust(parallelDist(data_to_cluster, threads=infercnv.env$GLOBAL_NUM_THREADS), method=hclust_method)
                 ordered_names <- c(ordered_names, group_obs_hcl$labels[group_obs_hcl$order])
@@ -752,6 +870,9 @@ plot_cnv <- function(infercnv_obj,
         # HCL with a inversely weighted euclidean distance.
         flog.info(paste("clustering observations via method: ", hclust_method, sep=""))
         if (nrow(obs_data) > 1) {
+            if (!("matrix" %in% is(obs_data))) {
+                obs_data = as.matrix(obs_data)
+            }
             obs_hcl <- hclust(parallelDist(obs_data[, hcl_group_indices], threads=infercnv.env$GLOBAL_NUM_THREADS), method=hclust_method)
             
             if (write_phylo) {
@@ -771,7 +892,8 @@ plot_cnv <- function(infercnv_obj,
                 memb_file <- file(paste(file_base_name,
                                         paste(hcl_desc,"HCL",cut_group,"members.txt",sep="_"),
                                         sep=.Platform$file.sep))
-                write.table(as.matrix(obs_data[group_memb,]), memb_file)
+                # write.table(as.matrix(obs_data[group_memb,]), memb_file)
+                write.table(obs_data[group_memb,], memb_file)
                 # Record seperation
                 ordered_memb <- which(ordered_names %in% group_memb)
                 if (is.null(obs_seps)) {
@@ -870,7 +992,9 @@ plot_cnv <- function(infercnv_obj,
                                         gene_position_breaks=gene_position_breaks,
                                         scale="none",
                                         x.center=x.center,
+                                        x.range=x.range,
                                         color.FUN=col_pal,
+                                        custom_colors=custom_colors,
                                         if.plot=!testing,
                                         # Seperate by contigs
                                         sepList=contigSepList,
@@ -990,6 +1114,7 @@ plot_cnv <- function(infercnv_obj,
                                 hclust_method,
                                 grouping_key_coln,
                                 col_pal,
+                                custom_colors,
                                 contig_seps,
                                 file_base_name,
                                 do_plot=TRUE,
@@ -998,7 +1123,8 @@ plot_cnv <- function(infercnv_obj,
                                 cnv_ref_title,
                                 breaksList,
                                 gene_position_breaks,
-                                x.center=x.center,
+                                x.center,
+                                x.range,
                                 layout_lmat=NULL,
                                 layout_lwid=NULL,
                                 layout_lhei=NULL,
@@ -1022,6 +1148,8 @@ plot_cnv <- function(infercnv_obj,
     # If there is more than one reference group, visually break
     # up the groups with a row seperator. Also plot the rows in
     # order so the current groups are shown and seperated.
+
+    ## below, infercnv_obj@expr.data is not affected by expression/allele mode as its only used to access cell names
 
     ordered_names <- c()
     if (!is.null(infercnv_obj@tumor_subclusters$hc[["all_references"]])) {  # this allows runs made with some versions of infercnv to be plotted, but shouldn't be happening anymore
@@ -1055,6 +1183,9 @@ plot_cnv <- function(infercnv_obj,
         ref_data <- ref_data[, ordered_names, drop=FALSE]
     }
     else {
+        if (!("matrix" %in% is(ref_data))) {
+            ref_data = as.matrix(ref_data)
+        }
         if(length(ref_groups) > 1){
             if (cluster_references) {
                 order_idx <- lapply(ref_groups, function(ref_grp) {
@@ -1163,7 +1294,9 @@ plot_cnv <- function(infercnv_obj,
                                        gene_position_breaks=gene_position_breaks,
                                        scale="none",
                                        x.center=x.center,
+                                       x.range=x.range,
                                        color.FUN=col_pal,
+                                       custom_colors=custom_colors,
                                        sepList=contigSepList,
                                        # Row colors and legend
                                        RowIndividualColors=row_groupings,
@@ -1415,8 +1548,10 @@ heatmap.cnv <-
            gene_position_breaks=NULL,
            ## centering colors to a value
            x.center,
+           x.range,
            ## colors
            color.FUN=gplots::bluered,
+           custom_colors=NULL,
            ##
            ## block sepration
            sepList=list(NULL,NULL),
@@ -1883,33 +2018,33 @@ heatmap.cnv <-
         flog.debug(paste("inferCNV::heatmap.cnv, breaks parameter set to: [", paste(breaks, collapse=","), "]", sep=""))
     }
 
-    ## get x.range according to the value of x.center ##
-    if (!.invalid(x.center)) { ## enhanced
-        if (is.numeric(x.center)) {
-            x.range.old <- range(x,na.rm=TRUE)
-            if (length(breaks) > 1) {
-                # important, use specified breakpoint info here if set by user
-                x.range.old = range(breaks)
-            }
-            dist.to.x.center <- max(abs(x.range.old-x.center))
-            x.range <- c(x.center-dist.to.x.center,x.center+dist.to.x.center)
-            if (length(breaks) > 1) {
-                # re-set the breaks according to the new x.range
-                breaks=seq(x.range[1], x.range[2], length=16)
-                flog.debug(paste("inferCNV::heatmap.cnv, resetting breaks to adjusted x.range: [",
-                                                         paste(breaks, collapse=","), "]", sep=""))
-            }
+    # ## get x.range according to the value of x.center ##
+    # if (!.invalid(x.center)) { ## enhanced
+    #     if (is.numeric(x.center)) {
+    #         x.range.old <- range(x,na.rm=TRUE)
+    #         if (length(breaks) > 1) {
+    #             # important, use specified breakpoint info here if set by user
+    #             x.range.old = range(breaks)
+    #         }
+    #         dist.to.x.center <- max(abs(x.range.old-x.center))
+    #         x.range <- c(x.center-dist.to.x.center,x.center+dist.to.x.center)
+    #         if (length(breaks) > 1) {
+    #             # re-set the breaks according to the new x.range
+    #             breaks=seq(x.range[1], x.range[2], length=16)
+    #             flog.debug(paste("inferCNV::heatmap.cnv, resetting breaks to adjusted x.range: [",
+    #                                                      paste(breaks, collapse=","), "]", sep=""))
+    #         }
 
-        } else {
-        stop("`x.center' should be numeric.")
-        }
-    } else {
-        x.range <- range(x,na.rm=TRUE)
-        if (length(breaks) > 1) {
-            # important, use specified breakpoint info here if set by user
-            x.range = range(breaks)
-        }
-    }
+    #     } else {
+    #     stop("`x.center' should be numeric.")
+    #     }
+    # } else {
+    #     x.range <- range(x,na.rm=TRUE)
+    #     if (length(breaks) > 1) {
+    #         # important, use specified breakpoint info here if set by user
+    #         x.range = range(breaks)
+    #     }
+    # }
 
     flog.debug( paste("inferCNV::heatmap.cnv x range set to: ",
                         paste(x.range, collapse=",")), sep="" )
@@ -1927,7 +2062,12 @@ heatmap.cnv <-
     ncolor <- length(breaks) - 1
 
     ## generate colors ##
-    colors <- color.FUN(ncolor)
+    if (is.null(custom_colors)) {
+        colors <- color.FUN(ncolor)
+    }
+    else {
+        colors = custom_colors
+    }
     ## set up breaks and force values outside the range into the endmost bins ##
     min.breaks <- min(breaks)
     max.breaks <- max(breaks)
@@ -2189,7 +2329,7 @@ heatmap.cnv <-
                   ...)
         }
         flog.info(paste("Colors for breaks: ", paste(colors, collapse=","), sep=" "))
-        flog.info(paste("Quantiles of plotted data range:", paste(quantile(x), collapse=","), sep=" "))
+        flog.info(paste("Quantiles of plotted data range:", paste(quantile(x, na.rm = T), collapse=","), sep=" "))
     
         ## plot/color NAs
         if(!.invalid(na.color) & any(is.na(x))) {
@@ -2487,12 +2627,15 @@ heatmap.cnv <-
             op.ori <- par()
   
             par(mar=c(2,1.5,0.75,1)*keysize,cex=cex.key,mgp=c(0.75,0,0),tcl=-0.05)
-            z <- seq(x.range[1],x.range[2],length=length(colors))
+            # z <- seq(x.range[1],x.range[2],length=length(colors))
+            z = caTools::runmean(breaks, k=2, endrule="trim")
+            # z = breaks
             flog.debug(paste("::inferCNV::heatmap.cnv colorkey z range: ", paste(z, collapse=","), sep=""))
             flog.debug(paste("::inferCNV::heatmap.cnv colorkey breaks range: ", paste(breaks, collapse=","), sep=""))
             flog.debug(paste("::inferCNV::heatmap.cnv colorkey colors range: ", paste(colors, collapse=","), sep=""))
   
-            image(z=matrix(z, ncol=1),
+            image(breaks, c(0,1),
+                  z=matrix(z, ncol=1),
                   col=colors,
                   breaks=breaks,
                   xaxt="n",
@@ -2501,7 +2644,7 @@ heatmap.cnv <-
                   ylab="",
                   main="",
                   add=force_add,
-                  useRaster=useRaster
+                  useRaster=FALSE
                   )
   
             par(usr=c(0,1,0,1))

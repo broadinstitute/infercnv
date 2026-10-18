@@ -292,51 +292,51 @@ setGeneric(name="initializeObject",
 setMethod(f="initializeObject",
           signature="MCMC_inferCNV",
           definition=function(obj, args_parsed, infercnv_obj)
-          {
-              futile.logger::flog.info(paste("Initializing new MCM InferCNV Object."))
-              files <- list.files(args_parsed$file_dir, full.names = TRUE)
-
-              # Validate the inferCNV Object
-              validate_infercnv_obj(infercnv_obj)
-
-              ## create the S4 object
-              obj <- MCMC_inferCNV(infercnv_obj)
-              ## add the command line arguments
-              obj@args <- args_parsed
-
-              ## Load the files for cnv predictions
-              cell_groups_PATH <- files[grep(files, pattern = paste0("17_HMM_pred", args_parsed$resume_file_token, ".cell_groupings"))]
-              pred_cnv_genes_PATH <- files[grep(files, pattern = paste0("17_HMM_pred", args_parsed$resume_file_token, ".pred_cnv_genes.dat"))]
-              cell_groups_df <- read.table(cell_groups_PATH, header = T, check.names = FALSE, sep="\t")
-              pred_cnv_genes_df <- read.table(pred_cnv_genes_PATH, header = T, check.names = FALSE, sep="\t", stringsAsFactors = TRUE)
-
-              # cnv region id's
-              obj@cnv_regions <- unique(pred_cnv_genes_df$gene_region_name)
-              futile.logger::flog.info(paste("Total CNV's: ", length(obj@cnv_regions)))
-
-              ## Load Mixture Model File
-              futile.logger::flog.info(paste("Loading BUGS Model."))
-              obj@bugs_model <- getArgs(obj)$model_file
-
-              ## list that holds Genes and Cells for each separate identified CNV
-              obj <- getGenesCells(obj, pred_cnv_genes_df, cell_groups_df)
-
-              # Create numerical ids for each subgroup of cells
-              ## group name ids
-              cell_group_id <- unique(pred_cnv_genes_df$cell_group_name)
-
-              ## set numerical id's for cell groups and set values in a vector for cell positions in the matrix
-              group_id <- rep(NA, max(unlist(obj@observation_grouped_cell_indices)))
-              lapply(seq_along(cell_group_id), function(i) {
-                  ## cells in the cluster group
-                  cells <- cell_groups_df[cell_groups_df$cell_group_name %in% cell_group_id[i],]$cell
-                  ## set the numerical id in the vector
-                  group_id[which(colnames(obj@expr.data) %in% cells)] <<- i
-              })
-              obj@group_id <- group_id
-
-              return(obj)
-          }
+    {
+        futile.logger::flog.info(paste("Initializing new MCM InferCNV Object."))
+        files <- list.files(args_parsed$file_dir, full.names = TRUE)
+  
+        # Validate the inferCNV Object
+        validate_infercnv_obj(infercnv_obj)
+  
+        ## create the S4 object
+        obj <- MCMC_inferCNV(infercnv_obj)
+        ## add the command line arguments
+        obj@args <- args_parsed
+  
+        ## Load the files for cnv predictions
+        cell_groups_PATH <- files[grep(files, pattern = paste0("19_HMM_pred", args_parsed$resume_file_token, ".cell_groupings"))]
+        pred_cnv_genes_PATH <- files[grep(files, pattern = paste0("19_HMM_pred", args_parsed$resume_file_token, ".pred_cnv_genes.dat"))]
+        cell_groups_df <- read.table(cell_groups_PATH, header = T, check.names = FALSE, sep="\t")
+        pred_cnv_genes_df <- read.table(pred_cnv_genes_PATH, header = T, check.names = FALSE, sep="\t", stringsAsFactors = TRUE)
+  
+        # cnv region id's
+        obj@cnv_regions <- unique(pred_cnv_genes_df$gene_region_name)
+        futile.logger::flog.info(paste("Total CNV's: ", length(obj@cnv_regions)))
+  
+        ## Load Mixture Model File
+        futile.logger::flog.info(paste("Loading BUGS Model."))
+        obj@bugs_model <- getArgs(obj)$model_file
+  
+        ## list that holds Genes and Cells for each separate identified CNV
+        obj <- getGenesCells(obj, pred_cnv_genes_df, cell_groups_df)
+  
+        # Create numerical ids for each subgroup of cells
+        ## group name ids
+        cell_group_id <- unique(pred_cnv_genes_df$cell_group_name)
+  
+        ## set numerical id's for cell groups and set values in a vector for cell positions in the matrix
+        group_id <- rep(NA, max(unlist(obj@observation_grouped_cell_indices)))
+        lapply(seq_along(cell_group_id), function(i) {
+            ## cells in the cluster group
+            cells <- cell_groups_df[cell_groups_df$cell_group_name %in% cell_group_id[i],]$cell
+            ## set the numerical id in the vector
+            group_id[which(colnames(obj@expr.data) %in% cells)] <<- i
+        })
+        obj@group_id <- group_id
+  
+        return(obj)
+    }
 )
 
 
@@ -1183,7 +1183,7 @@ plot_cnv_prob <- function(df, title, HMM_type){
 #' @param plotingProbs Option for adding plots of Cell and CNV probabilities. (Default: TRUE)
 #' @param quietly Option to print descriptions along each step. (Default: TRUE)
 #' @param diagnostics Option to plot Diagnostic plots and tables. (Default: FALSE)
-#' @param HMM_type The type of HMM that was ra, either 'i3' or 'i6'. Determines how many state were predicted by the HMM.
+#' @param HMM_type The type of HMM that was ran, either 'i3' or 'i6'. Determines how many states were predicted by the HMM.
 #' @param k_obs_groups Number of groups in which to break the observations. (default: 1)
 #' @param cluster_by_groups If observations are defined according to groups (ie. patients), each group
 #'                            of cells will be clustered separately. (default=FALSE, instead will use k_obs_groups setting)
@@ -1201,7 +1201,7 @@ plot_cnv_prob <- function(df, title, HMM_type){
 #' data(infercnv_data_example)
 #' data(infercnv_annots_example)
 #' data(infercnv_genes_example)
-#' data(HMM_states)
+#' data(infercnv_HMM_states_example)
 #'
 #' infercnv_object_example <- infercnv::CreateInfercnvObject(raw_counts_matrix=infercnv_data_example, 
 #'                                                           gene_order_file=infercnv_genes_example,
@@ -1384,7 +1384,8 @@ inferCNVBayesNet <- function( file_dir,
 #' @export
 #' 
 #' @examples
-#' data(mcmc_obj)
+#' data(infercnv_mcmc_obj_example)
+#' data(infercnv_HMM_states_example)
 #' 
 #' mcmc_obj_hmm_states_list <- infercnv::filterHighPNormals( MCMC_inferCNV_obj = mcmc_obj, 
 #'                                           HMM_states        = HMM_states, 

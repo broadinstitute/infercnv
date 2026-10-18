@@ -47,9 +47,19 @@ infercnv.env$GLOBAL_NUM_THREADS <- 1  # default is single-threaded.
 #' @importFrom SummarizedExperiment start colData rowData assays assays<- rowData<- colData<- 
 #' @importFrom SingleCellExperiment SingleCellExperiment
 #' @importFrom tidyr gather
-#' @importFrom parallel detectCores
+#' @importFrom parallel detectCores mclapply
 #' @importFrom gridExtra ttheme_default tableGrob gtable_combine marrangeGrob 
 #' @importFrom Seurat CreateSeuratObject FindVariableFeatures ScaleData RunPCA FindNeighbors
+#' @importFrom GenomicRanges GRanges findOverlaps GRangesList disjoin nearest
+#' @importFrom IRanges IRanges `%over%`
+#' @importFrom GenomeInfoDb sortSeqlevels seqnames
+#' @importFrom S4Vectors queryHits subjectHits
+#' @importFrom HiddenMarkov dthmm Viterbi
+#' @importFrom tidyr separate spread pivot_wider 
+#' @importFrom stringr str_replace
+#' @importFrom dplyr mutate group_by summarise left_join arrange select n ungroup
+#' @import ggplot2
+#' @importFrom cowplot plot_grid 
 
 
 NULL

@@ -1,0 +1,114 @@
+model {
+
+    ## Likelihood
+
+    ## Single cell
+    for( k in 1:K ) {
+
+        ## Gene level
+        for ( j in 1:J ) {
+
+            ## SNP level
+            for( i in 1:I.j[j] ) {
+                r[j,i,k] ~ dbin(p[j,i,k], n.sc[j,i,k])
+                
+                p[j,i,k] <- fma[j,i] * (equals(epsilon[k], 2 )) +
+                            ( ( 1 - b[j,k] ) * h[j,i,k] +
+                              b[j,k] * ( pseudo * d[j,k] + ( 1 - pseudo ) * ( 1 - d[j,k] ) )
+                                          ) * (equals(epsilon[k], 1 )) +
+                            ( ( 1 - b[j,k] ) * h[j,i,k] +
+                              b[j,k] * ( pseudo * d[j,k] + ( 1 - pseudo ) * ( 1 - d[j,k] ) )
+                                          ) * (equals(epsilon[k], 3 )) +
+                                          ( ( 1 - b[j,k] ) * h[j,i,k] +
+                              b[j,k] * ( pseudo * d[j,k] + ( 1 - pseudo ) * ( 1 - d[j,k] ) )
+                                          ) * (equals(epsilon[k], 4 )) +
+                                          ( ( 1 - b[j,k] ) * h[j,i,k] +
+                              b[j,k] * ( pseudo * d[j,k] + ( 1 - pseudo ) * ( 1 - d[j,k] ) )
+                                          ) * (equals(epsilon[k], 5 )) +
+                                          ( ( 1 - b[j,k] ) * h[j,i,k] +
+                              b[j,k] * ( pseudo * d[j,k] + ( 1 - pseudo ) * ( 1 - d[j,k] ) )
+                                          ) * (equals(epsilon[k], 6 ))
+                                          
+                ## heterozygous snp prob; used to just set to 0.5 but should allow for some wiggle room
+                h[j,i,k] ~ dnorm(0.5,0.1)T(pseudo, 1-pseudo) 
+            }
+            
+            ## Need to fully define in order to pull out from model even if not used
+            for( i in I.j[j]+1:max(I.j) ) {
+                p[j,i,k] <- 0
+                h[j,i,k] <- 0
+            }
+            ## If there is a deletion, decrease mean by some factor
+            d[j,k] ~ dbern(0.5) ## random direction of bias
+            b[j,k] ~ dbern(mono) ## probability of mono-allelic expression
+        }
+
+        ## Gene level
+        for ( j in 1:JJ ) {
+
+            ## Likelihood 
+            ## generative distribution of the observed data 
+            gexp[j, k] ~ dnorm(mu.1[k], tau.1[k])
+            
+        }
+
+        ## mu and tau are Fixed Effects dependent on the cluster/state assignment 
+        ## result in cluster specific means and precision
+        ## gamma is group specific Random Effect 
+        
+        mu.1[k] <-  mu[1] * (equals(epsilon[k], 1 )) +
+                    mu[2] * (equals(epsilon[k], 2 )) +
+                    mu[3] * (equals(epsilon[k], 3 )) +
+                    mu[4] * (equals(epsilon[k], 4 )) +
+                    mu[5] * (equals(epsilon[k], 5 )) +
+                    mu[6] * (equals(epsilon[k], 6 )) 
+
+        tau.1[k] <- sig[1] * (equals( epsilon[k], 1 )) +
+                    sig[2] * (equals( epsilon[k], 2 )) +
+                    sig[3] * (equals( epsilon[k], 3 )) +
+                    sig[4] * (equals( epsilon[k], 4 )) +
+                    sig[5] * (equals( epsilon[k], 5 )) +
+                    sig[6] * (equals( epsilon[k], 6 )) 
+        
+       # PRIOR
+       ##     Epsilons hold our cluster/state assignment 
+       ##     theta are the mixture probabilities for states 
+       ##      cell specific 
+     
+        epsilon[k] ~ dcat(theta[])             
+                    
+    }
+    
+    # HYPERPARAMETERS 
+    ## hyperparameter for for gamma, a flat gamma distribution 
+    sigma ~ dgamma(1,1)
+
+    #      dirchlet with equal probabilities for each state, equals to a uniform 
+    #      provides the probabilities distribution of states 
+    #      alpha can be 1 or (1/nubmer of states)
+
+   
+    ## Hyperparameter for epsilon, 
+    ## This is the mixing property!
+
+    theta[1:6] ~ ddirich(alpha[])
+
+    # HYPERHYPERPARAMETER
+
+    for(i in 1:6){
+        alpha[i] <- 1
+    }
+
+    ## Bulk
+    for ( j in 1:J ) {
+        for( i in 1:I.j[j] ) {
+            l[j,i] ~ dbin(fma[j,i], n.bulk[j,i]) # minor allele
+            fma[j,i] <- pseudo*(ma[j,i]) + (1-pseudo)*(1-ma[j,i]) # prob of observing minor allele
+            ma[j,i] ~ dbern(0.5) # whether minor allele is affected, each is independent
+        }
+        for( i in I.j[j]+1:max(I.j) ) {
+           fma[j,i] <- 0
+           ma[j,i] <- 0
+        }
+    }
+}

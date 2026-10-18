@@ -1,0 +1,54 @@
+model {
+    ## Single cell
+    for( k in 1:K ) {
+        ## Gene level (snp)
+        for ( j in 1:J ) {
+            r[j,k] ~ dbin(p[j,k], n.sc[j,k])
+            
+            ## if has deletion, then bias has no effect since only one allele to expression
+            ## the one allele expressed should be consistent with bulk
+            ## if no deletion, then there could be mono-allelic expression
+            ## which affects deviation away from expected 0.5 probability
+            ## b is imputed from our bias model
+            p[j,k] <- fma[j] * 
+                      ( S[k] * (1 - dd) ) + 
+                      ( h[j,k]*(1-b[j,k]) + (pseudo*d[j,k] + (1-pseudo)*(1-d[j,k]))*b[j,k] ) * 
+                      ( 1 - ( S[k] * (1 - dd) ) )
+        
+            h[j,k] ~ dnorm(0.5,0.1)T(pseudo, 1-pseudo) ## heterozygous snp prob
+            d[j,k] ~ dbern(0.5) ## random direction of bias
+            b[j,k] ~ dbern(mono) ## probability of mono-allelic expression
+        }
+        
+        ## Gene level (expression)
+        for ( j in 1:JJ ) {
+
+            ## Likelihood 
+            ## generative distribution of the observed data 
+            gexp[j, k] ~ dnorm(mu.1[j,k], tau.1[j,k])
+            
+            mu.1[j,k] <- ( (1 - dd) * S[k] ) * mu[1] +
+                         ( 1 - S[k] ) * mu[2] +
+                         ( dd * S[k] ) * mu[3]
+                         
+            tau.1[j,k] <- ( (1 - dd) * S[k] ) * sig[1] +
+                          ( 1 - S[k] ) * sig[2] +
+                          ( dd * S[k] ) * sig[3]
+            
+        }
+        
+        S[k] ~ dbern(alpha[k]) # cnv or not
+        alpha[k] ~ dunif(0,1) # cell specific hyper-parameter prior to allow for better mixing
+       
+    }
+    
+    ## Bulk
+    for ( j in 1:J ) {
+        l[j] ~ dbin(fma[j], n.bulk[j]) # minor allele
+        fma[j] <- pseudo*(ma[j]) + (1-pseudo)*(1-ma[j]) # prob of observing minor allele
+        ma[j] ~ dbern(0.5) # whether minor allele is affected, each is independent
+    }
+    
+    dd ~ dbern(beta) # direction of cnv
+    beta ~ dunif(0,1) # cell specific hyper-parameter
+}

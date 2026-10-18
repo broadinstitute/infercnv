@@ -1,0 +1,51 @@
+model {
+    ## Likelihood
+    ## Single cell
+    for( j in 1:K ) {                                   # for each cell line K
+        for ( i in 1:JJ ) {                             # for each gene j 
+            ## Likelihood 
+            ## generative distribution of the observed data 
+            gexp[i, j] ~ dnorm(mu.1[j], tau.1[j])
+        }
+        
+        ## mu and tau are Fixed Effects dependent on the cluster/state assignment 
+        ## result in cluster specific means and precision
+        ## gamma is group specific Random Effect 
+        
+        mu.1[j] <-  mu[1] * (equals(epsilon[j], 1 )) +
+                    mu[2] * (equals(epsilon[j], 2 )) +
+                    mu[3] * (equals(epsilon[j], 3 ))
+
+        tau.1[j] <- sig[1] * (equals( epsilon[j], 1 )) +
+                    sig[2] * (equals( epsilon[j], 2 )) +
+                    sig[3] * (equals( epsilon[j], 3 ))
+        
+    # PRIOR
+    ##     Epsilons hold our cluster/state assignment 
+    ##     theta are the mixture probabilities for states 
+    ##      cell specific 
+     
+        epsilon[j] ~ dcat(theta[])    
+    }
+
+
+    # HYPERPARAMETERS 
+    ## hyperparameter for for gamma, a flat gamma distribution 
+    sigma ~ dgamma(1,1)
+
+    #      dirchlet with equal probabilities for each state, equals to a uniform 
+    #      provides the probabilities distribution of states 
+    #      alpha can be 1 or (1/nubmer of states)
+
+   
+    ## Hyperparameter for epsilon, 
+    ## This is the mixing property!
+
+    theta[1:3] ~ ddirich(alpha[])
+
+    # HYPERHYPERPARAMETER
+
+    for(i in 1:3){
+        alpha[i] <- 1
+    }
+}
