@@ -1793,7 +1793,7 @@ run <- function(infercnv_obj,
     }
     step_count = step_count + 1 # 25
     if (skip_hmm < 7) {
-        if (HMM == TRUE && BayesMaxPNormal > 0 && length(unique(apply(hmm.infercnv_obj@allele.expr.data,2,unique))) != 1 ) {
+        if (HMM == TRUE && ("infercnv_allele" %in% is(infercnv_obj)) && BayesMaxPNormal > 0 && length(unique(apply(hmm.infercnv_obj@allele.expr.data,2,unique))) != 1 ) {
             flog.info(sprintf("\n\n\tSTEP %02d: Filter HMM predicted CNVs based on the allele based Bayesian Network Model results and BayesMaxPNormal\n", step_count))
             ## Filter CNV's by posterior Probabilities
             mcmc_obj_hmm_states_list <- infercnv::filterHighPNormals_allele(MCMC_inferCNV_obj = mcmc_allele_obj,
@@ -1967,7 +1967,7 @@ run <- function(infercnv_obj,
                 plot_cnv(infercnv_obj=hmm.infercnv_obj,
                          k_obs_groups=k_obs_groups,
                          mode="expression",  # for the combined results, we use the expression data slot
-                         preset="HMM_combined",
+                         preset=paste0("HMM_", HMM_type, "_combined"),
                          cluster_by_groups=cluster_by_groups,
                          cluster_references=cluster_references,
                          plot_chr_scale=plot_chr_scale,

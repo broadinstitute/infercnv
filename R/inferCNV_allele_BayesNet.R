@@ -86,10 +86,10 @@ getGenesCells_allele <- function(MCMC_inferCNV_obj,
         if(mode == "snp_level") {
           
             ## extract affected genes
-            genes.of.interest <- unique(MCMC_inferCNV_obj@SNP_info[genes]$gene)
+            genes.of.interest <- unique(infercnv_obj@SNP_info[genes]$gene)
             
             ## associate each gene factor with a set of snps
-            candidate_snp <- MCMC_inferCNV_obj@SNP_info[genes]
+            candidate_snp <- infercnv_obj@SNP_info[genes]
             genes2snps.dict <- lapply(seq_along(genes.of.interest), function(i) {
               names(candidate_snp)[which(candidate_snp$gene %in% genes.of.interest[i])]
             })
@@ -657,7 +657,8 @@ filterHighPNormals_allele <- function(MCMC_inferCNV_obj,
   MCMC_inferCNV_obj <- post_removed[[1]]
   HMM_states <- post_removed[[2]]
   
-  if(reassignCNVs){
+  # nothing left to reassign if every CNV was filtered out
+  if(reassignCNVs && length(MCMC_inferCNV_obj@cell_gene) > 0){
     
     post_reassign <- reassignCNV_allele(MCMC_inferCNV_obj, 
                                         HMM_states,
@@ -669,6 +670,15 @@ filterHighPNormals_allele <- function(MCMC_inferCNV_obj,
   
   return(list(MCMC_inferCNV_obj, HMM_states))
   
+}
+
+# Mean posterior probability of each state per CNV, as a states x CNVs matrix.
+# In the combined model only regions with SNP data get the extra cnLOH state (last state),
+# so shorter probability vectors are padded with 0 for the missing cnLOH state.
+.cnv_state_means <- function(cnv_probabilities) {
+    means <- lapply(cnv_probabilities, colMeans)
+    n_states <- max(lengths(means))
+    vapply(means, function(m) c(m, rep(0, n_states - length(m))), numeric(n_states))
 }
 
 removeCNV_allele <- function(MCMC_inferCNV_obj,
@@ -685,8 +695,10 @@ removeCNV_allele <- function(MCMC_inferCNV_obj,
     # Assign index and state that represents normal based on the HMM method 
     normalID <- ifelse(HMM_type == 'i6', 3, 2)
     
-    cnv_means <- sapply(MCMC_inferCNV_obj@cnv_probabilities, function(i) colMeans(i))
-    # cnv_means = do.call(rbind, cnv_means)
+    if (length(MCMC_inferCNV_obj@cnv_probabilities) == 0) {
+        return(list(MCMC_inferCNV_obj, HMM_states))
+    }
+    cnv_means <- .cnv_state_means(MCMC_inferCNV_obj@cnv_probabilities)
     
     futile.logger::flog.info(paste("Attempting to removing CNV(s) with a probability of being normal above ", BayesMaxPNormal))
     
@@ -772,7 +784,7 @@ reassignCNV_allele <- function(MCMC_inferCNV_obj,
     
     # 1.
     # get probabilities for each cnv
-    cnv_means <- sapply(MCMC_inferCNV_obj@cnv_probabilities,function(i) colMeans(i))
+    cnv_means <- .cnv_state_means(MCMC_inferCNV_obj@cnv_probabilities)
     # get HMM state asignments per CNV 
     hmm_assigned_states <- vapply(MCMC_inferCNV_obj@cell_gene, function(i){i$State}, FUN.VALUE = numeric(1))
     # get the highest probabillity state for each cnv 
