@@ -597,7 +597,7 @@ run_combined_snp_mcmc <- function(bugs,
     
     model <- rjags::jags.model(bugs,
                                data = input,
-                               inits = inits,
+                               inits = .jags_rng_inits(inits),
                                n.chains = length(inits), 
                                n.adapt = 500,
                                quiet = F)
@@ -681,7 +681,7 @@ run_combined_gene_mcmc <- function(bugs,
   
   model <- rjags::jags.model(bugs,
                              data = input,
-                             inits = inits,
+                             inits = .jags_rng_inits(inits),
                              n.chains = length(inits), 
                              n.adapt = 500,
                              quiet = F)

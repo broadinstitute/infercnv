@@ -1094,7 +1094,7 @@ run_gibb_sampling <- function(gene_exp,
     # Create the model for rjags
     model <- rjags::jags.model(modelFile(MCMC_inferCNV_obj),
                                data     = data,
-                               inits    = inits, # (Initialization) optional specification of initial values in the form of a list or a function
+                               inits    = .jags_rng_inits(inits), # (Initialization) optional specification of initial values in the form of a list or a function
                                n.chains = ifelse(getArgs(MCMC_inferCNV_obj)$HMM_type == "i3", 3, 6),  # the number of parallel chains for the model
                                n.adapt  = 500, # the number of iterations for adaptation (burn in)
                                quiet    = getArgs(MCMC_inferCNV_obj)$quietly)

@@ -462,6 +462,7 @@ run_allele_snp_mcmc <- function(bugs,
     
     model <- rjags::jags.model(bugs,
                                data = input,
+                               inits = .jags_rng_inits(NULL, 3),
                                n.chains = 3,
                                n.adapt = 500,
                                quiet = F)
@@ -495,6 +496,7 @@ run_allele_gene_mcmc <- function(bugs,
     
     model <- rjags::jags.model(bugs,
                                data = input,
+                               inits = .jags_rng_inits(NULL, 3),
                                n.chains = 3,
                                n.adapt = 500,
                                quiet = F)

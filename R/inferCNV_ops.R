@@ -155,6 +155,11 @@
 #'
 #' @param num_threads (int) number of threads for parallel steps (default: 4)
 #'
+#' @param seed (int) seed for the random number generators, making results reproducible for a given seed and num_threads.
+#'                   Switches R to the "L'Ecuyer-CMRG" generator for the duration of the run so that parallel workers get
+#'                   reproducible streams, and also seeds the JAGS samplers. The caller's RNG kind and state are restored on exit.
+#'                   NULL (default) leaves the RNG untouched and results vary between runs.
+#'
 #' @param plot_steps If true, saves infercnv objects and plots data at the intermediate steps.
 #'
 #' @param inspect_subclusters If true, plot subclusters as annotations after the subclustering step to easily see if the subclustering options are good. (default = TRUE)
@@ -320,6 +325,7 @@ run <- function(infercnv_obj,
                 final_center_val = NULL,
                 debug=FALSE, #for debug level logging
                 num_threads = 4,
+                seed = NULL,
                 plot_steps=FALSE,
                 inspect_subclusters = TRUE,
                 resume_mode=TRUE,
@@ -396,6 +402,10 @@ run <- function(infercnv_obj,
     flog.info(paste("::process_data:Start", sep=""))
     
     infercnv.env$GLOBAL_NUM_THREADS <- num_threads
+    if (!is.null(seed)) {
+        prev_rng <- .set_run_seed(seed)
+        on.exit(.restore_rng(prev_rng), add=TRUE)
+    }
     if (is.null(out_dir)) {
         flog.error("Error, out_dir is NULL, please provide a path.")
         stop("out_dir is NULL")
@@ -3756,6 +3766,63 @@ compareNA <- function(v1,v2) {
     return(FALSE)
 }
 
+#' Seed R's RNG for a run(), returning the previous RNG kind and state for .restore_rng()
+#'
+#' "L'Ecuyer-CMRG" is used because parallel::mclapply (also behind doParallel) derives
+#' reproducible per-worker streams from it; with the default generator workers are seeded randomly.
+#'
+#' @keywords internal
+#' @noRd
+#'
+
+.set_run_seed <- function(seed) {
+    prev = list(kind = RNGkind(),
+                seed = if (exists(".Random.seed", envir=.GlobalEnv, inherits=FALSE)) get(".Random.seed", envir=.GlobalEnv) else NULL)
+    RNGkind("L'Ecuyer-CMRG")
+    set.seed(seed)
+    flog.info(paste0("::process_data:Using seed ", seed))
+    return(prev)
+}
+
+
+#' @keywords internal
+#' @noRd
+#'
+
+.restore_rng <- function(prev) {
+    do.call(RNGkind, as.list(prev$kind))
+    if (is.null(prev$seed)) {
+        if (exists(".Random.seed", envir=.GlobalEnv, inherits=FALSE)) {
+            rm(".Random.seed", envir=.GlobalEnv)
+        }
+    } else {
+        assign(".Random.seed", prev$seed, envir=.GlobalEnv)
+    }
+}
+
+
+#' Add JAGS RNG settings to per-chain inits, drawn from R's RNG
+#'
+#' JAGS does not use R's RNG, so without this the MCMC sampling differs between runs even when R is seeded.
+#'
+#' @param inits list of per-chain initial values, or NULL
+#' @param n.chains number of chains, used when inits is NULL
+#'
+#' @keywords internal
+#' @noRd
+#'
+
+.jags_rng_inits <- function(inits, n.chains=NULL) {
+    if (is.null(inits)) {
+        inits = replicate(n.chains, list(), simplify=FALSE)
+    }
+    lapply(inits, function(chain_inits) {
+        c(chain_inits, list(.RNG.name = "base::Mersenne-Twister",
+                            .RNG.seed = sample.int(.Machine$integer.max, 1)))
+    })
+}
+
+
 #' @return FALSE if relevant args are not identical, TRUE if they are
 #'
 #' @keywords internal
@@ -3807,7 +3874,7 @@ compareNA <- function(v1,v2) {
     step_i = 1
 
     # 1 _incoming_data.infercnv_obj
-    relevant_args[[step_i]] = c("chr_exclude", "max_cells_per_group", "min_max_counts_per_cell", "counts_md5")
+    relevant_args[[step_i]] = c("chr_exclude", "max_cells_per_group", "min_max_counts_per_cell", "counts_md5", "seed")
     expected_file_names[[step_i]] = file.path(run_arguments$out_dir, sprintf("%02d_incoming_data.infercnv_obj", step_i))
     step_i = step_i + 1
 

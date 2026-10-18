@@ -56,6 +56,7 @@ run(
   final_center_val = NULL,
   debug = FALSE,
   num_threads = 4,
+  seed = NULL,
   plot_steps = FALSE,
   inspect_subclusters = TRUE,
   resume_mode = TRUE,
@@ -234,6 +235,11 @@ Will preferentially use outlier_lower_bounda and outlier_upper_bound if set.}
 \item{debug}{If true, output debug level logging.}
 
 \item{num_threads}{(int) number of threads for parallel steps (default: 4)}
+
+\item{seed}{(int) seed for the random number generators, making results reproducible for a given seed and num_threads.
+Switches R to the "L'Ecuyer-CMRG" generator for the duration of the run so that parallel workers get
+reproducible streams, and also seeds the JAGS samplers. The caller's RNG kind and state are restored on exit.
+NULL (default) leaves the RNG untouched and results vary between runs.}
 
 \item{plot_steps}{If true, saves infercnv objects and plots data at the intermediate steps.}
 
