@@ -474,7 +474,7 @@ collapse_snp2gene <- function(infercnv_allele_obj,
                                              pivot_wider(names_from = cell,
                                                          values_from = AF,
                                                          values_fill = 0) %>%
-                                             data.frame()
+                                             data.frame(check.names = FALSE)
 
     # why the unique()?
     # expr.data = subset_melt_data %>% select(cell, gene, AF) %>% tidytext::cast_sparse("gene", "cell", "AF")
@@ -488,7 +488,7 @@ collapse_snp2gene <- function(infercnv_allele_obj,
                                               pivot_wider(names_from = cell,
                                                           values_from = ALT,
                                                           values_fill = 0) %>%
-                                              data.frame()
+                                              data.frame(check.names = FALSE)
 
     rownames(allele.count.data) <- allele.count.data$gene
     allele.count.data[,"gene"] <- NULL
@@ -499,7 +499,7 @@ collapse_snp2gene <- function(infercnv_allele_obj,
                                             pivot_wider(names_from = cell,
                                                         values_from = allele,
                                                         values_fill = 0) %>%
-                                            data.frame()
+                                            data.frame(check.names = FALSE)
 
     rownames(allele.alt.data) <- allele.alt.data$gene
     allele.alt.data[,"gene"] <- NULL
@@ -510,11 +510,24 @@ collapse_snp2gene <- function(infercnv_allele_obj,
                                                  pivot_wider(names_from = cell,
                                                              values_from = COV,
                                                              values_fill = 0) %>%
-                                                 data.frame()
+                                                 data.frame(check.names = FALSE)
 
     rownames(allele.coverage.data) <- allele.coverage.data$gene
     allele.coverage.data[,"gene"] <- NULL
     allele.coverage.data <- as.matrix(allele.coverage.data) %>% round()
+
+    # cells without coverage at any SNP drop out of the pivot above; restore them as all-zero columns
+    all_cells <- colnames(infercnv_allele_obj@allele.expr.data)
+    missing_cells <- setdiff(all_cells, colnames(allele.expr.data))
+    if (length(missing_cells) > 0) {
+        flog.info(sprintf("%d cells have no SNP coverage, setting their gene level allele data to 0", length(missing_cells)))
+        zeros <- matrix(0, nrow = nrow(allele.expr.data), ncol = length(missing_cells),
+                        dimnames = list(rownames(allele.expr.data), missing_cells))
+        allele.expr.data     <- cbind(allele.expr.data,     zeros)
+        allele.count.data    <- cbind(allele.count.data,    zeros[rownames(allele.count.data), , drop=FALSE])
+        allele.alt.data      <- cbind(allele.alt.data,      zeros[rownames(allele.alt.data), , drop=FALSE])
+        allele.coverage.data <- cbind(allele.coverage.data, zeros[rownames(allele.coverage.data), , drop=FALSE])
+    }
 
     allele.expr.data     <- allele.expr.data[    unique(infercnv_allele_obj@SNP_info$gene), colnames(infercnv_allele_obj@allele.expr.data)]
     allele.count.data    <- allele.count.data[   unique(infercnv_allele_obj@SNP_info$gene), colnames(infercnv_allele_obj@allele.expr.data)]

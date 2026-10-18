@@ -233,7 +233,7 @@ my_plot_cnv_prob <- function(df, title) {
 # Function to plot the probability for each cell line of being in a particular state -- my version
 my_plot_cell_prob <- function(df, title) {
     df$mag = seq_len(nrow(df))
-    long_data <- reshape::melt(df, id = "mag")
+    long_data <- melt(df, id.vars = "mag")
     long_data$mag <- as.factor(long_data$mag)
     ggplot2::ggplot(long_data, ggplot2::aes_string(x = 'variable', y = 'value', fill = 'mag')) +
         ggplot2::geom_bar(stat="identity", width = 1) +
@@ -539,7 +539,7 @@ plot_mcmc <- function(samples,
     #                                   "amp x1", "amp x2", "amp x3")
     # } else{colnames(theta_samples_df) <- c("del", "neutral")}
     #    
-    theta_samples_df <- theta_samples_df %>% reshape::melt()
+    theta_samples_df <- theta_samples_df %>% melt()
     colnames(theta_samples_df) <- c("index", "State", "Probability")
     # if(length(unique(theta_samples_df$State)) == 3){
     #   theta_samples_df$State <- factor(theta_samples_df$State,

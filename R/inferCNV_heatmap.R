@@ -255,7 +255,7 @@ plot_cnv <- function(infercnv_obj,
     # if (! any(is.na(x.range))) {
 
 
-    if ( is.na(x.range) || (length(x.range) == 1) & (x.range[1] == "auto") ) {
+    if ( any(is.na(x.range)) || (length(x.range) == 1 && x.range[1] == "auto") ) {
 
         # examine distribution of data that's off-center, since much of the center could
         # correspond to a mass of data that has been wiped out during noise reduction
