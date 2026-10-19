@@ -729,8 +729,9 @@ run_combined_gene_mcmc <- function(bugs,
 #' @param ... Additional parameters passed to infercnv::plot_cnv()
 #' 
 #' @return Returns an Infercnv hmm-based obj, and HMM states store in the slot of expr.data
-#' (i6 states: 1-2,Deletion; 3,Neutral; 4-6,Amplification; 7,cnLOH; 8, Opposed prediction),
-#' (i3 states: 1,Deletion; 2,Neutral; 3,Amplification; 4,cnLOH; 5, Opposed prediction), for CNV's identified by inferCNV's HMM.
+#' (i6 states: 1-2,Deletion; 3,Neutral; 4-6,Amplification (with or without allelic imbalance); 7,cnLOH;
+#'  8, Opposed prediction: allelic imbalance where expression indicates 0 copies),
+#' (i3 states: 1,Deletion; 2,Neutral; 3,Amplification; 4,cnLOH), for CNV's identified by inferCNV's HMM.
 #'
 #' @export
 #' 
@@ -871,22 +872,23 @@ fusion_HMM_report_two_methods <- function(expression_file_path,
         
         if (HMM_type == "i6") {
             
-            tmp_gr$state <- ifelse(tmp_gr$allele_state == tmp_gr$expression_state,
-                                   tmp_gr$allele_state,
-                                   ifelse(tmp_gr$allele_state == 2,
-                                          ifelse(tmp_gr$expression_state == 3,
-                                                 7,
-                                                 8),
-                                          tmp_gr$expression_state))
+            # allelic imbalance (allele_state 2) with neutral expression is cnLOH (7);
+            # with a gain it is an allele-specific gain, so keep the expression state;
+            # only imbalance with a 0-copy call (1) contradicts itself (8)
+            tmp_gr$state <- ifelse(tmp_gr$allele_state == 2,
+                                   ifelse(tmp_gr$expression_state == 3,
+                                          7,
+                                          ifelse(tmp_gr$expression_state == 1,
+                                                 8,
+                                                 tmp_gr$expression_state)),
+                                   tmp_gr$expression_state)
             
         } else {
-            tmp_gr$state <- ifelse(tmp_gr$allele_state == tmp_gr$expression_state,
-                                   tmp_gr$allele_state,
-                                   ifelse(tmp_gr$allele_state == 1,
-                                          ifelse(tmp_gr$expression_state == 2,
-                                                 4,
-                                                 5),
-                                          tmp_gr$expression_state))
+            # allelic imbalance (allele_state 1) with neutral expression is cnLOH (4);
+            # with a loss or gain keep the expression state (i3 has no 0-copy state to contradict it)
+            tmp_gr$state <- ifelse(tmp_gr$allele_state == 1 & tmp_gr$expression_state == 2,
+                                   4,
+                                   tmp_gr$expression_state)
         }
         return(tmp_gr)
                                       

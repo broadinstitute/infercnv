@@ -47,8 +47,9 @@ while "common" removes those ones.}
 }
 \value{
 Returns an Infercnv hmm-based obj, and HMM states store in the slot of expr.data
-(i6 states: 1-2,Deletion; 3,Neutral; 4-6,Amplification; 7,cnLOH; 8, Opposed prediction),
-(i3 states: 1,Deletion; 2,Neutral; 3,Amplification; 4,cnLOH; 5, Opposed prediction), for CNV's identified by inferCNV's HMM.
+(i6 states: 1-2,Deletion; 3,Neutral; 4-6,Amplification (with or without allelic imbalance); 7,cnLOH;
+ 8, Opposed prediction: allelic imbalance where expression indicates 0 copies),
+(i3 states: 1,Deletion; 2,Neutral; 3,Amplification; 4,cnLOH), for CNV's identified by inferCNV's HMM.
 }
 \description{
 This function aims to integrate HMM boundaries from expression/allele based methods.
