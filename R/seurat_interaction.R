@@ -83,14 +83,15 @@ add_to_seurat <- function(seurat_obj = NULL,
         hmm_genes = read.table(paste(infercnv_output_path, sort(lfiles[grep(lfiles, pattern=paste0("HMM_CNV_predictions.HMMi[36].*", analysis_mode_pattern, ".Pnorm_0.[0-9]+.pred_cnv_genes.dat"))])[1], sep=.Platform$file.sep), sep="\t", header=TRUE, check.names=FALSE, colClasses = c("character", "character", "integer", "character", "character", "integer", "integer"))
         # from_pbayes()
     }
-    else if (any(grep(lfiles, pattern = paste0("17_HMM_predHMM.*", analysis_mode_pattern)))) {
+    # HMM step is 17 on master and in older runs, 19 on this branch (SNP steps 4-5 inserted)
+    else if (any(grep(lfiles, pattern = paste0("(17|19)_HMM_predHMM.*", analysis_mode_pattern)))) {
         ###### states are 1/2/3/4/5/6
         # scaling_factor = 2
-        if (any(grep(lfiles, pattern = paste0("17_HMM_predHMMi6.*", analysis_mode_pattern)))) {
+        if (any(grep(lfiles, pattern = paste0("(17|19)_HMM_predHMMi6.*", analysis_mode_pattern)))) {
             mode = "i6"
             center_state = 3
         }
-        else if (any(grep(lfiles, pattern = paste0("17_HMM_predHMMi3.*", analysis_mode_pattern)))) {
+        else if (any(grep(lfiles, pattern = paste0("(17|19)_HMM_predHMMi3.*", analysis_mode_pattern)))) {
             mode = "i3"
             center_state = 2
         }
@@ -98,8 +99,8 @@ add_to_seurat <- function(seurat_obj = NULL,
             flog.warn("::Found HMM predictions output, but they do not match any known model type")
             stop()
         }
-        regions = read.table(paste(infercnv_output_path, lfiles[grep(lfiles, pattern=paste0("17_HMM_predHMMi[36].*", analysis_mode_pattern, ".pred_cnv_regions.dat"))][1], sep=.Platform$file.sep), sep="\t", header=TRUE, check.names=FALSE, colClasses = c("character", "character", "integer", "character", "integer", "integer"))
-        hmm_genes = read.table(paste(infercnv_output_path, lfiles[grep(lfiles, pattern=paste0("17_HMM_predHMMi[36].*", analysis_mode_pattern, ".pred_cnv_genes.dat"))][1], sep=.Platform$file.sep), sep="\t", header=TRUE, check.names=FALSE, colClasses = c("character", "character", "integer", "character", "character", "integer", "integer"))
+        regions = read.table(paste(infercnv_output_path, lfiles[grep(lfiles, pattern=paste0("(17|19)_HMM_predHMMi[36].*", analysis_mode_pattern, ".pred_cnv_regions.dat"))][1], sep=.Platform$file.sep), sep="\t", header=TRUE, check.names=FALSE, colClasses = c("character", "character", "integer", "character", "integer", "integer"))
+        hmm_genes = read.table(paste(infercnv_output_path, lfiles[grep(lfiles, pattern=paste0("(17|19)_HMM_predHMMi[36].*", analysis_mode_pattern, ".pred_cnv_genes.dat"))][1], sep=.Platform$file.sep), sep="\t", header=TRUE, check.names=FALSE, colClasses = c("character", "character", "integer", "character", "character", "integer", "integer"))
         # from_hmm()
     }
     else {
