@@ -45,7 +45,7 @@ define_signif_tumor_subclusters <- function(infercnv_obj,
     if (z_score_filter > 0 && length(infercnv_obj@reference_grouped_cell_indices) > 0) {
         ref_matrix = infercnv_obj@expr.data[, unlist(infercnv_obj@reference_grouped_cell_indices), drop=FALSE]
         z_score = (ref_matrix - mean(ref_matrix))/sd(ref_matrix)
-        outliers =  which(apply(abs(z_score), 1, mean) >= 0.8)
+        outliers =  which(apply(abs(z_score), 1, mean) >= z_score_filter)
 
         if (!is.null(outliers)) {
             # if (mask_zscore) {   ## option to add to handle if to completely remove the outliers from the analysis, or add alternate option to assign them a value from neighbor genes

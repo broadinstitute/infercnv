@@ -86,9 +86,9 @@ run(
 \arguments{
 \item{infercnv_obj}{An infercnv object populated with raw count data}
 
-\item{cutoff}{Cut-off for the min average read counts per gene among reference cells. (default: 1)}
+\item{cutoff}{Cut-off for the min average read counts per gene, computed over all cells (references and observations). (default: 1)}
 
-\item{min_cells_per_gene}{minimum number of reference cells requiring expression measurements to include the corresponding gene.
+\item{min_cells_per_gene}{minimum number of cells (references and observations) with nonzero expression required to include the corresponding gene.
 default: 3}
 
 \item{out_dir}{path to directory to deposit outputs (default: NULL, required to provide non NULL)
@@ -112,7 +112,7 @@ relation to reference_obs. (default: NULL)}
 #############################}
 
 \item{cluster_by_groups}{If observations are defined according to groups (ie. patients), each group
-of cells will be clustered separately. (default=FALSE, instead will use k_obs_groups setting)}
+of cells will be clustered separately. If FALSE, all observations are clustered together using the k_obs_groups setting. (default=TRUE)}
 
 \item{cluster_references}{Whether to cluster references within their annotations or not. (dendrogram not displayed)
 (default: TRUE)}
@@ -149,7 +149,7 @@ i3: infercnv 3-state model (del, neutral, amp) configured based on normal cells 
 
 \item{HMM_i3_pval}{p-value for HMM i3 state overlap (default: 0.05)}
 
-\item{HMM_i3_use_KS}{boolean: use the KS test statistic to estimate mean of amp/del distributions (ala HoneyBadger). (default=TRUE)
+\item{HMM_i3_use_KS}{boolean: use the KS test statistic to estimate mean of amp/del distributions (ala HoneyBadger). (default=FALSE)
 
 
 ## Filtering low-conf HMM preds via BayesNet P(Normal)}
@@ -167,12 +167,15 @@ i3: infercnv 3-state model (del, neutral, amp) configured based on normal cells 
 ## Tumor subclustering}
 
 \item{analysis_mode}{options(samples|subclusters|cells), Grouping level for image filtering or HMM predictions.
-default: samples (fastest, but subclusters is ideal)}
+default: subclusters (samples is fastest)}
 
-\item{tumor_subcluster_partition_method}{method for defining tumor subclusters. Options('leiden', 'random_trees', 'qnorm')
+\item{tumor_subcluster_partition_method}{method for defining tumor subclusters. Options('leiden', 'random_trees', 'qnorm', 'pheight', 'qgamma'); default: 'leiden'.
+('shc' is accepted but not implemented.)
 leiden: Runs a nearest neighbor search, where communities are then partitionned with the Leiden algorithm.
 random_trees: Slow, uses permutation statistics w/ tree construction.
-qnorm: defines tree height based on the quantile defined by the tumor_subcluster_pval}
+qnorm: defines tree height based on the quantile defined by the tumor_subcluster_pval
+pheight: cuts the tree at tumor_subcluster_pval * the maximum tree height
+qgamma: like qnorm, but using a gamma distribution fitted to the tree heights}
 
 \item{tumor_subcluster_pval}{max p-value for defining a significant tumor subcluster (default: 0.1)}
 
@@ -195,7 +198,7 @@ This should provide enough definition in the predictions while avoiding subclust
 
 \item{per_chr_hmm_subclusters_references}{Whether the per chromosome subclustering should also be done on references, which should not have as much variation as observations. (default = FALSE)}
 
-\item{z_score_filter}{Z-score used as a treshold to filter genes used for subclustering. 
+\item{z_score_filter}{Z-score used as a threshold to filter genes used for subclustering; set to 0 to disable. 
                       Applied based on reference genes to automatically ignore genes with high expression variability such as MHC genes. (default: 0.8)
 
 
@@ -267,7 +270,7 @@ NULL (default) leaves the RNG untouched and results vary between runs.}
 ## experimental opts involving DE analysis}
 
 \item{mask_nonDE_genes}{If true, sets genes not significantly differentially expressed between tumor/normal to
-the mean value for the complete data set (default: 0.05)}
+the mean value for the complete data set (default: FALSE; see mask_nonDE_pval for the p-value threshold)}
 
 \item{mask_nonDE_pval}{p-value threshold for defining statistically significant DE genes between tumor/normal}
 
@@ -295,7 +298,7 @@ other experimental opts}
 
 \item{useRaster}{Whether to use rasterization for drawing heatmap. Only disable if it produces an error as it is much faster than not using it. (default: TRUE)}
 
-\item{up_to_step}{run() only up to this exact step number (default: 100 >> 23 steps currently in the process)}
+\item{up_to_step}{run() only up to this exact step number (default: 100, i.e. all 30 steps)}
 }
 \value{
 infercnv_obj containing filtered and transformed data
