@@ -179,7 +179,7 @@ define_signif_tumor_subclusters <- function(infercnv_obj,
 
 
 .single_tumor_subclustering <- function(tumor_name, tumor_group_idx, tumor_expr_data, p_val, hclust_method,
-                                        partition_method=c('qnorm', 'pheight', 'qgamma', 'shc', 'none')
+                                        partition_method=c('qnorm', 'pheight', 'qgamma', 'none')
                                         ) {
     
     partition_method = match.arg(partition_method)

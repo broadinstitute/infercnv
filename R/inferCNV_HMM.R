@@ -355,7 +355,9 @@ predict_CNV_via_HMM_on_tumor_subclusters  <- function(infercnv_obj,
 
     if (is.null(infercnv_obj@tumor_subclusters)) {
         flog.warn("No subclusters defined, so instead running on whole samples")
-        return(predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_obj, cnv_mean_sd, cnv_level_to_mean_sd_fit, t));
+        # arguments by name: the second positional argument is cluster_by_groups
+        return(predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_obj, cluster_by_groups=TRUE, cnv_mean_sd=cnv_mean_sd,
+                                                          cnv_level_to_mean_sd_fit=cnv_level_to_mean_sd_fit, t=t));
     }
     
     
@@ -421,7 +423,9 @@ predict_CNV_via_HMM_on_tumor_subclusters_per_chr  <- function(infercnv_obj,
 
     if (is.null(subclusters_per_chr)) {
         flog.warn("No subclusters defined, so instead running on whole samples")
-        return(predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_obj, cnv_mean_sd, cnv_level_to_mean_sd_fit, t));
+        # arguments by name: the second positional argument is cluster_by_groups
+        return(predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_obj, cluster_by_groups=TRUE, cnv_mean_sd=cnv_mean_sd,
+                                                          cnv_level_to_mean_sd_fit=cnv_level_to_mean_sd_fit, t=t));
     }
     
     

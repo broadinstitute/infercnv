@@ -105,13 +105,14 @@
     
     
     ##                      states: 0.5,    1,     1 .5
-    state_transitions = matrix( c(1-5*t,  t,     t,
-                                  t,     1-5*t,  t,
-                                  t,      t,     1-5*t),
+    # rows sum to 1 (previously 1-5*t on the diagonal, copied from the 6-state model)
+    state_transitions = matrix( c(1-2*t,  t,     t,
+                                  t,     1-2*t,  t,
+                                  t,      t,     1-2*t),
                                byrow=TRUE,
                                nrow=3)
     
-    delta=c(t,     1-5*t,    t) # more likely normal,
+    delta=c(t,     1-2*t,    t) # more likely normal,
     
     mu = sd_trend$mu # normal cell mean
     
@@ -258,7 +259,9 @@ i3HMM_predict_CNV_via_HMM_on_tumor_subclusters  <- function(infercnv_obj,
     
     if (is.null(infercnv_obj@tumor_subclusters)) {
         flog.warn("No subclusters defined, so instead running on whole samples")
-        return(i3HMM_predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_obj, i3_p_val, sd_trend, t, use_KS));
+        # arguments by name: the second positional argument is cluster_by_groups
+        return(i3HMM_predict_CNV_via_HMM_on_whole_tumor_samples(infercnv_obj, cluster_by_groups=TRUE, i3_p_val=i3_p_val,
+                                                                sd_trend=sd_trend, t=t, use_KS=use_KS));
     }
     
     chrs = unique(infercnv_obj@gene_order$chr)

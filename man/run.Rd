@@ -33,7 +33,7 @@ run(
   reassignCNVs = TRUE,
   analysis_mode = c("subclusters", "samples", "cells"),
   tumor_subcluster_partition_method = c("leiden", "random_trees", "qnorm", "pheight",
-    "qgamma", "shc"),
+    "qgamma"),
   tumor_subcluster_pval = 0.1,
   k_nn = 20,
   leiden_method = c("PCA", "simple"),
@@ -170,7 +170,6 @@ i3: infercnv 3-state model (del, neutral, amp) configured based on normal cells 
 default: subclusters (samples is fastest)}
 
 \item{tumor_subcluster_partition_method}{method for defining tumor subclusters. Options('leiden', 'random_trees', 'qnorm', 'pheight', 'qgamma'); default: 'leiden'.
-('shc' is accepted but not implemented.)
 leiden: Runs a nearest neighbor search, where communities are then partitionned with the Leiden algorithm.
 random_trees: Slow, uses permutation statistics w/ tree construction.
 qnorm: defines tree height based on the quantile defined by the tumor_subcluster_pval

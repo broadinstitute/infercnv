@@ -90,7 +90,6 @@
 #'                                                          default: subclusters (samples is fastest)
 #'
 #' @param tumor_subcluster_partition_method  method for defining tumor subclusters. Options('leiden', 'random_trees', 'qnorm', 'pheight', 'qgamma'); default: 'leiden'.
-#'                                           ('shc' is accepted but not implemented.)
 #'                                           leiden: Runs a nearest neighbor search, where communities are then partitionned with the Leiden algorithm.
 #'                                           random_trees: Slow, uses permutation statistics w/ tree construction.
 #'                                           qnorm: defines tree height based on the quantile defined by the tumor_subcluster_pval
@@ -298,7 +297,7 @@ run <- function(infercnv_obj,
 
                 ## tumor subclustering options
                 analysis_mode=c('subclusters', 'samples', 'cells'), # for filtering and HMM
-                tumor_subcluster_partition_method=c('leiden', 'random_trees', 'qnorm', 'pheight', 'qgamma', 'shc'),
+                tumor_subcluster_partition_method=c('leiden', 'random_trees', 'qnorm', 'pheight', 'qgamma'),
                 tumor_subcluster_pval=0.1,
                 k_nn=20,
                 leiden_method=c("PCA", "simple"),
@@ -385,8 +384,8 @@ run <- function(infercnv_obj,
     HMM_report_by = match.arg(HMM_report_by)
     analysis_mode = match.arg(analysis_mode)
     if(analysis_mode == "cells" && HMM_report_by != "cell") {
-        flog.warn(paste0("analysis_mode is \"cells\" but HMM_report_by is not, "),
-                         "changing HMM_report_by to \"cells\".")
+        flog.warn(paste0("analysis_mode is \"cells\" but HMM_report_by is not \"cell\", ",
+                         "changing HMM_report_by to \"cell\"."))
         HMM_report_by = "cell"
     }
     tumor_subcluster_partition_method = match.arg(tumor_subcluster_partition_method)
@@ -3112,8 +3111,11 @@ smooth_by_chromosome_coordinates <- function(infercnv_obj, window_length) {
             around_indices = i
         }
         weights = 1 - abs(((genes$stop[around_indices] + genes$start[around_indices])/2) - current_pos)/window_length
-        if (length(around_indices < 10)) {
-            to_add = floor(length(around_indices - 10)/2)
+        # pad windows with fewer than 10 genes up to about 10 genes (low weight for the added genes).
+        # (Previously written length(around_indices < 10) and floor(length(around_indices - 10)/2), so every
+        # window was padded on each side by half its own size.)
+        if (length(around_indices) < 10) {
+            to_add = ceiling((10 - length(around_indices))/2)
 
             new_low = max(1, (min(around_indices) - to_add))
             new_high = min(length(obs_data), (max(around_indices) + to_add))
@@ -3834,6 +3836,10 @@ compareNA <- function(v1,v2) {
 
 .compare_args <- function(current_args, relevant_args, loaded_options) {
 
+    # an argument given explicitly at its default value must match a run that left it unset (and vice versa)
+    current_args = .fill_default_args(current_args, relevant_args)
+    loaded_options = .fill_default_args(loaded_options, relevant_args)
+
     diff_a = any(relevant_args %in% names(current_args[!(names(current_args) %in% names(loaded_options))]))
     diff_b = any(relevant_args %in% names(loaded_options[!(names(loaded_options) %in% names(current_args))]))
 
@@ -3844,6 +3850,25 @@ compareNA <- function(v1,v2) {
     return(all(sapply(relevant_args[relevant_args %in% names(current_args)], function(arg_n) {
         all(compareNA(current_args[[arg_n]], loaded_options[[arg_n]]))
     })))
+}
+
+
+#' @keywords internal
+#' @noRd
+#'
+
+.fill_default_args <- function(args, relevant_args) {
+    defaults = formals(run)
+    for (arg_n in setdiff(relevant_args, names(args))) {
+        if (! arg_n %in% names(defaults)) next
+        default_val = tryCatch(eval(defaults[[arg_n]], envir=baseenv()), error=function(e) NULL)
+        if (is.null(default_val) || is.symbol(default_val) || is.language(default_val)) next
+        if (is.character(default_val) && length(default_val) > 1) {
+            default_val = default_val[1]  # match.arg() choice lists default to their first element
+        }
+        args[[arg_n]] = default_val
+    }
+    return(args)
 }
 
 

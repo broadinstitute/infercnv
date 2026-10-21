@@ -210,14 +210,25 @@ get_DE_genes_basic <- function(infercnv_obj,
         
     ## turn on only DE genes in tumors
     tumor_groupings = infercnv_obj@observation_grouped_cell_indices
-    for (tumor_type in names(tumor_groupings)) {
-        
-        indices = infercnv_obj@tumor_subclusters[["subclusters"]][[ tumor_type ]]
+    # observation subclusters are stored per annotation group, or under "all_observations" when
+    # cluster_by_groups=FALSE; without subclusters, each annotation group is tested as a whole.
+    # (Previously only per-group names were looked up, so with cluster_by_groups=FALSE no tumour cells
+    # were tested and all of them were masked; unnamed index vectors were also skipped.)
+    subclusters = infercnv_obj@tumor_subclusters[["subclusters"]]
+    obs_entries = intersect(names(subclusters), c(names(tumor_groupings), "all_observations"))
+    if (length(obs_entries) == 0) {
+        subclusters = tumor_groupings
+        obs_entries = names(tumor_groupings)
+    }
+    for (tumor_type in obs_entries) {
+
+        indices = subclusters[[ tumor_type ]]
         if(is.list(indices)) {
             tumor_indices_list = indices
         }
         else { # is.vector(indices)
             tumor_indices_list = list(indices)
+            names(tumor_indices_list) = tumor_type
         }
         
         for (tumor_indices_name in names(tumor_indices_list)) {

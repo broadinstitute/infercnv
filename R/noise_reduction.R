@@ -58,8 +58,18 @@ apply_median_filtering <- function(infercnv_obj,
         for (tumor_type in names(infercnv_obj@observation_grouped_cell_indices)) {
             
             tumor_indices_list = infercnv_obj@tumor_subclusters[["subclusters"]][[ tumor_type ]]
+            # filter neighbouring cells in the order of the subclustering dendrogram (as in the heatmap),
+            # not in matrix column order
+            hc = infercnv_obj@tumor_subclusters[["hc"]][[ tumor_type ]]
+            hc_cell_order = NULL
+            if (! is.null(hc) && ! is.null(hc$labels)) {
+                hc_cell_order = match(hc$labels[hc$order], colnames(infercnv_obj@expr.data))
+            }
             
             for (tumor_indices in tumor_indices_list) {
+                if (! is.null(hc_cell_order) && all(tumor_indices %in% hc_cell_order)) {
+                    tumor_indices = hc_cell_order[hc_cell_order %in% tumor_indices]
+                }
                 for (chr in chrs) {
                     chr_genes_indices = which(gene_chr_listing == chr)
                     working_data = infercnv_obj@expr.data[chr_genes_indices, tumor_indices, drop=FALSE]
@@ -99,11 +109,12 @@ apply_median_filtering <- function(infercnv_obj,
     
     # if (xdim >= window_size & ydim >= window_size) {
         for (posx in seq_len(xdim)) {
-            posxa <- ifelse(posx <= (half_window + 1), 1, (posx - (half_window + 1)))
-            posxb <- ifelse(posx >= (xdim - (half_window + 1)), xdim, (posx + (half_window + 1)))
+            # window of window_size centred on posx, truncated at the edges (previously half_window + 1 on each side)
+            posxa <- max(1, posx - half_window)
+            posxb <- min(xdim, posx + half_window)
             for (posy in seq_len(ydim)) {
-                posya <- ifelse(posy <= (half_window + 1), 1, (posy - (half_window + 1)))
-                posyb <- ifelse(posy >= (ydim - (half_window + 1)), ydim, (posy + (half_window + 1)))
+                posya <- max(1, posy - half_window)
+                posyb <- min(ydim, posy + half_window)
                 results[posx, posy] = median(data[posxa:posxb, posya:posyb])
             }
         }

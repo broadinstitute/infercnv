@@ -51,8 +51,12 @@ define_signif_tumor_subclusters_via_random_smooothed_trees <- function(infercnv_
     if (! is.null(infercnv_copy@.hspike)) {
         flog.info("-mirroring for hspike")
 
-        infercnv_copy@.hspike <- define_signif_tumor_subclusters_via_random_smooothed_trees(infercnv_copy@.hspike, p_val, hclust_method,
-                                                                                            window_size, max_recursion_depth, min_cluster_size_recurse)
+        # as for the other partition methods (see define_signif_tumor_subclusters), the hspike is not subclustered,
+        # which would lower the expected noise level of the states. (This call previously passed its arguments by
+        # position, shifted by one, so the hspike was subclustered with window_size = 3.)
+        infercnv_copy@.hspike <- define_signif_tumor_subclusters(infercnv_copy@.hspike,
+                                                                 cluster_by_groups = TRUE,
+                                                                 partition_method = "none")[[1]]
     }
     
     
