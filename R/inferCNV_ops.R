@@ -128,7 +128,7 @@
 #'
 #' @param denoise       If True, turns on denoising according to options below
 #'
-#' @param noise_filter  Values +- from the reference cell mean will be set to zero (whitening effect)
+#' @param noise_filter  Values +- from the reference cell mean will be set to the reference cell mean (whitening effect)
 #'                      default(NA, instead will use sd_amplifier below.
 #'
 #' @param sd_amplifier  Noise is defined as mean(reference_cells) +- sdev(reference_cells) * sd_amplifier
@@ -150,9 +150,9 @@
 #' ##########################
 #' ## Misc options
 #'
-#' @param final_scale_limits The scale limits for the final heatmap output by the run() method. Default "auto". Alt, c(low,high)
+#' @param final_scale_limits The scale limits for the final heatmap output by the run() method. Default NULL, which uses "auto". Alt, c(low,high)
 #'
-#' @param final_center_val   Center value for final heatmap output by the run() method.
+#' @param final_center_val   Center value for final heatmap output by the run() method. Default NULL, which uses 1.
 #'
 #' @param debug If true, output debug level logging.
 #'

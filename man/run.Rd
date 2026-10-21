@@ -207,7 +207,7 @@ This should provide enough definition in the predictions while avoiding subclust
 
 \item{denoise}{If True, turns on denoising according to options below}
 
-\item{noise_filter}{Values +- from the reference cell mean will be set to zero (whitening effect)
+\item{noise_filter}{Values +- from the reference cell mean will be set to the reference cell mean (whitening effect)
 default(NA, instead will use sd_amplifier below.}
 
 \item{sd_amplifier}{Noise is defined as mean(reference_cells) +- sdev(reference_cells) * sd_amplifier
@@ -231,9 +231,9 @@ Will preferentially use outlier_lower_bounda and outlier_upper_bound if set.}
 ##########################
 ## Misc options}
 
-\item{final_scale_limits}{The scale limits for the final heatmap output by the run() method. Default "auto". Alt, c(low,high)}
+\item{final_scale_limits}{The scale limits for the final heatmap output by the run() method. Default NULL, which uses "auto". Alt, c(low,high)}
 
-\item{final_center_val}{Center value for final heatmap output by the run() method.}
+\item{final_center_val}{Center value for final heatmap output by the run() method. Default NULL, which uses 1.}
 
 \item{debug}{If true, output debug level logging.}
 
