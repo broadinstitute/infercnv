@@ -185,10 +185,10 @@ setAlleleMatrix <- function(infercnv_allele_obj,
             frac_matrix_bool = as(frac_matrix, "lgCMatrix")
 
             frac_matrix_bool@x = frac_matrix@x < 0.5
-            cells_w_ref_allele = Matrix::rowSums(ref_frac_matrix_bool)
+            cells_w_ref_allele = Matrix::rowSums(frac_matrix_bool)
 
             frac_matrix_bool@x = frac_matrix@x > 0.5
-            cells_w_alt_allele = Matrix::rowSums(ref_frac_matrix_bool)
+            cells_w_alt_allele = Matrix::rowSums(frac_matrix_bool)
 
         }
 

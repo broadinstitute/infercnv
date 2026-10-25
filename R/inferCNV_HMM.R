@@ -1126,7 +1126,7 @@ Viterbi.dthmm.adj <- function (object, ...){
 
     if (length(x) < 2) {
         ## not enough run a trace on
-        return(3); # neutral state
+        return(which.max(object$delta)); # neutral state (3 for i6, 2 for i3)
     }
     
     dfunc <- HiddenMarkov:::makedensity(object$distn)
