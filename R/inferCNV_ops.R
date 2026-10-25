@@ -195,6 +195,10 @@
 #' @param clones_pool_groups optional list of character vectors of observation groups to analyse together when
 #'                           defining clones (e.g. the epithelial clusters of a spatial sample) (default: NULL)
 #'
+#' @param HMM_gene_density_check with HMM = TRUE: "stop" (default) or "warn" when the median chromosome has fewer genes
+#'                               than window_length after the expression cutoff (data too sparse for the HMM; checked
+#'                               at step 2), "none" to skip the check. Below 2 x window_length a warning is given.
+#'
 #' @param save_rds Whether to save the current step object results as an .rds file (default: TRUE)
 #'
 #' @param save_final_rds Whether to save the final object results as an .rds file (default: TRUE)
@@ -221,7 +225,7 @@
 #'
 #' other experimental opts
 #'
-#' @param sim_method   method for calibrating CNV levels in the i6 HMM (default: 'meanvar')
+#' @param sim_method   method for calibrating CNV levels in the i6 HMM (default: 'meanvar'; 'resample': h-spike from resampled reference cells at the data's gene density, experimental)
 #'
 #' @param sim_foreground  don't use... for debugging, developer option.
 #'
@@ -342,6 +346,7 @@ run <- function(infercnv_obj,
                 plot_probabilities = TRUE,
                 clones = FALSE,
                 clones_pool_groups = NULL,
+                HMM_gene_density_check = c("stop", "warn", "none"),
                 save_rds = TRUE,
                 save_final_rds = TRUE,
                 diagnostics = FALSE,
@@ -373,6 +378,7 @@ run <- function(infercnv_obj,
 
 
     smooth_method = match.arg(smooth_method)
+    HMM_gene_density_check = match.arg(HMM_gene_density_check)
     HMM_type = match.arg(HMM_type)
     allele_mode = match.arg(allele_mode)
     combined_method = match.arg(combined_method)
@@ -675,6 +681,10 @@ run <- function(infercnv_obj,
         if (save_rds) {
             saveRDS(infercnv_obj, reload_info$expected_file_names[[step_count]])
         }
+    }
+
+    if (HMM && smooth_method != 'coordinates' && HMM_gene_density_check != "none") {
+        .check_hmm_gene_density(infercnv_obj, window_length, HMM_gene_density_check)
     }
     
     

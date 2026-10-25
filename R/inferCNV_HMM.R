@@ -44,16 +44,15 @@ get_spike_dists <- function(hspike_obj) {
 
 .get_gene_expr_by_cnv <- function(hspike_obj) {
     
-    chr_info = .get_hspike_chr_info(1,1) # dummy values for now
+    chr_levels = .hspike_chr_levels(hspike_obj)
 
     spike_cell_idx = unlist(hspike_obj@observation_grouped_cell_indices)
 
     spike.expr.data = hspike_obj@expr.data[, spike_cell_idx]
 
     gene_expr_by_cnv = list()
-    for (info in chr_info) {
-        chr_name = info$name
-        cnv = sprintf("cnv:%g", info$cnv)
+    for (chr_name in names(chr_levels)) {
+        cnv = sprintf("cnv:%g", chr_levels[[chr_name]])
         chr_gene_idx = which(hspike_obj@gene_order$chr == chr_name)
         gene.expr = c(spike.expr.data[chr_gene_idx, ])
         
@@ -153,6 +152,10 @@ get_spike_dists <- function(hspike_obj) {
 
 get_hspike_cnv_mean_sd_trend_by_num_cells_fit <- function(hspike_obj, plot=FALSE) {
     
+    if (all(grepl("^hs[0-9]+_cnv:", unique(as.character(hspike_obj@gene_order$chr))))) {
+        return(.hspike_whole_cell_sd_fit(hspike_obj))
+    }
+
     gene_expr_by_cnv <- .get_gene_expr_by_cnv(hspike_obj)
     cnv_level_to_mean_sd = list()
     
@@ -212,6 +215,74 @@ get_hspike_cnv_mean_sd_trend_by_num_cells_fit <- function(hspike_obj, plot=FALSE
 }
 
 
+
+
+# sd of an n-cell mean at one level: lm of log(sd) on log(num_cells) (i.i.d. resampling of h-spike values), or the
+# whole-cell model below (sd^2 = a / n + b)
+.hspike_sd_at <- function(fit, num_cells) {
+    if (inherits(fit, "hspike_sd_model")) {
+        return(sqrt(fit$a / num_cells + fit$b))
+    }
+    exp(predict(fit, newdata=data.frame(num_cells=num_cells))[[1]])
+}
+
+# For the 'resample' h-spike: per level, the spread across genes of the mean profile of n h-spike tumour cells drawn
+# as whole cells (keeps per-gene structure and the correlation between neighbouring smoothed genes), for n = 1-100,
+# fitted as sd^2 = a / n + b: a sampling part that shrinks with more cells and a part that does not. The 100-cell pool's
+# own sampling noise (a / pool size) is taken out of b.
+.hspike_whole_cell_sd_fit <- function(hspike_obj, n_max=100, nrounds=30) {
+    chr_levels <- .hspike_chr_levels(hspike_obj)
+    cells <- unlist(hspike_obj@observation_grouped_cell_indices)
+    E <- hspike_obj@expr.data[, cells, drop=FALSE]
+    lev_gene <- chr_levels[as.character(hspike_obj@gene_order$chr)]
+    fits <- lapply(sort(unique(chr_levels)), function(lv) {
+        X <- E[which(lev_gene == lv), , drop=FALSE]
+        mu <- mean(X)
+        ns <- unique(round(exp(seq(0, log(n_max), length.out=25))))
+        v <- vapply(ns, function(n) mean(replicate(nrounds, {
+            m <- rowMeans(X[, sample(ncol(X), n, replace=TRUE), drop=FALSE]); mean((m - mu)^2) })), numeric(1))
+        f <- stats::lm(v ~ I(1 / ns))
+        a <- unname(stats::coef(f)[2]); b <- unname(stats::coef(f)[1])
+        if (!is.finite(a) || a < 0) a <- 0
+        b <- max(0, b - a / ncol(X))
+        structure(list(a=a, b=b, n=ns, var=v), class="hspike_sd_model")
+    })
+    names(fits) <- sprintf("cnv:%g", sort(unique(chr_levels)))
+    fits
+}
+
+
+# The HMM works on expression smoothed over window_length genes. When most chromosomes have fewer genes than one
+# window (sparse data: few genes pass the expression cutoff), the smoothed profile of a subcluster wanders by more than
+# the gap between the HMM states and the HMM calls that noise as CNVs. Stop (or warn) when the median chromosome has
+# fewer than window_length genes; warn below 2 x window_length; list chromosomes with fewer than window_length / 2.
+.check_hmm_gene_density <- function(infercnv_obj, window_length, action=c("stop", "warn")) {
+    action <- match.arg(action)
+    chr <- as.character(infercnv_obj@gene_order$chr)
+    n <- table(factor(chr, levels=unique(chr)))
+    med <- stats::median(n)
+    msg <- sprintf("median %g genes per chromosome after the expression cutoff (%d genes, %d chromosomes); smoothing window %d genes",
+                   med, length(chr), length(n), window_length)
+    flog.info(sprintf("HMM gene density check: %s", msg))
+    short <- names(n)[n < window_length / 2]
+    if (length(short) && med >= window_length) {
+        flog.warn(sprintf("chromosomes with fewer than %g genes (HMM calls there are less reliable): %s", window_length / 2,
+                          paste(sprintf("%s (%d)", short, n[short]), collapse=", ")))
+    }
+    if (med < window_length) {
+        txt <- sprintf(paste0("Too few genes for the HMM: %s. Most chromosomes are shorter than one smoothing window, so the ",
+                              "HMM would call noise as CNVs. Use more reads per cell (e.g. larger spatial bins, or pooled cells), ",
+                              "or run with HMM=FALSE; set HMM_gene_density_check='warn' to proceed anyway."), msg)
+        if (action == "stop") {
+            flog.error(txt)
+            stop(txt)
+        }
+        flog.warn(txt)
+    } else if (med < 2 * window_length) {
+        flog.warn(sprintf("Low gene density for the HMM: %s. CNV calls may be noisy; compare them with the expression heatmap.", msg))
+    }
+    invisible(list(median=med, per_chr=n))
+}
 
 
 #' @title .get_HMM
@@ -590,8 +661,7 @@ predict_CNV_via_HMM_on_whole_tumor_samples  <- function(infercnv_obj,
 .get_state_emission_params <- function(num_cells, cnv_mean_sd, cnv_level_to_mean_sd_fit, plot=FALSE) {
         
     for (cnv_level in names(cnv_mean_sd)) {
-        fit <- cnv_level_to_mean_sd_fit[[cnv_level]]
-        sd <- exp(predict(fit, newdata=data.frame(num_cells=num_cells))[[1]])
+        sd <- .hspike_sd_at(cnv_level_to_mean_sd_fit[[cnv_level]], num_cells)
         cnv_mean_sd[[cnv_level]]$sd <- sd
     }
     
@@ -681,7 +751,7 @@ predict_CNV_via_HMM_on_whole_tumor_samples  <- function(infercnv_obj,
 
     df = do.call(rbind, lapply(cnv_levels, function(cnv_level) {
         sd_obs=cnv_mean_sd[[cnv_level]]$sd
-        sd_pred=exp(predict(cnv_level_to_mean_sd_fit[[cnv_level]], newdata=data.frame(num_cells=1)))
+        sd_pred=.hspike_sd_at(cnv_level_to_mean_sd_fit[[cnv_level]], 1)
         return(data.frame(cnv=cnv_level, sd_obs=sd_obs, sd_pred=sd_pred))
 
     }))

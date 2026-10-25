@@ -64,6 +64,7 @@ run(
   plot_probabilities = TRUE,
   clones = FALSE,
   clones_pool_groups = NULL,
+  HMM_gene_density_check = c("stop", "warn", "none"),
   save_rds = TRUE,
   save_final_rds = TRUE,
   diagnostics = FALSE,
@@ -158,7 +159,7 @@ i3: infercnv 3-state model (del, neutral, amp) configured based on normal cells 
 
 \item{BayesMaxPNormal}{maximum P(Normal) allowed for a CNV prediction according to BayesNet. (default=0.5, note zero turns it off)}
 
-\item{sim_method}{method for calibrating CNV levels in the i6 HMM (default: 'meanvar')}
+\item{sim_method}{method for calibrating CNV levels in the i6 HMM (default: 'meanvar'; 'resample': h-spike from resampled reference cells at the data's gene density, experimental)}
 
 \item{sim_foreground}{don't use... for debugging, developer option.}
 
@@ -261,6 +262,10 @@ infercnv.clones.* files (see infercnv_clones()). Needs analysis_mode = 'subclust
 
 \item{clones_pool_groups}{optional list of character vectors of observation groups to analyse together when
 defining clones (e.g. the epithelial clusters of a spatial sample) (default: NULL)}
+
+\item{HMM_gene_density_check}{with HMM = TRUE: "stop" (default) or "warn" when the median chromosome has fewer genes
+than window_length after the expression cutoff (data too sparse for the HMM; checked
+at step 2), "none" to skip the check. Below 2 x window_length a warning is given.}
 
 \item{save_rds}{Whether to save the current step object results as an .rds file (default: TRUE)}
 
