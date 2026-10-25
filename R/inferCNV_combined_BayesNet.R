@@ -299,6 +299,8 @@ getGenesCells_combined <- function(MCMC_inferCNV_combined_obj,
 #' @param output_path (string) Path to where the output file should be saved to.
 #' 
 #' @param cores Option to run parallel by specifying the number of cores to be used. (Default: 5)
+#' @param plotingProbs Option to plot the posterior probabilities of the CNV regions and cells. (Default: TRUE)
+#' @param diagnostics Option to plot the MCMC diagnostics (trace, autocorrelation, Gelman plots), which can be very large. (Default: FALSE)
 #' 
 #' @return Returns a MCMC_infercnv_combined obj and posterior probability of being in one of three/six Copy Number Variation states
 #' (i6 states: 1-2,Deletion; 3,Neutral; 4-6,Amplification; 7,cnLOH,if enable_cnLOH),
@@ -371,7 +373,9 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
                                      HMM_type = c("i6", "i3"),
                                      enable_cnLOH = TRUE,
                                      output_path,
-                                     cores = 5) {
+                                     cores = 5,
+                                     plotingProbs = TRUE,
+                                     diagnostics = FALSE) {
   
     allele_mode <- match.arg(allele_mode)
     method <- match.arg(method)
@@ -409,7 +413,7 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
     }
     
     if (method == "common") {
-        infercnv_allele_obj <- remove_genes(infercnv_obj,
+        infercnv_allele_obj <- remove_genes(infercnv_allele_obj,
                                             which(! rownames(infercnv_allele_obj@gene_order) %in% 
                                                     infercnv_allele_obj@SNP_info$gene))
     }
@@ -432,7 +436,10 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
     flog.info(sprintf("Enable identifing cnLOH event: %s", enable_cnLOH))
     
     start_time <- Sys.time()
-    
+
+    if (getOption("infercnv.bayes_sampler", "native") == "native") {
+        mcmc <- .run_combined_native(MCMC_inferCNV_combined_obj, infercnv_allele_obj, HMM_type, enable_cnLOH, cores)
+    } else {
     mcmc <- mclapply(MCMC_inferCNV_combined_obj@cell_gene, function(x) {
 
         if (allele_mode == "snp_level") {
@@ -508,7 +515,7 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
             #           output_path = output_path)
         }
     }, mc.cores = cores)
-    #})
+    }
     end_time <- Sys.time()
     flog.info(paste0("MCMC running time: ",
                      difftime(end_time, start_time, units = "min")[[1]], " Minutes"))
@@ -518,11 +525,14 @@ inferCNVCombinedBayesNet <- function(combined_file_path,
     
     saveRDS(MCMC_inferCNV_combined_obj, file = file.path(output_path, "MCMC_inferCNV_combined_obj.rds"))
     
-    flog.info("Plotting the distribution of posterior probabilities")
-    plot_posterior_prob(MCMC_inferCNV_obj = MCMC_inferCNV_combined_obj, output_path)
-    
-    flog.info("Plotting diagnostic statistics")
-    plot_Diagnostics(mcmc = mcmc, output_path)
+    if (plotingProbs) {
+        flog.info("Plotting the distribution of posterior probabilities")
+        plot_posterior_prob(MCMC_inferCNV_obj = MCMC_inferCNV_combined_obj, output_path)
+    }
+    if (diagnostics) {
+        flog.info("Plotting diagnostic statistics")
+        plot_Diagnostics(mcmc = mcmc, output_path)
+    }
     
     return(MCMC_inferCNV_combined_obj)
 }

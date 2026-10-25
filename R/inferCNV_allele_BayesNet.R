@@ -314,6 +314,8 @@ plot_Diagnostics <- function(mcmc, output_path) {
 #' @param output_path (string) Path to where the output file should be saved to.
 #' 
 #' @param cores Option to run parallel by specifying the number of cores to be used. (Default: 5)
+#' @param plotingProbs Option to plot the posterior probabilities of the CNV regions and cells. (Default: TRUE)
+#' @param diagnostics Option to plot the MCMC diagnostics (trace, autocorrelation, Gelman plots), which can be very large. (Default: FALSE)
 #' 
 #' @return Returns a MCMC_inferCNV_allele_obj and posterior probability of being in one of two Copy Number Variation states
 #' (i2 states: 1,Deletion; 2,Neutral) for CNV's identified by inferCNV_allele's HMM.
@@ -365,7 +367,9 @@ inferCNVAlleleBayesNet <- function(file_path,
                                    infercnv_allele_obj,
                                    allele_mode = c("snp_level", "gene_level"),
                                    output_path,
-                                   cores = 1) {
+                                   cores = 1,
+                                   plotingProbs = TRUE,
+                                   diagnostics = FALSE) {
   
     if(!dir.exists(file.path(output_path))){
         dir.create(file.path(output_path), recursive = T)
@@ -383,7 +387,9 @@ inferCNVAlleleBayesNet <- function(file_path,
     flog.info("Start running Gibbs sampling ")
     
     start_time <- Sys.time()
-    if(allele_mode == "snp_level"){
+    if (getOption("infercnv.bayes_sampler", "native") == "native") {
+        mcmc <- .run_allele_native(MCMC_inferCNV_obj, infercnv_allele_obj, allele_mode, cores)
+    } else if(allele_mode == "snp_level"){
       
         mcmc <- mclapply(MCMC_inferCNV_obj@cell_gene, function(x) {
           #browser()
@@ -429,11 +435,14 @@ inferCNVAlleleBayesNet <- function(file_path,
     
     saveRDS(MCMC_inferCNV_obj, file = file.path(output_path, "mcmc_allele.rds"))
     
-    flog.info("Plotting the distribution of posterior probabilities")
-    plot_posterior_prob(MCMC_inferCNV_obj = MCMC_inferCNV_obj, output_path)
-    
-    flog.info("Plotting diagnostic statistics")
-    plot_Diagnostics(mcmc = mcmc, output_path)
+    if (plotingProbs) {
+        flog.info("Plotting the distribution of posterior probabilities")
+        plot_posterior_prob(MCMC_inferCNV_obj = MCMC_inferCNV_obj, output_path)
+    }
+    if (diagnostics) {
+        flog.info("Plotting diagnostic statistics")
+        plot_Diagnostics(mcmc = mcmc, output_path)
+    }
     
     return(MCMC_inferCNV_obj)
 }

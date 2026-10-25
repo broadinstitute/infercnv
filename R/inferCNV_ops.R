@@ -1781,7 +1781,9 @@ run <- function(infercnv_obj,
                                                                 infercnv_allele_obj = infercnv_obj, ## allele-snp obj
                                                                 allele_mode = allele_mode,
                                                                 output_path = file.path(out_dir, paste0("allele_i2_bayesian_snp_", analysis_mode)), # define your path
-                                                                cores = num_threads)
+                                                                cores = num_threads,
+                                                                plotingProbs = plot_probabilities,
+                                                                diagnostics = diagnostics)
 
 
             # mcmc_obj_file = file.path(out_dir, sprintf("%02d_HMM_pred.Bayes_Net%s.mcmc_obj",
@@ -1809,7 +1811,7 @@ run <- function(infercnv_obj,
             flog.info(sprintf("\n\n\tSTEP %02d: Filter HMM predicted CNVs based on the allele based Bayesian Network Model results and BayesMaxPNormal\n", step_count))
             ## Filter CNV's by posterior Probabilities
             mcmc_obj_hmm_states_list <- infercnv::filterHighPNormals_allele(MCMC_inferCNV_obj = mcmc_allele_obj,
-                                                                            HMM_states = infercnv_obj@allele.expr.data,
+                                                                            HMM_states = hmm.infercnv_obj@allele.expr.data,
                                                                             BayesMaxPNormal = BayesMaxPNormal,
                                                                             reassignCNVs = TRUE,
                                                                             HMM_type = "i2") 
@@ -1879,11 +1881,21 @@ run <- function(infercnv_obj,
 
             flog.info(sprintf("\n\n\tSTEP %02d: Combine boundaries of HMM predicted from expression and allele data\n", step_count))
 
-            ## combine HMM boundaries from two methods
+            ## combine HMM boundaries from two methods; use the regions kept by the Bayesian filters (steps 21 and 25)
+            ## when they ran, otherwise the HMM regions (steps 19 and 23)
+            expr_token <- sprintf("HMM_CNV_predictions.%s.Pnorm_%g", hmm_resume_file_token, BayesMaxPNormal)
+            if (!file.exists(file.path(out_dir, paste0(expr_token, ".pred_cnv_regions.dat")))) {
+                expr_token <- sprintf("%02d_HMM_pred%s", step_count-7, hmm_resume_file_token)
+            }
+            allele_token <- sprintf("HMM_allele_CNV_predictions.%s.Pnorm_%g", hmm_allele_resume_file_token, BayesMaxPNormal)
+            if (!file.exists(file.path(out_dir, paste0(allele_token, ".pred_cnv_regions.dat")))) {
+                allele_token <- sprintf("%02d_HMM_allele_pred%s", step_count-3, hmm_allele_resume_file_token)
+            }
+            flog.info(sprintf("Combining CNV regions from %s and %s", expr_token, allele_token))
             common_obj <- infercnv::fusion_HMM_report_two_methods(expression_file_path = out_dir, # the path you exported the expression-based HMM reports
-                                                                  expression_file_token = sprintf("%02d_HMM_pred%s", step_count-7, hmm_resume_file_token),  # update subcslutering method in filename
+                                                                  expression_file_token = expr_token,
                                                                   allele_file_path = out_dir, # the path you exported the allele-based HMM reports
-                                                                  allele_file_token = sprintf("%02d_HMM_allele_pred%s", step_count-3, hmm_allele_resume_file_token),
+                                                                  allele_file_token = allele_token,
                                                                   infercnv_allele_obj = infercnv_obj,
                                                                   method = combined_method,
                                                                   HMM_type = HMM_type,
@@ -1933,7 +1945,10 @@ run <- function(infercnv_obj,
                                                                 method = combined_method,
                                                                 HMM_type = HMM_type,
                                                                 enable_cnLOH = TRUE,
-                                                                output_path = bayesian_output)
+                                                                output_path = bayesian_output,
+                                                                cores = num_threads,
+                                                                plotingProbs = plot_probabilities,
+                                                                diagnostics = diagnostics)
 
             if (save_rds) {
                 saveRDS(mcmc_combined, reload_info$expected_file_names[[step_count]])

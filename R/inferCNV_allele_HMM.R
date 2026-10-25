@@ -84,22 +84,24 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters <- function(infercnv_allele_
 
                 vote[vote > 0] <- 1
                 mv <- 1 ## at least 1 vote
-                cs <- 1
+                cs <- 0
                 bound.snps.cont <- rep(0, length(vote))
                 names(bound.snps.cont) <- names(vote)
 
-                for(i in 2:length(vote)) {
-                    if(vote[i] >= mv & vote[i] == vote[i-1]) {
+                ## label each run of consecutive bound SNPs 1, 2, ... (0 = not bound)
+                for(i in seq_along(vote)) {
+                    if(vote[i] >= mv) {
+                        if(i == 1 || vote[i-1] < mv) {
+                            cs <- cs + 1
+                        }
                         bound.snps.cont[i] <- cs
-                    } else {
-                        cs <- cs + 1
                     }
                 }
 
                 tb <- table(bound.snps.cont)
                 tbv <- as.vector(tb)
                 names(tbv) <- names(tb)
-                tbv <- tbv[-1] # get rid of 0
+                tbv <- tbv[names(tbv) != "0"] # get rid of 0
 
                 ## all detected deletions have fewer than 5 SNPs...reached the end
                 tbv <- tbv[tbv >= min.num.snps]
@@ -227,22 +229,24 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples <- function(infercnv_allel
 
                 vote[vote > 0] <- 1
                 mv <- 1 ## at least 1 vote
-                cs <- 1
+                cs <- 0
                 bound.snps.cont <- rep(0, length(vote))
                 names(bound.snps.cont) <- names(vote)
 
-                for(i in 2:length(vote)) {
-                    if(vote[i] >= mv & vote[i] == vote[i-1]) {
+                ## label each run of consecutive bound SNPs 1, 2, ... (0 = not bound)
+                for(i in seq_along(vote)) {
+                    if(vote[i] >= mv) {
+                        if(i == 1 || vote[i-1] < mv) {
+                            cs <- cs + 1
+                        }
                         bound.snps.cont[i] <- cs
-                    } else {
-                        cs <- cs + 1
                     }
                 }
 
                 tb <- table(bound.snps.cont)
                 tbv <- as.vector(tb)
                 names(tbv) <- names(tb)
-                tbv <- tbv[-1] # get rid of 0
+                tbv <- tbv[names(tbv) != "0"] # get rid of 0
 
                 ## all detected deletions have fewer than 5 SNPs...reached the end
                 tbv <- tbv[tbv >= min.num.snps]
@@ -386,22 +390,24 @@ allele_HMM_predict_CNV_via_HMM_on_tumor_subclusters_mod <- function(infercnv_all
 
                 vote[vote > 0] <- 1
                 mv <- 1 ## at least 1 vote
-                cs <- 1
+                cs <- 0
                 bound.snps.cont <- rep(0, length(vote))
                 names(bound.snps.cont) <- names(vote)
 
-                for(i in 2:length(vote)) {
-                    if(vote[i] >= mv & vote[i] == vote[i-1]) {
+                ## label each run of consecutive bound SNPs 1, 2, ... (0 = not bound)
+                for(i in seq_along(vote)) {
+                    if(vote[i] >= mv) {
+                        if(i == 1 || vote[i-1] < mv) {
+                            cs <- cs + 1
+                        }
                         bound.snps.cont[i] <- cs
-                    } else {
-                        cs <- cs + 1
                     }
                 }
 
                 tb <- table(bound.snps.cont)
                 tbv <- as.vector(tb)
                 names(tbv) <- names(tb)
-                tbv <- tbv[-1] # get rid of 0
+                tbv <- tbv[names(tbv) != "0"] # get rid of 0
 
                 ## all detected deletions have fewer than 5 SNPs...reached the end
                 tbv <- tbv[tbv >= min.num.snps]
@@ -542,22 +548,24 @@ allele_HMM_predict_CNV_via_HMM_on_whole_tumor_samples_mod <- function(infercnv_a
 
                 vote[vote > 0] <- 1
                 mv <- 1 ## at least 1 vote
-                cs <- 1
+                cs <- 0
                 bound.snps.cont <- rep(0, length(vote))
                 names(bound.snps.cont) <- names(vote)
 
-                for(i in 2:length(vote)) {
-                    if(vote[i] >= mv & vote[i] == vote[i-1]) {
+                ## label each run of consecutive bound SNPs 1, 2, ... (0 = not bound)
+                for(i in seq_along(vote)) {
+                    if(vote[i] >= mv) {
+                        if(i == 1 || vote[i-1] < mv) {
+                            cs <- cs + 1
+                        }
                         bound.snps.cont[i] <- cs
-                    } else {
-                        cs <- cs + 1
                     }
                 }
 
                 tb <- table(bound.snps.cont)
                 tbv <- as.vector(tb)
                 names(tbv) <- names(tb)
-                tbv <- tbv[-1] # get rid of 0
+                tbv <- tbv[names(tbv) != "0"] # get rid of 0
 
                 ## all detected deletions have fewer than 5 SNPs...reached the end
                 tbv <- tbv[tbv >= min.num.snps]

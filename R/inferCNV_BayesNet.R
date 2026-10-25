@@ -414,7 +414,7 @@ setMethod(f="withParallel",
                   }
                   if(!(length(obj@cell_gene[[i]]$Cells) == 0)){
                       tumor_grouping <- obj@group_id[ obj@cell_gene[[i]]$Cells ] # subset the tumor ids for the cells wanted
-                      gene_exp <- obj@expr.data[obj@cell_gene[[i]]$Genes, obj@cell_gene[[i]]$Cells]
+                      gene_exp <- obj@expr.data[obj@cell_gene[[i]]$Genes, obj@cell_gene[[i]]$Cells, drop = FALSE]
                       return(run_gibb_sampling(gene_exp, obj))
                   } else {
                       return(list(NULL))
@@ -458,7 +458,7 @@ setMethod(f="nonParallel",
                   }
                   if(!(length(obj@cell_gene[[i]]$Cells) == 0)){
                       tumor_grouping <- obj@group_id[ obj@cell_gene[[i]]$Cells ] # subset the tumor ids for the cells wanted
-                      gene_exp <- obj@expr.data[obj@cell_gene[[i]]$Genes, obj@cell_gene[[i]]$Cells]
+                      gene_exp <- obj@expr.data[obj@cell_gene[[i]]$Genes, obj@cell_gene[[i]]$Cells, drop = FALSE]
                       return(run_gibb_sampling(gene_exp, obj))
                   } else {
                       return(list(NULL))
@@ -504,11 +504,11 @@ setMethod(f="reassignCNV",
 
               # 1.
               # get probabilities for each cnv
-              cnv_means <- sapply(obj@cnv_probabilities,function(i) colMeans(i))
+              cnv_means <- .cnv_state_means(obj@cnv_probabilities)
               # get HMM state asignments per CNV 
               hmm_assigned_states <- vapply(cellGene(obj), function(i){i$State}, FUN.VALUE = numeric(1) )
               # get the highest probabillity state for each cnv 
-              highest_prob <- apply(cnv_means, 2, function(i) which( i == max(i)))
+              highest_prob <- apply(cnv_means, 2, which.max)
 
               # 2. 
               # Handle cnvs that have normal state as its highest probability
@@ -573,7 +573,7 @@ setMethod(f="removeCNV",
               # Assign index and state that represents normal based on the HMM method 
               normalID <- ifelse(getArgs(obj)$HMM_type == 'i6', 3, 2)
               # Mean values of the probability distribution of the CNV states p(CNV == {states 1:6})
-              cnv_means <- sapply(obj@cnv_probabilities,function(i) colMeans(i))
+              cnv_means <- .cnv_state_means(obj@cnv_probabilities)
               
               futile.logger::flog.info(paste("Attempting to removing CNV(s) with a probability of being normal above ", getArgs(obj)$BayesMaxPNormal))
               futile.logger::flog.info(paste("Removing ",length(which(cnv_means[normalID,] > getArgs(obj)$BayesMaxPNormal)), " CNV(s) identified by the HMM."))
@@ -604,7 +604,7 @@ setMethod(f="removeCNV",
                   obj@cell_gene <- obj@cell_gene[-remove_cnv]
                   obj@cell_probabilities <- obj@cell_probabilities[-remove_cnv]
                   obj@cnv_probabilities <- obj@cnv_probabilities[-remove_cnv]
-                  cnv_means <- cnv_means[,-remove_cnv]
+                  cnv_means <- cnv_means[, -remove_cnv, drop = FALSE]
                   # obj@mcmc <- obj@mcmc[-remove_cnv]
                   # obj@combined_mcmc <- obj@combined_mcmc[-remove_cnv]
                   futile.logger::flog.info(paste("Total CNV's after removing: ", length(obj@cell_gene)))
@@ -760,7 +760,7 @@ setMethod(f="postProbNormal",
           {
               if (getArgs(obj)$plotingProbs == TRUE){
                   # get probability of the cnv's belonging to each state
-                  cnv_means <- sapply(obj@cnv_probabilities,function(i) colMeans(i))
+                  cnv_means <- .cnv_state_means(obj@cnv_probabilities)
                   # Adjust the probabilities so greater probability corresponds to less likely to be normal
                   if ( getArgs(obj)$HMM_type == 'i6'){
                       normal_prob <- 1 - cnv_means[3,]
@@ -1043,6 +1043,46 @@ pargs$add_argument(c("-x","--plot"),
                    help=paste("Plot the posterior probabilites for each CNV and each cell line in each cnv.",
                               "[Default %default]"))
 
+# Gibbs sampler for the mixture model of inst/BUGS_Mixture_Model (i6) and BUGS_Mixture_Model_i3, written in R.
+# The model is the same as the JAGS one: for each cell j of a CNV region, every gene's residual is
+# N(mu[eps_j], precision sig[eps_j]) with mu and sig fixed (MeanSD), eps_j ~ Cat(theta), theta ~ Dirichlet(1, ..., 1).
+# Because mu and sig are fixed, each cell's log-likelihood under each state is computed once from its sums of x and
+# x^2, so a sweep costs O(cells x states) rather than O(genes x cells x states). Sampling follows run_gibb_sampling's
+# JAGS settings: one chain per state, initialised with all cells in that state, 700 discarded sweeps (500 adaptation +
+# 200 burn-in) and 1000 kept sweeps; the chains are updated side by side. Returns an mcmc.list with the columns
+# theta[k] and epsilon[j], as coda.samples() does. Set options(infercnv.bayes_sampler = "jags") to use rjags instead.
+.native_mixture_gibbs <- function(gene_exp, mu, sig, n_burn = 700, n_keep = 1000) {
+    K <- length(mu); C <- ncol(gene_exp); G <- nrow(gene_exp); M <- K
+    s1 <- colSums(gene_exp); s2 <- colSums(gene_exp^2)
+    LL <- 0.5 * G * log(sig / (2 * pi)) - 0.5 * sig * (outer(rep(1, K), s2) - 2 * outer(mu, s1) + G * mu^2)  # K x C
+    LL <- LL - rep(apply(LL, 2, max), each = K)
+    L <- exp(LL)[, rep(seq_len(C), M), drop = FALSE]  # K x (C * M); chain m holds columns (m-1)*C + 1:C
+    chain <- rep(seq_len(M), each = C)
+    eps <- chain                                       # chain m starts with every cell in state m
+    theta_draws <- array(0, c(n_keep, K, M))
+    eps_draws <- array(0L, c(n_keep, C, M))
+    for (it in seq_len(n_burn + n_keep)) {
+        cnt <- matrix(tabulate(eps + K * (chain - 1L), K * M), K, M)
+        g <- matrix(stats::rgamma(K * M, 1 + cnt), K, M)
+        th <- g / rep(colSums(g), each = K)
+        P <- L * th[, chain, drop = FALSE]
+        cp <- P
+        for (k in seq_len(K)[-1]) cp[k, ] <- cp[k - 1, ] + P[k, ]
+        u <- stats::runif(C * M) * cp[K, ]
+        eps <- 1L + colSums(cp < rep(u, each = K))
+        if (it > n_burn) {
+            theta_draws[it - n_burn, , ] <- th
+            eps_draws[it - n_burn, , ] <- eps
+        }
+    }
+    cols <- c(sprintf("theta[%d]", seq_len(K)), sprintf("epsilon[%d]", seq_len(C)))
+    coda::mcmc.list(lapply(seq_len(M), function(m) {
+        coda::mcmc(matrix(c(theta_draws[, , m], eps_draws[, , m]), n_keep, K + C, dimnames = list(NULL, cols)),
+                   start = n_burn + 1)
+    }))
+}
+
+
 # Function to run the mixture model for given expression data
 # Runs on each cnv seperately. Then seperate by tumor subgroup.
 #       input:
@@ -1056,6 +1096,11 @@ run_gibb_sampling <- function(gene_exp,
                               ){
     if (is.null(ncol(gene_exp))){
         gene_exp <- data.frame(gene_exp)
+    }
+    # the R sampler implements only the bundled mixture models; a user-supplied BUGS file is run with rjags
+    bundled <- system.file(c("BUGS_Mixture_Model", "BUGS_Mixture_Model_i3"), package = "infercnv")
+    if (getOption("infercnv.bayes_sampler", "native") == "native" && modelFile(MCMC_inferCNV_obj) %in% bundled) {
+        return(.native_mixture_gibbs(as.matrix(gene_exp), MCMC_inferCNV_obj@mu, MCMC_inferCNV_obj@sig))
     }
     C = ncol(gene_exp)
     G = nrow(gene_exp)
