@@ -188,6 +188,13 @@
 #'
 #' @param plot_probabilities option to plot posterior probabilities (default: TRUE)
 #'
+#' @param clones group the tumour subclusters into clones by shared CNV events, with event boundaries shared across
+#'               clones, a parsimony re-call per clone and a clone tree of truncal and derived events; writes
+#'               infercnv.clones.* files (see infercnv_clones()). Needs analysis_mode = 'subclusters'. (default: FALSE)
+#'
+#' @param clones_pool_groups optional list of character vectors of observation groups to analyse together when
+#'                           defining clones (e.g. the epithelial clusters of a spatial sample) (default: NULL)
+#'
 #' @param save_rds Whether to save the current step object results as an .rds file (default: TRUE)
 #'
 #' @param save_final_rds Whether to save the final object results as an .rds file (default: TRUE)
@@ -333,6 +340,8 @@ run <- function(infercnv_obj,
                 resume_mode=TRUE,
                 png_res=300,
                 plot_probabilities = TRUE,
+                clones = FALSE,
+                clones_pool_groups = NULL,
                 save_rds = TRUE,
                 save_final_rds = TRUE,
                 diagnostics = FALSE,
@@ -1634,6 +1643,15 @@ run <- function(infercnv_obj,
     }
     step_count = step_count + 1 # 22
     if (skip_hmm < 4) {
+        if (HMM && clones) {
+            if (analysis_mode == "subclusters" && !per_chr_hmm_subclusters) {
+                flog.info("\n\n\tDefining clones from the subcluster HMM calls\n")
+                infercnv_clones(infercnv_obj, hmm.infercnv_obj@expr.data, HMM_type = HMM_type, out_dir = out_dir,
+                                pool_groups = clones_pool_groups)
+            } else {
+                flog.warn("clones = TRUE needs analysis_mode = 'subclusters' without per_chr_hmm_subclusters; skipped")
+            }
+        }
         if (HMM) {
             flog.info(sprintf("\n\n\tSTEP %02d: Converting HMM-based CNV states to repr expr vals\n", step_count))
             

@@ -62,6 +62,8 @@ run(
   resume_mode = TRUE,
   png_res = 300,
   plot_probabilities = TRUE,
+  clones = FALSE,
+  clones_pool_groups = NULL,
   save_rds = TRUE,
   save_final_rds = TRUE,
   diagnostics = FALSE,
@@ -252,6 +254,13 @@ NULL (default) leaves the RNG untouched and results vary between runs.}
 \item{png_res}{Resolution for png output.}
 
 \item{plot_probabilities}{option to plot posterior probabilities (default: TRUE)}
+
+\item{clones}{group the tumour subclusters into clones by shared CNV events, with event boundaries shared across
+clones, a parsimony re-call per clone and a clone tree of truncal and derived events; writes
+infercnv.clones.* files (see infercnv_clones()). Needs analysis_mode = 'subclusters'. (default: FALSE)}
+
+\item{clones_pool_groups}{optional list of character vectors of observation groups to analyse together when
+defining clones (e.g. the epithelial clusters of a spatial sample) (default: NULL)}
 
 \item{save_rds}{Whether to save the current step object results as an .rds file (default: TRUE)}
 
