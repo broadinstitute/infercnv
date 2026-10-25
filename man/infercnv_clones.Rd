@@ -16,6 +16,7 @@ infercnv_clones(
   lambda = 10,
   min_event_genes = 100,
   d_frac = 0.7,
+  min_clone_frac = 0.01,
   plot = TRUE
 )
 }
@@ -44,6 +45,8 @@ clusters of a spatial sample); other groups are analysed separately}
 \item{min_event_genes}{smallest event (genes) that can separate two clones (default: 100)}
 
 \item{d_frac}{smallest difference, as a fraction of the one-copy step, that can separate two clones (default: 0.7)}
+
+\item{min_clone_frac}{smallest clone, as a fraction of the group's cells (default: 0.01)}
 
 \item{plot}{write a clone tree + clone copy-number figure per group (default: TRUE)}
 }

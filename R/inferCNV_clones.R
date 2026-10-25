@@ -20,6 +20,9 @@
 #  4. Clone tree. Each event (consecutive segments with the same direction and the same carrier clones) has a carrier
 #     set; nested carrier sets give the tree (events carried by all clones are truncal, the others derived). Carrier
 #     sets that conflict with the tree are reported as unplaced.
+#  5. Collapse. Clones with the same placed events (differing only by unplaced, i.e. homoplastic, events) are one
+#     genotype and are merged, as are clones smaller than `min_clone_frac` of the cells (into the clone with the most
+#     similar calls); steps 3-4 are repeated after each merge.
 #
 # States are coded as i6 (1-6, neutral 3); i3 calls (1-3) are mapped to 2, 3, 4 and back on output.
 
@@ -44,6 +47,7 @@
 #' @param lambda penalty per change of state in the parsimony re-call (default: 10)
 #' @param min_event_genes smallest event (genes) that can separate two clones (default: 100)
 #' @param d_frac smallest difference, as a fraction of the one-copy step, that can separate two clones (default: 0.7)
+#' @param min_clone_frac smallest clone, as a fraction of the group's cells (default: 0.01)
 #' @param plot write a clone tree + clone copy-number figure per group (default: TRUE)
 #'
 #' @return list per group: cells (cell, group, subcluster, clone), states (genes x clones, after the parsimony
@@ -53,7 +57,8 @@
 #'
 infercnv_clones <- function(infercnv_obj, hmm_states, HMM_type = c("i6", "i3"), out_dir = NULL,
                             output_prefix = "infercnv.clones", pool_groups = NULL, min_cells = 5, tol = 30,
-                            lambda = 10, min_event_genes = 100, d_frac = 0.7, plot = TRUE) {
+                            lambda = 10, min_event_genes = 100, d_frac = 0.7, min_clone_frac = 0.01,
+                            plot = TRUE) {
     HMM_type <- match.arg(HMM_type)
     genes <- intersect(rownames(hmm_states), rownames(infercnv_obj@expr.data))
     gene_order <- infercnv_obj@gene_order[genes, , drop = FALSE]
@@ -85,11 +90,16 @@ infercnv_clones <- function(infercnv_obj, hmm_states, HMM_type = c("i6", "i3"), 
         seg <- rf$seg
         cl <- if (sum(ns >= min_cells) >= 2) .clone_candidates(P2, seg, R, cbs, min_cells = min_cells)
               else list(clone = setNames(rep("A", length(subs)), subs), low = character(0))
-        mp <- .clone_merge(cl, P2, seg, chr, R, cbs, lambda = lambda, min_event_genes = min_event_genes, d_frac = d_frac)
-        ev <- .clone_shared_events(mp$pcons, seg, chr)
-        ev$start_pos <- pos[ev$start]; ev$end_pos <- gene_order$stop[ev$end]
-        ev$start_gene <- genes[ev$start]; ev$end_gene <- genes[ev$end]
-        tl <- .clone_tree_layout(ev, mp$sizes)
+        repeat {
+            mp <- .clone_merge(cl, P2, seg, chr, R, cbs, lambda = lambda, min_event_genes = min_event_genes, d_frac = d_frac)
+            ev <- .clone_shared_events(mp$pcons, seg, chr)
+            ev$start_pos <- pos[ev$start]; ev$end_pos <- gene_order$stop[ev$end]
+            ev$start_gene <- genes[ev$start]; ev$end_gene <- genes[ev$end]
+            tl <- .clone_tree_layout(ev, mp$sizes)
+            to <- .clone_collapse(ev, tl$unplaced, mp, min_size = max(min_cells, min_clone_frac * sum(ns)))
+            if (is.null(to)) break
+            cl$clone <- to
+        }
         states <- mp$pcons; if (HMM_type == "i3") states <- states - 1
         rownames(states) <- genes
         cells_df <- data.frame(cell = cells[s_g$cell], group = g, subcluster = s_g$sub,
@@ -464,6 +474,36 @@ infercnv_clones <- function(infercnv_obj, hmm_states, HMM_type = c("i6", "i3"), 
     tr$size <- ifelse(tr$leaf, as.numeric(sizes[tr$node]), NA_real_)
     tr$truncal <- tr$node == sets[1]
     list(tree = tr, leaves = leaves, unplaced = unplaced)
+}
+
+
+## ---- 5. collapse clones without their own placed events, and small clones ----
+
+# one merge per call (NULL when none): the smallest clone below min_size joins the clone with the most similar calls
+# (genes with a different direction); otherwise the smallest clone that shares its set of placed events with another
+# clone joins the largest such clone. Returns the subcluster -> clone map.
+.clone_collapse <- function(ev, unplaced, mp, min_size) {
+    sz <- mp$sizes; ks <- names(sz); if (length(ks) < 2) return(NULL)
+    D <- .clone_dir(mp$pcons)
+    to <- NULL
+    small <- ks[sz < min_size]
+    if (length(small)) {
+        a <- small[which.min(sz[small])]; o <- setdiff(ks, a)
+        d <- vapply(o, function(k) sum(D[, a] != D[, k]), numeric(1))
+        to <- c(a, o[order(d, -sz[o])][1])
+    } else {
+        key <- function(e) paste(e$chr, e$start, e$dir, e$carriers)
+        placed <- ev[!key(ev) %in% key(unplaced), ]
+        sig <- vapply(ks, function(k) paste(sort(key(placed[grepl(k, placed$carriers, fixed = TRUE), ])), collapse = ";"),
+                      character(1))
+        dup <- ks[duplicated(sig) | duplicated(sig, fromLast = TRUE)]
+        if (length(dup)) {
+            a <- dup[which.min(sz[dup])]; o <- setdiff(ks[sig == sig[a]], a)
+            to <- c(a, o[which.max(sz[o])])
+        }
+    }
+    if (is.null(to)) return(NULL)
+    cl <- mp$clone; cl[cl == to[1]] <- to[2]; cl
 }
 
 
