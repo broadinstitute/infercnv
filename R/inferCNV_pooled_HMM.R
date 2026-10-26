@@ -9,11 +9,11 @@
 #   2. each gene's noise for a group of n cells is estimated from the reference cells: sampling (between-cell squared
 #      coefficient of variation / n) plus, with several reference groups, the gene's variation between reference cell
 #      types (which does not average out); both are moderated towards their trend on mean expression;
-#   3. the log ratios are smoothed along each chromosome with a small (pyramid) window, weighting genes by 1/sd
+#   3. each gene's log ratio is limited to clip_z (3) sd, then the log ratios are smoothed along each chromosome with a small (pyramid) window, weighting genes by 1/sd
 #      ('zscore': the mean of the genes' z-scores, rescaled to log-fold units), 1/variance ('invvar') or equally;
 #   4. an i6 HMM is run with state means fixed at log(0.01), log(0.5), 0, log(1.5), log(2), log(3) and a
-#      position-specific sd (the smoothed noise), scaled by a factor calibrated on random groups of reference cells
-#      (left out of the reference profile), so that their smoothed profiles are N(0, 1) in sd units; Student-t
+#      position-specific sd (the smoothed noise), scaled by a factor (log-linear in group size) calibrated on random
+#      groups of reference cells (left out of the reference profile), so that their smoothed profiles are N(0, 1) in sd units; Student-t
 #      emissions limit the pull of outlier positions.
 # The same random reference groups give the null false-call rate.
 
@@ -91,7 +91,7 @@
 
 # smoothed log-ratio profiles and their sd for groups of cells (columns: groups); mu_list optionally gives a per-group
 # reference profile (leave-out)
-.pooled_profiles <- function(N, groups, model, chr_idx, window_length, gene_weights, center, mu_list = NULL) {
+.pooled_profiles <- function(N, groups, model, chr_idx, window_length, gene_weights, center, mu_list = NULL, clip_z = 3) {
     k <- .pooled_pyramid(window_length)
     S <- matrix(NA_real_, nrow(N), length(groups)); SD <- S
     for (j in seq_along(groups)) {
@@ -105,6 +105,11 @@
             reliable <- mu * n >= 5
             if (sum(reliable) < 100) reliable <- rep(TRUE, length(r))
             r <- r - stats::median(r[reliable])
+        }
+        ## limit single genes (co-expressed gene clusters, outlier cells) to clip_z sd; a one-copy change is < 1 sd per gene
+        if (is.finite(clip_z)) {
+            lim <- clip_z * sqrt(s2)
+            r <- pmin(pmax(r, -lim), lim)
         }
         for (gi in chr_idx) {
             num <- .pooled_conv(w[gi] * r[gi], k)
@@ -124,7 +129,7 @@
     st <- matrix(NA_integer_, nrow(S), ncol(S))
     for (j in seq_len(ncol(S))) {
         for (gi in chr_idx) {
-            sc <- kappa * SD[gi, j]
+            sc <- kappa[j] * SD[gi, j]
             LL <- sapply(lev, function(m) stats::dt((S[gi, j] - m) / sc, df = df, log = TRUE) - log(sc))
             st[gi, j] <- .pooled_viterbi(matrix(LL, ncol = 6), logT, logdelta)
         }
@@ -187,15 +192,26 @@ predict_CNV_via_pooled_HMM_on_tumor_subclusters <- function(infercnv_obj, window
         model$mu + (mg - model$m[, g]) / G
     })
     np <- .pooled_profiles(N, nd$groups, model, chr_idx, window_length, gene_weights, center, mu_list)
-    z <- as.numeric(np$S / np$SD)
-    kappa <- stats::mad(z[is.finite(z)], center = 0)
-    null_st <- .pooled_states(np$S, np$SD, kappa, chr_idx, t, df)
+    ## noise scale per group size: spread of each null profile in model sd units, log-linear in log group size
+    ## (correlated neighbouring genes inflate the smoothed noise by a size-dependent factor)
+    kj <- vapply(seq_along(nd$groups), function(j) { z <- np$S[, j] / np$SD[, j]; stats::mad(z[is.finite(z)], center = 0) },
+                 numeric(1))
+    nj <- lengths(nd$groups)
+    kappa_at <- if (length(unique(nj)) >= 3 && max(nj) / min(nj) >= 1.5) {
+        fit <- stats::lm(log(kj) ~ log(nj))
+        function(n) pmin(pmax(exp(stats::predict(fit, newdata = data.frame(nj = n))), min(kj)), max(kj))
+    } else {
+        function(n) rep(stats::median(kj), length(n))
+    }
+    null_st <- .pooled_states(np$S, np$SD, kappa_at(nj), chr_idx, t, df)
     null_fpr <- mean(null_st != 3)
-    flog.info(sprintf("pooled HMM: noise scale %.2f (from %d reference groups, median %d cells); null false-call rate %.1f%%",
-                      kappa, length(nd$groups), as.integer(stats::median(lengths(nd$groups))), 100 * null_fpr))
+    flog.info(sprintf(paste0("pooled HMM: noise scale %.2f-%.2f (groups of %d-%d cells; from %d reference groups); ",
+                             "null false-call rate %.1f%%"), min(kappa_at(range(nj))), max(kappa_at(range(nj))), min(nj), max(nj),
+                      length(nd$groups), 100 * null_fpr))
 
     ## all subclusters (observation and reference)
     op <- .pooled_profiles(N, sub, model, chr_idx, window_length, gene_weights, center)
+    kappa <- kappa_at(lengths(sub))
     st <- .pooled_states(op$S, op$SD, kappa, chr_idx, t, df)
     hmm.data <- infercnv_obj@expr.data
     hmm.data[, ] <- -1
