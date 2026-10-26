@@ -288,7 +288,8 @@ get_hspike_cnv_mean_sd_trend_by_num_cells_fit <- function(hspike_obj, plot=FALSE
 # Empirical false-call rate of the i6 HMM. Reference cells carry no CNVs, so the HMM, run with the emission model it
 # will use on the observations, on random groups of reference cells (drawn within each reference group, sized like the
 # observation subclusters) should call (almost) everything neutral; the fraction of genes x groups called non-neutral
-# estimates how often the run's calls are noise. Random groups are an optimistic null (they lack the shared structure of
+# estimates how often the run's calls are noise (averaged over cells, so that small groups do not dominate). Random
+# groups are an optimistic null (they lack the shared structure of
 # real subclusters), so the thresholds are set low. Stop (or warn) above thresholds[2]; warn above thresholds[1].
 # The random number state is restored afterwards so the rest of the run is unchanged.
 .check_hmm_null_fpr <- function(infercnv_obj, t, action=c("stop", "warn"), thresholds=c(0.05, 0.15), max_groups=60,
@@ -356,7 +357,7 @@ get_hspike_cnv_mean_sd_trend_by_num_cells_fit <- function(hspike_obj, plot=FALSE
         }))
         mean(st != 3)
     }, numeric(1))
-    fpr <- mean(called)
+    fpr <- stats::weighted.mean(called, lengths(groups))   # per cell
     msg <- sprintf("%.1f%% of genes called as CNVs in %d random groups of reference cells (median %d cells, %s; worst group %.1f%%)",
                    100 * fpr, length(groups), as.integer(stats::median(lengths(groups))), sized, 100 * max(called))
     flog.info(sprintf("HMM null false-call check: %s", msg))

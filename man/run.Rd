@@ -67,6 +67,8 @@ run(
   HMM_gene_density_check = c("stop", "warn", "none"),
   HMM_null_fpr_check = c("stop", "warn", "none"),
   HMM_null_fpr_thresholds = c(0.05, 0.15),
+  HMM_min_subcluster_size = "auto",
+  HMM_min_subcluster_fpr = 0.02,
   save_rds = TRUE,
   save_final_rds = TRUE,
   diagnostics = FALSE,
@@ -276,6 +278,14 @@ HMM_null_false_call_rate.tsv). "stop" (default) or "warn" when it exceeds
 HMM_null_fpr_thresholds[2], "none" to skip. A warning is given above HMM_null_fpr_thresholds[1].}
 
 \item{HMM_null_fpr_thresholds}{false-call rates for a warning and for stopping (default: c(0.05, 0.15))}
+
+\item{HMM_min_subcluster_size}{with HMM = TRUE and analysis_mode = 'subclusters': subclusters smaller than this are
+merged into their most similar subcluster of the same group (small groups of cells
+give many false HMM calls). "auto" (default; i6 only) runs the HMM on random groups of
+reference cells of increasing size and uses the smallest size whose false-call rate is
+at most HMM_min_subcluster_fpr; a number sets the size; 0 or 1 disables merging.}
+
+\item{HMM_min_subcluster_fpr}{target false-call rate for HMM_min_subcluster_size = "auto" (default: 0.02)}
 
 \item{save_rds}{Whether to save the current step object results as an .rds file (default: TRUE)}
 

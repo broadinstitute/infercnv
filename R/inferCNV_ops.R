@@ -207,6 +207,14 @@
 #'
 #' @param HMM_null_fpr_thresholds false-call rates for a warning and for stopping (default: c(0.05, 0.15))
 #'
+#' @param HMM_min_subcluster_size with HMM = TRUE and analysis_mode = 'subclusters': subclusters smaller than this are
+#'                                merged into their most similar subcluster of the same group (small groups of cells
+#'                                give many false HMM calls). "auto" (default; i6 only) runs the HMM on random groups of
+#'                                reference cells of increasing size and uses the smallest size whose false-call rate is
+#'                                at most HMM_min_subcluster_fpr; a number sets the size; 0 or 1 disables merging.
+#'
+#' @param HMM_min_subcluster_fpr target false-call rate for HMM_min_subcluster_size = "auto" (default: 0.02)
+#'
 #' @param save_rds Whether to save the current step object results as an .rds file (default: TRUE)
 #'
 #' @param save_final_rds Whether to save the final object results as an .rds file (default: TRUE)
@@ -357,6 +365,8 @@ run <- function(infercnv_obj,
                 HMM_gene_density_check = c("stop", "warn", "none"),
                 HMM_null_fpr_check = c("stop", "warn", "none"),
                 HMM_null_fpr_thresholds = c(0.05, 0.15),
+                HMM_min_subcluster_size = "auto",
+                HMM_min_subcluster_fpr = 0.02,
                 save_rds = TRUE,
                 save_final_rds = TRUE,
                 diagnostics = FALSE,
@@ -1290,6 +1300,28 @@ run <- function(infercnv_obj,
             subclusters_per_chr = res[[2]]
             rm(res)
 
+            if (HMM && !identical(HMM_min_subcluster_size, 0) && !identical(HMM_min_subcluster_size, 1)) {
+                if (per_chr_hmm_subclusters) {
+                    flog.info("per-chromosome HMM subclusters: small subclusters are not merged")
+                } else {
+                    min_size <- NULL
+                    if (identical(HMM_min_subcluster_size, "auto")) {
+                        if (HMM_type == 'i6') {
+                            min_size <- .hmm_min_subcluster_size(infercnv_obj, target=HMM_min_subcluster_fpr,
+                                                                 t=HMM_transition_prob)$size
+                        } else {
+                            flog.info("HMM_min_subcluster_size='auto' is determined with the i6 model only; no merging")
+                        }
+                    } else {
+                        min_size <- as.numeric(HMM_min_subcluster_size)
+                    }
+                    if (!is.null(min_size)) {
+                        flog.info(sprintf("minimum subcluster size for the HMM: %g cells", min_size))
+                        infercnv_obj <- .merge_small_subclusters(infercnv_obj, min_size, hclust_method)
+                    }
+                }
+            }
+
             if (save_rds) {
                 saveRDS(infercnv_obj, reload_info$expected_file_names[[step_count]])
                 if(per_chr_hmm_subclusters) {
@@ -1481,6 +1513,12 @@ run <- function(infercnv_obj,
             } else if (analysis_mode == 'cells') {
                 
                 if (HMM_type == 'i6') {
+                    fp1 <- .hmm_min_subcluster_size(infercnv_obj, target=HMM_min_subcluster_fpr, sizes=1, t=HMM_transition_prob)
+                    if (!is.null(fp1) && fp1$fpr[1] > HMM_min_subcluster_fpr) {
+                        flog.warn(sprintf(paste0("HMM on single cells: %.1f%% of genes called as CNVs in random single reference ",
+                                                 "cells. Per-cell calls are unreliable here; consider analysis_mode='subclusters'."),
+                                          100 * fp1$fpr[1]))
+                    }
                     hmm.infercnv_obj <- predict_CNV_via_HMM_on_indiv_cells(infercnv_obj, t=HMM_transition_prob)
                 } else if (HMM_type == 'i3') {
                     hmm.infercnv_obj <- i3HMM_predict_CNV_via_HMM_on_indiv_cells(infercnv_obj,

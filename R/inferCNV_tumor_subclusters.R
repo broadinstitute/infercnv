@@ -772,3 +772,116 @@ add_single_branch_to_phylo = function(in_tree, label) {
     return(in_tree)
 }
 
+
+
+# Minimum subcluster size for the HMM. The i6 HMM (h-spike emission model, size-dependent sd) is run on random groups of
+# reference cells (one reference group per draw; reference cells carry no CNVs, so every call is false) of increasing
+# size; the smallest size whose false-call rate is at most target is returned (the largest size tested, with a warning,
+# if none is). The random number state is restored afterwards.
+.hmm_min_subcluster_size <- function(infercnv_obj, target = 0.02, sizes = c(1, 2, 3, 5, 10, 15, 20, 30, 50, 75, 100),
+                                     groups_per_size = 10, t = 1e-6) {
+    ref_groups <- infercnv_obj@reference_grouped_cell_indices
+    if (length(ref_groups) == 0) {
+        flog.info("minimum subcluster size: no reference cells, not determined")
+        return(NULL)
+    }
+    if (exists(".Random.seed", envir = globalenv())) {
+        old_seed <- get(".Random.seed", envir = globalenv())
+        on.exit(assign(".Random.seed", old_seed, envir = globalenv()))
+    }
+    set.seed(1)
+    cnv_mean_sd <- get_spike_dists(infercnv_obj@.hspike)
+    fit <- get_hspike_cnv_mean_sd_trend_by_num_cells_fit(infercnv_obj@.hspike)
+    HMM_info <- .get_HMM(cnv_mean_sd, t)
+    gene_order <- infercnv_obj@gene_order
+    chr_idx <- split(seq_len(nrow(gene_order)), factor(gene_order$chr, levels = unique(gene_order$chr)))
+    rs <- lengths(ref_groups)
+    sizes <- sizes[sizes <= max(rs) / 2]
+    fpr <- setNames(rep(NA_real_, length(sizes)), sizes)
+    for (n in sizes) {
+        ok <- which(rs >= 2 * n)
+        called <- vapply(seq_len(groups_per_size), function(i) {
+            g <- ok[sample.int(length(ok), 1, prob = rs[ok])]
+            cells <- ref_groups[[g]][sample.int(rs[g], n)]
+            ep <- .get_state_emission_params(n, cnv_mean_sd, fit)
+            st <- unlist(lapply(chr_idx, function(gi) {
+                v <- rowMeans(infercnv_obj@expr.data[gi, cells, drop = FALSE])
+                Viterbi.dthmm.adj(HiddenMarkov::dthmm(v, HMM_info[['state_transitions']], HMM_info[['delta']], "norm", ep))
+            }))
+            mean(st != 3)
+        }, numeric(1))
+        fpr[as.character(n)] <- mean(called)
+        if (fpr[as.character(n)] <= target) break
+    }
+    tested <- fpr[!is.na(fpr)]
+    flog.info(sprintf("HMM false calls on random reference groups by size: %s",
+                      paste(sprintf("%s cells %.1f%%", names(tested), 100 * tested), collapse = ", ")))
+    hit <- names(tested)[tested <= target]
+    if (length(hit) == 0) {
+        flog.warn(sprintf("no group size up to %s cells keeps HMM false calls at or below %g%%; using %s",
+                          tail(names(tested), 1), 100 * target, tail(names(tested), 1)))
+        return(list(size = as.numeric(tail(names(tested), 1)), fpr = tested))
+    }
+    list(size = as.numeric(hit[1]), fpr = tested)
+}
+
+
+# Merge subclusters smaller than min_size into the most similar subcluster of the same group (highest correlation of
+# mean profiles; smallest first, profiles updated after each merge). A group with fewer than min_size cells in all is
+# kept as one subcluster. The group's dendrogram is rebuilt so that subclusters stay contiguous (as in the Leiden step).
+.merge_small_subclusters <- function(infercnv_obj, min_size, hclust_method) {
+    if (is.null(min_size) || min_size <= 1) return(infercnv_obj)
+    subs <- infercnv_obj@tumor_subclusters$subclusters
+    X <- infercnv_obj@expr.data
+    n_merged <- 0; n_cells <- 0
+    for (g in names(subs)) {
+        sg <- subs[[g]]
+        if (length(sg) < 2) next
+        changed <- FALSE
+        repeat {
+            sz <- lengths(sg)
+            if (length(sg) < 2 || min(sz) >= min_size) break
+            i <- which.min(sz)
+            prof <- vapply(sg, function(ix) rowMeans(X[, ix, drop = FALSE]), numeric(nrow(X)))
+            r <- suppressWarnings(stats::cor(prof[, i], prof[, -i, drop = FALSE]))
+            r[is.na(r)] <- -Inf
+            j <- seq_along(sg)[-i][which.max(r)]
+            n_merged <- n_merged + 1; n_cells <- n_cells + sz[i]
+            sg[[j]] <- sort(c(sg[[j]], sg[[i]]))
+            sg[[i]] <- NULL
+            changed <- TRUE
+        }
+        if (changed) {
+            subs[[g]] <- sg
+            infercnv_obj@tumor_subclusters$hc[[g]] <- .subclusters_hc(X, sg, hclust_method)
+        }
+    }
+    infercnv_obj@tumor_subclusters$subclusters <- subs
+    flog.info(sprintf("merged %d subclusters smaller than %g cells (%d cells) into their most similar subcluster",
+                      n_merged, min_size, n_cells))
+    infercnv_obj
+}
+
+# dendrogram of a group's cells with each subcluster as a clade (as built by .single_tumor_leiden_subclustering)
+.subclusters_hc <- function(X, sg, hclust_method) {
+    sg <- sg[order(lengths(sg), decreasing = TRUE)]
+    full <- NULL
+    for (ix in sg) {
+        if (length(ix) >= 2) {
+            ph <- as.phylo(hclust(parallelDist(t(X[, ix, drop = FALSE]), threads = infercnv.env$GLOBAL_NUM_THREADS),
+                                  method = hclust_method))
+            if (is.null(full)) {
+                full <- ph
+            } else {
+                h1 <- get.rooted.tree.height(ph); h2 <- get.rooted.tree.height(full)
+                if (h1 == h2) { ph$root.edge <- 1; full$root.edge <- 1 }
+                else if (h1 > h2) { ph$root.edge <- 1; full$root.edge <- h1 - h2 + 1 }
+                else { ph$root.edge <- h2 - h1 + 1; full$root.edge <- 1 }
+                full <- ph + full
+            }
+        } else {
+            full <- add_single_branch_to_phylo(full, colnames(X)[ix])
+        }
+    }
+    as.hclust(full)
+}
