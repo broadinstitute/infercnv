@@ -36,6 +36,7 @@ Collate:
     'inferCNV_mask_non_DE.R'
     'inferCNV_meanVarSim.R'
     'inferCNV_ops.R'
+    'inferCNV_pooled_HMM.R'
     'inferCNV_simple_sim.R'
     'inferCNV_tumor_subclusters.R'
     'inferCNV_tumor_subclusters.random_smoothed_trees.R'

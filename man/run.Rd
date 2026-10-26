@@ -67,6 +67,9 @@ run(
   HMM_gene_density_check = c("stop", "warn", "none"),
   HMM_null_fpr_check = c("stop", "warn", "none"),
   HMM_null_fpr_thresholds = c(0.05, 0.15),
+  HMM_expr_model = c("cell_log", "pooled"),
+  pooled_window_length = 31,
+  pooled_gene_weights = c("zscore", "invvar", "equal"),
   save_rds = TRUE,
   save_final_rds = TRUE,
   diagnostics = FALSE,
@@ -276,6 +279,18 @@ HMM_null_false_call_rate.tsv). "stop" (default) or "warn" when it exceeds
 HMM_null_fpr_thresholds[2], "none" to skip. A warning is given above HMM_null_fpr_thresholds[1].}
 
 \item{HMM_null_fpr_thresholds}{false-call rates for a warning and for stopping (default: c(0.05, 0.15))}
+
+\item{HMM_expr_model}{expression input of the i6 HMM in analysis_mode = 'subclusters': "cell_log" (default; subcluster
+mean of the per-cell smoothed log expression, emission model from the h-spike) or "pooled"
+(experimental: counts pooled per subcluster and compared with the pooled reference on the log
+scale, genes weighted by their noise estimated from the reference cells, smoothed over
+pooled_window_length genes, state means fixed at the copy-number fold changes, noise scale
+calibrated on random groups of reference cells). (default: "cell_log")}
+
+\item{pooled_window_length}{smoothing window (genes) of the pooled HMM (default: 31)}
+
+\item{pooled_gene_weights}{gene weights in the pooled HMM's smoothing: "zscore" (1/sd, default), "invvar" (1/variance)
+or "equal"}
 
 \item{save_rds}{Whether to save the current step object results as an .rds file (default: TRUE)}
 

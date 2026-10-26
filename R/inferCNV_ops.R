@@ -207,6 +207,18 @@
 #'
 #' @param HMM_null_fpr_thresholds false-call rates for a warning and for stopping (default: c(0.05, 0.15))
 #'
+#' @param HMM_expr_model expression input of the i6 HMM in analysis_mode = 'subclusters': "cell_log" (default; subcluster
+#'                       mean of the per-cell smoothed log expression, emission model from the h-spike) or "pooled"
+#'                       (experimental: counts pooled per subcluster and compared with the pooled reference on the log
+#'                       scale, genes weighted by their noise estimated from the reference cells, smoothed over
+#'                       pooled_window_length genes, state means fixed at the copy-number fold changes, noise scale
+#'                       calibrated on random groups of reference cells). (default: "cell_log")
+#'
+#' @param pooled_window_length smoothing window (genes) of the pooled HMM (default: 31)
+#'
+#' @param pooled_gene_weights gene weights in the pooled HMM's smoothing: "zscore" (1/sd, default), "invvar" (1/variance)
+#'                            or "equal"
+#'
 #' @param save_rds Whether to save the current step object results as an .rds file (default: TRUE)
 #'
 #' @param save_final_rds Whether to save the final object results as an .rds file (default: TRUE)
@@ -357,6 +369,9 @@ run <- function(infercnv_obj,
                 HMM_gene_density_check = c("stop", "warn", "none"),
                 HMM_null_fpr_check = c("stop", "warn", "none"),
                 HMM_null_fpr_thresholds = c(0.05, 0.15),
+                HMM_expr_model = c("cell_log", "pooled"),
+                pooled_window_length = 31,
+                pooled_gene_weights = c("zscore", "invvar", "equal"),
                 save_rds = TRUE,
                 save_final_rds = TRUE,
                 diagnostics = FALSE,
@@ -390,6 +405,8 @@ run <- function(infercnv_obj,
     smooth_method = match.arg(smooth_method)
     HMM_gene_density_check = match.arg(HMM_gene_density_check)
     HMM_null_fpr_check = match.arg(HMM_null_fpr_check)
+    HMM_expr_model = match.arg(HMM_expr_model)
+    pooled_gene_weights = match.arg(pooled_gene_weights)
     HMM_type = match.arg(HMM_type)
     allele_mode = match.arg(allele_mode)
     combined_method = match.arg(combined_method)
@@ -695,7 +712,8 @@ run <- function(infercnv_obj,
     }
 
     if (HMM && smooth_method != 'coordinates' && HMM_gene_density_check != "none") {
-        .check_hmm_gene_density(infercnv_obj, window_length, HMM_gene_density_check)
+        .check_hmm_gene_density(infercnv_obj, if (HMM_expr_model == 'pooled') pooled_window_length else window_length,
+                                HMM_gene_density_check)
     }
     
     
@@ -1447,14 +1465,29 @@ run <- function(infercnv_obj,
         if (skip_hmm < 1) {
             flog.info(sprintf("\n\n\tSTEP %02d: expression-based HMM CNV prediction\n", step_count))
 
-            if (HMM_type == 'i6' && HMM_null_fpr_check != "none") {
+            if (HMM_type == 'i6' && HMM_null_fpr_check != "none" && HMM_expr_model == 'cell_log') {
                 .check_hmm_null_fpr(infercnv_obj, t=HMM_transition_prob, action=HMM_null_fpr_check,
                                     thresholds=HMM_null_fpr_thresholds, out_dir=out_dir)
             }
             
             if (analysis_mode == 'subclusters') {
                 
-                if (HMM_type == 'i6') {
+                if (HMM_type == 'i6' && HMM_expr_model == 'pooled') {
+                    hmm.infercnv_obj <- predict_CNV_via_pooled_HMM_on_tumor_subclusters(infercnv_obj,
+                                                                                        window_length=pooled_window_length,
+                                                                                        gene_weights=pooled_gene_weights,
+                                                                                        t=HMM_transition_prob)
+                    nf <- hmm.infercnv_obj@options$pooled_hmm$null_fpr
+                    if (HMM_null_fpr_check != "none" && nf > HMM_null_fpr_thresholds[2]) {
+                        txt <- sprintf(paste0("HMM calls would be unreliable: pooled HMM null false-call rate %.1f%%, above %g%%. ",
+                                              "Use a larger pooled_window_length or more reads per cell; set HMM_null_fpr_check='warn' ",
+                                              "to proceed anyway."), 100 * nf, 100 * HMM_null_fpr_thresholds[2])
+                        if (HMM_null_fpr_check == "stop") { flog.error(txt); stop(txt) }
+                        flog.warn(txt)
+                    } else if (HMM_null_fpr_check != "none" && nf > HMM_null_fpr_thresholds[1]) {
+                        flog.warn(sprintf("Elevated pooled HMM null false-call rate: %.1f%%. Treat small calls with caution.", 100 * nf))
+                    }
+                } else if (HMM_type == 'i6') {
                     if (tumor_subcluster_partition_method == "leiden" && per_chr_hmm_subclusters) {
                         hmm.infercnv_obj <- predict_CNV_via_HMM_on_tumor_subclusters_per_chr(infercnv_obj = infercnv_obj, 
                                                                                              subclusters_per_chr = subclusters_per_chr,
