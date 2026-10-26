@@ -65,6 +65,8 @@ run(
   clones = FALSE,
   clones_pool_groups = NULL,
   HMM_gene_density_check = c("stop", "warn", "none"),
+  HMM_null_fpr_check = c("stop", "warn", "none"),
+  HMM_null_fpr_thresholds = c(0.05, 0.15),
   save_rds = TRUE,
   save_final_rds = TRUE,
   diagnostics = FALSE,
@@ -266,6 +268,14 @@ defining clones (e.g. the epithelial clusters of a spatial sample) (default: NUL
 \item{HMM_gene_density_check}{with HMM = TRUE: "stop" (default) or "warn" when the median chromosome has fewer genes
 than window_length after the expression cutoff (data too sparse for the HMM; checked
 at step 2), "none" to skip the check. Below 2 x window_length a warning is given.}
+
+\item{HMM_null_fpr_check}{with HMM = TRUE and HMM_type = 'i6': before the HMM, run it on random groups of reference cells
+sized like the observation subclusters; as reference cells carry no CNVs, the fraction of
+genes called non-neutral estimates the false-call rate (written to
+HMM_null_false_call_rate.tsv). "stop" (default) or "warn" when it exceeds
+HMM_null_fpr_thresholds[2], "none" to skip. A warning is given above HMM_null_fpr_thresholds[1].}
+
+\item{HMM_null_fpr_thresholds}{false-call rates for a warning and for stopping (default: c(0.05, 0.15))}
 
 \item{save_rds}{Whether to save the current step object results as an .rds file (default: TRUE)}
 

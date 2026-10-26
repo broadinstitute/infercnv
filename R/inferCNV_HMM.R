@@ -285,6 +285,103 @@ get_hspike_cnv_mean_sd_trend_by_num_cells_fit <- function(hspike_obj, plot=FALSE
 }
 
 
+# Empirical false-call rate of the i6 HMM. Reference cells carry no CNVs, so the HMM, run with the emission model it
+# will use on the observations, on random groups of reference cells (drawn within each reference group, sized like the
+# observation subclusters) should call (almost) everything neutral; the fraction of genes x groups called non-neutral
+# estimates how often the run's calls are noise. Random groups are an optimistic null (they lack the shared structure of
+# real subclusters), so the thresholds are set low. Stop (or warn) above thresholds[2]; warn above thresholds[1].
+# The random number state is restored afterwards so the rest of the run is unchanged.
+.check_hmm_null_fpr <- function(infercnv_obj, t, action=c("stop", "warn"), thresholds=c(0.05, 0.15), max_groups=60,
+                                min_groups=5, out_dir=NULL,
+                                cnv_mean_sd=get_spike_dists(infercnv_obj@.hspike),
+                                cnv_level_to_mean_sd_fit=get_hspike_cnv_mean_sd_trend_by_num_cells_fit(infercnv_obj@.hspike)) {
+    action <- match.arg(action)
+    ref_groups <- infercnv_obj@reference_grouped_cell_indices
+    if (length(ref_groups) == 0) {
+        flog.info("HMM null false-call check: no reference cells, skipped")
+        return(invisible(NULL))
+    }
+    ref_cells <- unlist(ref_groups)
+    if (!is.null(infercnv_obj@tumor_subclusters)) {
+        sub <- unlist(infercnv_obj@tumor_subclusters[["subclusters"]], recursive=FALSE)
+        sizes <- lengths(sub[!vapply(sub, function(ix) all(ix %in% ref_cells), logical(1))])
+    } else {
+        sizes <- lengths(infercnv_obj@observation_grouped_cell_indices)
+    }
+    if (length(sizes) == 0) {
+        return(invisible(NULL))
+    }
+    has_seed <- exists(".Random.seed", envir=globalenv())
+    if (has_seed) {
+        old_seed <- get(".Random.seed", envir=globalenv())
+        on.exit(assign(".Random.seed", old_seed, envir=globalenv()))
+    }
+    draw <- function(sizes) {
+        groups <- list()
+        for (g in names(ref_groups)) {
+            pool <- ref_groups[[g]]
+            pool <- pool[sample.int(length(pool))]
+            while (length(pool) >= min(sizes) && length(groups) < max_groups) {
+                k <- min(sizes[sample.int(length(sizes), 1)], length(pool))
+                groups[[length(groups) + 1]] <- pool[seq_len(k)]
+                pool <- pool[-seq_len(k)]
+            }
+        }
+        groups
+    }
+    set.seed(1)
+    groups <- draw(sizes)
+    sized <- "sized like the observation subclusters"
+    if (length(groups) < min_groups) {
+        ## observation groups larger than the reference pool (e.g. analysis_mode='samples'): smaller groups, with the
+        ## emission sd for their size
+        cap <- max(floor(sum(lengths(ref_groups)) / (2 * min_groups)), 1)
+        flog.info(sprintf("HMM null false-call check: observation groups larger than the reference pool; using groups of up to %d reference cells", cap))
+        groups <- draw(pmin(sizes, cap))
+        sized <- "smaller than the observation groups"
+    }
+    if (length(groups) < min_groups) {
+        flog.info(sprintf("HMM null false-call check: only %d groups of reference cells the size of the observation subclusters, skipped",
+                          length(groups)))
+        return(invisible(NULL))
+    }
+    HMM_info <- .get_HMM(cnv_mean_sd, t)
+    gene_order <- infercnv_obj@gene_order
+    chr_idx <- split(seq_len(nrow(gene_order)), factor(gene_order$chr, levels=unique(gene_order$chr)))
+    called <- vapply(groups, function(cells) {
+        ep <- .get_state_emission_params(length(cells), cnv_mean_sd, cnv_level_to_mean_sd_fit)
+        st <- unlist(lapply(chr_idx, function(gi) {
+            v <- rowMeans(infercnv_obj@expr.data[gi, cells, drop=FALSE])
+            Viterbi.dthmm.adj(HiddenMarkov::dthmm(v, HMM_info[['state_transitions']], HMM_info[['delta']], "norm", ep))
+        }))
+        mean(st != 3)
+    }, numeric(1))
+    fpr <- mean(called)
+    msg <- sprintf("%.1f%% of genes called as CNVs in %d random groups of reference cells (median %d cells, %s; worst group %.1f%%)",
+                   100 * fpr, length(groups), as.integer(stats::median(lengths(groups))), sized, 100 * max(called))
+    flog.info(sprintf("HMM null false-call check: %s", msg))
+    if (!is.null(out_dir)) {
+        utils::write.table(data.frame(groups=length(groups), median_group_cells=stats::median(lengths(groups)),
+                                      null_false_call_rate=fpr, worst_group=max(called),
+                                      warn_above=thresholds[1], stop_above=thresholds[2]),
+                           file.path(out_dir, "HMM_null_false_call_rate.tsv"), sep="\t", quote=FALSE, row.names=FALSE)
+    }
+    if (fpr > thresholds[2]) {
+        txt <- sprintf(paste0("HMM calls would be unreliable: %s, above %g%%. The data are too noisy for the HMM to separate ",
+                              "copy-number states. Use more reads per cell (e.g. larger spatial bins, or pooled cells), or run ",
+                              "with HMM=FALSE; set HMM_null_fpr_check='warn' to proceed anyway."), msg, 100 * thresholds[2])
+        if (action == "stop") {
+            flog.error(txt)
+            stop(txt)
+        }
+        flog.warn(txt)
+    } else if (fpr > thresholds[1]) {
+        flog.warn(sprintf("Elevated HMM false-call rate: %s. Treat small or low-amplitude calls with caution.", msg))
+    }
+    invisible(list(rate=fpr, per_group=called))
+}
+
+
 #' @title .get_HMM
 #'
 #' @description retrieves parameters for the i6 HMM including state transition and state emission probabilities.

@@ -199,6 +199,14 @@
 #'                               than window_length after the expression cutoff (data too sparse for the HMM; checked
 #'                               at step 2), "none" to skip the check. Below 2 x window_length a warning is given.
 #'
+#' @param HMM_null_fpr_check with HMM = TRUE and HMM_type = 'i6': before the HMM, run it on random groups of reference cells
+#'                           sized like the observation subclusters; as reference cells carry no CNVs, the fraction of
+#'                           genes called non-neutral estimates the false-call rate (written to
+#'                           HMM_null_false_call_rate.tsv). "stop" (default) or "warn" when it exceeds
+#'                           HMM_null_fpr_thresholds[2], "none" to skip. A warning is given above HMM_null_fpr_thresholds[1].
+#'
+#' @param HMM_null_fpr_thresholds false-call rates for a warning and for stopping (default: c(0.05, 0.15))
+#'
 #' @param save_rds Whether to save the current step object results as an .rds file (default: TRUE)
 #'
 #' @param save_final_rds Whether to save the final object results as an .rds file (default: TRUE)
@@ -347,6 +355,8 @@ run <- function(infercnv_obj,
                 clones = FALSE,
                 clones_pool_groups = NULL,
                 HMM_gene_density_check = c("stop", "warn", "none"),
+                HMM_null_fpr_check = c("stop", "warn", "none"),
+                HMM_null_fpr_thresholds = c(0.05, 0.15),
                 save_rds = TRUE,
                 save_final_rds = TRUE,
                 diagnostics = FALSE,
@@ -379,6 +389,7 @@ run <- function(infercnv_obj,
 
     smooth_method = match.arg(smooth_method)
     HMM_gene_density_check = match.arg(HMM_gene_density_check)
+    HMM_null_fpr_check = match.arg(HMM_null_fpr_check)
     HMM_type = match.arg(HMM_type)
     allele_mode = match.arg(allele_mode)
     combined_method = match.arg(combined_method)
@@ -1435,6 +1446,11 @@ run <- function(infercnv_obj,
         
         if (skip_hmm < 1) {
             flog.info(sprintf("\n\n\tSTEP %02d: expression-based HMM CNV prediction\n", step_count))
+
+            if (HMM_type == 'i6' && HMM_null_fpr_check != "none") {
+                .check_hmm_null_fpr(infercnv_obj, t=HMM_transition_prob, action=HMM_null_fpr_check,
+                                    thresholds=HMM_null_fpr_thresholds, out_dir=out_dir)
+            }
             
             if (analysis_mode == 'subclusters') {
                 
