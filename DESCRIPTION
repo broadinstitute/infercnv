@@ -27,6 +27,7 @@ Collate:
     'inferCNV_allele_BayesNet.R'
     'inferCNV_allele_HMM.R'
     'inferCNV_allele_native.R'
+    'inferCNV_auto_reference.R'
     'inferCNV_clones.R'
     'inferCNV_combined_BayesNet.R'
     'inferCNV_constants.R'
