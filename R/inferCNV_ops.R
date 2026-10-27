@@ -55,6 +55,20 @@
 #'                    representative normal expression profiles rather than being able to leverage normal single cell data
 #'                    that goes with your experiment.
 #'
+#' @param scale_data_by_ref_sd  (experimental) divide each gene's log-transformed expression by its standard deviation
+#'                    among the reference cells (within reference groups), moderated toward the trend of standard
+#'                    deviation on mean expression, before the reference is subtracted (default: FALSE). Residuals are
+#'                    then in units of normal-cell variability, so noisy genes count less in the smoothing windows.
+#'                    The hidden spike (h-spike) is processed the same way, so the HMM states are parameterised in the
+#'                    same units. Without reference cells, all cells are used. Not combined with scale_data.
+#'                    With it on, max_centered_threshold is in standard deviations.
+#'
+#' @param ref_sd_prior_df  scale_data_by_ref_sd: prior degrees of freedom of the moderation (empirical Bayes, as in
+#'                    limma): each gene's variance is shrunk toward the trend with this weight (default: 10)
+#'
+#' @param ref_sd_floor  scale_data_by_ref_sd: lower bound of a gene's moderated standard deviation, as a fraction of
+#'                    the trend at its mean, so that nearly constant genes do not dominate (default: 0.5)
+#'
 #' #########################################################################
 #' ## Downstream Analyses (HMM or non-DE-masking) based on tumor subclusters
 #'
@@ -301,6 +315,9 @@ run <- function(infercnv_obj,
 
                 max_centered_threshold=3, # or set to a specific value or "auto", or NA to turn off
                 scale_data=FALSE,
+                scale_data_by_ref_sd=FALSE,
+                ref_sd_prior_df=10,
+                ref_sd_floor=0.5,
 
                 ## HMM opts
                 HMM=FALSE, # turn on to auto-run the HMM prediction of CNV levels
@@ -854,12 +871,20 @@ run <- function(infercnv_obj,
         return(infercnv_obj)
     }
     step_count = step_count + 1 # 7
-    if (scale_data) {
+    if (scale_data && scale_data_by_ref_sd) {
+        stop("scale_data and scale_data_by_ref_sd cannot both be TRUE")
+    }
+    if (scale_data || scale_data_by_ref_sd) {
         
-        flog.info(sprintf("\n\n\tSTEP %02d: scaling all expression data\n", step_count))
+        flog.info(sprintf("\n\n\tSTEP %02d: scaling all expression data%s\n", step_count,
+                          if (scale_data_by_ref_sd) " by moderated reference standard deviations" else ""))
 
         if (skip_past < step_count) {
-            infercnv_obj <- scale_infercnv_expr(infercnv_obj)
+            infercnv_obj <- if (scale_data_by_ref_sd) {
+                scale_infercnv_expr_by_ref_sd(infercnv_obj, prior_df=ref_sd_prior_df, sd_floor=ref_sd_floor)
+            } else {
+                scale_infercnv_expr(infercnv_obj)
+            }
             
             if (save_rds) {
                 saveRDS(infercnv_obj, reload_info$expected_file_names[[step_count]])
@@ -3792,6 +3817,75 @@ scale_infercnv_expr <- function(infercnv_obj) {
 }
 
 
+#' @title scale_infercnv_expr_by_ref_sd
+#'
+#' @description Divides each gene's (log-transformed) expression by its moderated standard deviation among the
+#' reference cells. Variances are pooled within reference groups (so differences between reference cell types are
+#' not counted as noise), shrunk toward a loess trend of log standard deviation on mean expression with prior_df
+#' degrees of freedom (empirical Bayes, as limma::squeezeVar), and bounded below by sd_floor times the trend.
+#' Centring is left to the reference subtraction that follows. Mirrored on the hidden spike, using its own reference
+#' (normal) cells, so that the HMM is parameterised in the same units.
+#'
+#' @param infercnv_obj infercnv object
+#' @param prior_df prior degrees of freedom of the moderation
+#' @param sd_floor lower bound of the moderated standard deviation, as a fraction of the trend
+#'
+#' @return infercnv_obj with scaled expr.data; the per-gene moderated standard deviations are in
+#'         infercnv_obj@options$ref_sd (not for the hidden spike)
+#'
+#' @keywords internal
+#' @noRd
+#'
+
+scale_infercnv_expr_by_ref_sd <- function(infercnv_obj, prior_df=10, sd_floor=0.5) {
+
+    X <- infercnv_obj@expr.data
+    ref_groups <- if (has_reference_cells(infercnv_obj)) infercnv_obj@reference_grouped_cell_indices else
+        list(proxyNormal = unlist(infercnv_obj@observation_grouped_cell_indices))
+    ref_groups <- ref_groups[lengths(ref_groups) >= 2]
+    if (length(ref_groups) == 0) {
+        stop("scale_data_by_ref_sd: needs at least 2 reference cells in a group")
+    }
+    flog.info(sprintf("-scaling expr data by moderated reference sd (%d groups, %d cells; prior df %g, floor %g)",
+                      length(ref_groups), sum(lengths(ref_groups)), prior_df, sd_floor))
+
+    ## pooled within-group mean and variance
+    ss <- 0; sm <- 0; df <- 0
+    for (g in ref_groups) {
+        Xg <- as.matrix(X[, g, drop=FALSE])
+        m <- rowMeans(Xg)
+        ss <- ss + rowSums((Xg - m)^2)
+        sm <- sm + m * length(g)
+        df <- df + length(g) - 1
+    }
+    mu <- sm / sum(lengths(ref_groups))
+    s2 <- ss / df
+
+    ## trend of log sd on mean, fitted on genes with non-zero variance
+    ok <- s2 > 0
+    fit <- stats::loess(log(sqrt(s2[ok])) ~ mu[ok], span=0.3, degree=1)
+    mu_c <- pmin(pmax(mu, min(mu[ok])), max(mu[ok]))
+    tr <- exp(stats::predict(fit, mu_c))
+    tr[!is.finite(tr)] <- stats::median(sqrt(s2[ok]))
+
+    s2_mod <- (prior_df * tr^2 + df * s2) / (prior_df + df)
+    s_mod <- pmax(sqrt(s2_mod), sd_floor * tr)
+
+    infercnv_obj@expr.data <- X / s_mod
+    infercnv_obj@options$ref_sd <- data.frame(gene=rownames(X), mean=mu, sd=sqrt(s2), trend=tr, sd_moderated=s_mod,
+                                              stringsAsFactors=FALSE)
+    flog.info(sprintf("-moderated reference sd: median %.3f (range %.3f-%.3f); %d genes at the floor",
+                      stats::median(s_mod), min(s_mod), max(s_mod), sum(s_mod <= sd_floor * tr * (1 + 1e-9))))
+
+    if (! is.null(infercnv_obj@.hspike)) {
+        flog.info("-mirroring for hspike")
+        infercnv_obj@.hspike <- scale_infercnv_expr_by_ref_sd(infercnv_obj@.hspike, prior_df=prior_df, sd_floor=sd_floor)
+    }
+
+    return(infercnv_obj)
+}
+
+
 
 #' @keywords internal
 #' @noRd
@@ -4041,7 +4135,7 @@ compareNA <- function(v1,v2) {
     step_i = step_i + 1
 
     # 7 _scaled%s.infercnv_obj
-    relevant_args[[step_i]] = c("scale_data")
+    relevant_args[[step_i]] = c("scale_data", "scale_data_by_ref_sd", "ref_sd_prior_df", "ref_sd_floor")
     expected_file_names[[step_i]] = file.path(run_arguments$out_dir, sprintf("%02d_scaled%s.infercnv_obj", step_i, resume_file_token))
     step_i = step_i + 1
 

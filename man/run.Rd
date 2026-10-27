@@ -21,6 +21,9 @@ run(
   hclust_method = "ward.D2",
   max_centered_threshold = 3,
   scale_data = FALSE,
+  scale_data_by_ref_sd = FALSE,
+  ref_sd_prior_df = 10,
+  ref_sd_floor = 0.5,
   HMM = FALSE,
   HMM_transition_prob = 1e-06,
   HMM_report_by = c("subcluster", "consensus", "cell"),
@@ -143,6 +146,20 @@ Set to NA to turn off.}
 
 #########################################################################
 ## Downstream Analyses (HMM or non-DE-masking) based on tumor subclusters}
+
+\item{scale_data_by_ref_sd}{(experimental) divide each gene's log-transformed expression by its standard deviation
+                   among the reference cells (within reference groups), moderated toward the trend of standard
+                   deviation on mean expression, before the reference is subtracted (default: FALSE). Residuals are
+                   then in units of normal-cell variability, so noisy genes count less in the smoothing windows.
+                   The hidden spike (h-spike) is processed the same way, so the HMM states are parameterised in the
+                   same units. Without reference cells, all cells are used. Not combined with scale_data.
+                   With it on, max_centered_threshold is in standard deviations.}
+
+\item{ref_sd_prior_df}{scale_data_by_ref_sd: prior degrees of freedom of the moderation (empirical Bayes, as in
+                   limma): each gene's variance is shrunk toward the trend with this weight (default: 10)}
+
+\item{ref_sd_floor}{scale_data_by_ref_sd: lower bound of a gene's moderated standard deviation, as a fraction of
+                   the trend at its mean, so that nearly constant genes do not dominate (default: 0.5)}
 
 \item{HMM}{when set to True, runs HMM to predict CNV level (default: FALSE)}
 
