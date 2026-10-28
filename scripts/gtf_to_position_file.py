@@ -9,7 +9,9 @@ Converts GTF files to proprietary formats.
 # Import statements
 import argparse
 import csv
+import gzip
 import os
+
 
 __author__ = 'Timothy Tickle, Itay Tirosh, Brian Haas'
 __copyright__ = 'Copyright 2016'
@@ -18,6 +20,20 @@ __license__ = 'BSD-3'
 __maintainer__ = 'Timothy Tickle'
 __email__ = 'ttickle@bbroadinstitute.org'
 __status__ = 'Development'
+
+
+def open_file(file_path):
+    """ Open a file, handling gzip if necessary.
+
+    :param file_path: Path to input file
+    :type file_path: String
+
+    :returns: File object
+    """
+    if file_path.endswith('.gz'):
+        return gzip.open(file_path, 'rt')
+    else:
+        return open(file_path, 'r')
 
 
 def convert_to_positional_file(input_gtf, output_positional, attribute_key):
@@ -37,6 +53,7 @@ def convert_to_positional_file(input_gtf, output_positional, attribute_key):
     if not input_gtf or not os.path.exists(input_gtf):
         print("".join(["gtf_to_position_file.py:: ",
                        "Could not find input file : " + input_gtf]))
+        return False
 
     all_genes_found = set()
 
@@ -53,8 +70,8 @@ def convert_to_positional_file(input_gtf, output_positional, attribute_key):
     i_accepted_entries = 0
     i_written_lines = 0
 
-    with open(input_gtf, "r") as gtf:
-        gtf_file = csv.reader(gtf,delimiter="\t")
+    with open_file(input_gtf) as gtf:
+        gtf_file = csv.reader(gtf, delimiter="\t")
         for gtf_line in gtf_file:
             if gtf_line[0][0] == "#":
                 i_comments += 1
@@ -64,12 +81,12 @@ def convert_to_positional_file(input_gtf, output_positional, attribute_key):
             attributes = gtf_line[8].split(";")
             attributes = [entry.strip(" ") for entry in attributes]
             attributes = [entry.split(" ") for entry in attributes if entry]
-            attributes = [[entry[0].strip('"'),entry[1].strip('"')] for entry in attributes]
-            attributes = dict([[entry[0].split("|")[0],entry[1]] for entry in attributes])
+            attributes = [[entry[0].strip('"'), entry[1].strip('"')] for entry in attributes]
+            attributes = dict([[entry[0].split("|")[0], entry[1]] for entry in attributes])
             if attribute_key in attributes:
                 gene_name = attributes[attribute_key]
             else:
-                print("Could not find an attribute in the GTF with the name '"+attribute_key+"'. Line="+"\t".join(gtf_line))
+                print("Could not find an attribute in the GTF with the name '" + attribute_key + "'. Line=" + "\t".join(gtf_line))
                 exit(99)
             if not gene_name == previous_gene:
                 if len(gene_positions) > 1 and previous_gene not in all_genes_found:
@@ -104,6 +121,7 @@ def convert_to_positional_file(input_gtf, output_positional, attribute_key):
     print("Number of entries: " + str(i_accepted_entries))
     print("Number of duplicate entries: " + str(i_duplicate_entries))
     print("Number of entries written: " + str(i_written_lines))
+
 
 if __name__ == "__main__":
 
