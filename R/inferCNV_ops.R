@@ -6,6 +6,11 @@
 #' @param infercnv_obj An infercnv object populated with raw count data
 #'
 #' @param cutoff Cut-off for the min average read counts per gene, computed over all cells (references and observations). (default: 1)
+#'               Usual values: 1 for Smart-seq2 (full-length, read counts), 0.1 for 10x single-cell and Visium HD 16-32 um
+#'               (UMI counts). "auto": the largest of 1, 0.1, 0.03, 0.01, 0.003, 0.001 that keeps a median of at least
+#'               3 x window_length genes per chromosome (autosomes), so that sparse data (e.g. Visium HD 8 um bins, a few
+#'               hundred UMI per bin) keep enough genes for the smoothing window and the HMM; the value chosen is logged
+#'               and stored in infercnv_obj@options$cutoff_auto.
 #'
 #' @param min_cells_per_gene minimum number of cells (references and observations) with nonzero expression required to include the corresponding gene.
 #'                           default: 3
@@ -687,6 +692,10 @@ run <- function(infercnv_obj,
 
     if (skip_past < step_count) {
     # }
+        if (identical(cutoff, "auto")) {
+            cutoff <- .auto_expression_cutoff(infercnv_obj, window_length, min_cells_per_gene)
+            infercnv_obj@options$cutoff_auto <- cutoff
+        }
         infercnv_obj <- require_above_min_mean_expr_cutoff(infercnv_obj, cutoff)
         
         ## require each gene to be present in a min number of cells for ref sets
@@ -2752,6 +2761,36 @@ require_above_min_mean_expr_cutoff <- function(infercnv_obj, min_mean_expr_cutof
 #' @keywords internal
 #' @noRd
 #'
+
+# cutoff = "auto": the largest grid value that keeps a median of at least 3 x window_length genes per autosome after
+# the mean-count cutoff and the min_cells_per_gene filter (computed on the raw counts, as step 2 applies them).
+.auto_expression_cutoff <- function(infercnv_obj, window_length, min_cells_per_gene,
+                                    grid=c(1, 0.1, 0.03, 0.01, 0.003, 0.001)) {
+    X <- infercnv_obj@expr.data
+    m <- Matrix::rowMeans(X)
+    det <- Matrix::rowSums(X > 0)
+    chr <- as.character(infercnv_obj@gene_order[rownames(X), "chr"])
+    lv <- unique(chr)
+    lv <- lv[!grepl("(X|Y|M|MT)$", lv)]
+    target <- 3 * window_length
+    med <- vapply(grid, function(cu) {
+        keep <- m >= cu & det >= min_cells_per_gene
+        stats::median(as.numeric(table(factor(chr[keep], levels=lv))))
+    }, numeric(1))
+    flog.info(sprintf("cutoff = 'auto': median genes per chromosome at cutoff %s: %s (target >= %d)",
+                      paste(grid, collapse="/"), paste(med, collapse="/"), target))
+    ok <- which(med >= target)
+    if (length(ok)) {
+        chosen <- grid[ok[1]]
+    } else {
+        chosen <- grid[length(grid)]
+        flog.warn(sprintf("cutoff = 'auto': no cutoff keeps %d genes per chromosome; using %g (data very sparse)",
+                          target, chosen))
+    }
+    flog.info(sprintf("cutoff = 'auto': using cutoff %g", chosen))
+    chosen
+}
+
 
 .below_min_mean_expr_cutoff <- function(expr_data, min_mean_expr) {
     

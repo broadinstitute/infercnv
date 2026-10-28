@@ -272,7 +272,8 @@ get_hspike_cnv_mean_sd_trend_by_num_cells_fit <- function(hspike_obj, plot=FALSE
     if (med < window_length) {
         txt <- sprintf(paste0("Too few genes for the HMM: %s. Most chromosomes are shorter than one smoothing window, so the ",
                               "HMM would call noise as CNVs. Use more reads per cell (e.g. larger spatial bins, or pooled cells), ",
-                              "or run with HMM=FALSE; set HMM_gene_density_check='warn' to proceed anyway."), msg)
+                              "or run with HMM=FALSE; for sparse data (e.g. Visium HD 8 um) try cutoff='auto' (lower expression cutoff); ",
+                              "set HMM_gene_density_check='warn' to proceed anyway."), msg)
         if (action == "stop") {
             flog.error(txt)
             stop(txt)

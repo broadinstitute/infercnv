@@ -4,19 +4,25 @@
 #' @description Finds normal (copy-number neutral) cells to use as the reference when none are known, and classifies
 #' the remaining cells as malignant or normal. Two passes of inferCNV up to the subclustering step (no HMM):
 #'
-#' 1. Provisional reference. All cells are subclustered together (Leiden; no reference, so the mean of all cells is
-#'    the baseline). Expression alone cannot tell normal cells measured against a tumour-dominated baseline from tumour
-#'    cells measured against a normal baseline (the two profiles are mirror images), so the provisional reference is
-#'    taken, in order of preference, from:
+#' 1. Provisional reference. All cells are subclustered together (Leiden; no reference). The provisional reference
+#'    is taken from (reference_method = "auto": the first that applies):
 #'    (a) normal_groups, annotation groups known to be normal;
-#'    (b) subclusters expressing markers of non-malignant lineages (immune, endothelial, fibroblast; normal_markers),
-#'        as SCEVAN does to find confident normal cells (De Falco et al. 2023, Nat Commun 14:1074): per panel, the
-#'        subclusters are split in two by mean log panel expression (k-means), and the high group is marker-positive
-#'        when it is at least marker_fold higher;
-#'    (c) failing both, the subclusters with the flattest profiles (lowest CNV score, k-means on its log), the CopyKAT
-#'        criterion (Gao et al. 2021, Nat Biotechnol 39:599). This is only reliable when normal cells are a large share
-#'        of the cells: with mostly tumour cells the baseline is the tumour profile and the tumour looks flat; a
-#'        warning is given.
+#'    (b) "markers": subclusters expressing markers of non-malignant lineages (immune, endothelial, fibroblast;
+#'        normal_markers), as SCEVAN does to find confident normal cells (De Falco et al. 2023, Nat Commun 14:1074):
+#'        per panel, the subclusters are split in two by mean log panel expression (k-means), and the high group is
+#'        marker-positive when it is at least marker_fold higher;
+#'    (c) "self_centered": the expression cluster with the flattest self-centred profile, the principle of CopyKAT's
+#'        baseline search (Gao et al. 2021, Nat Biotechnol 39:599). Cells are first clustered by expression (standard
+#'        Seurat workflow: log normalisation, flat_n_features variable genes, PCA, shared nearest neighbours, Louvain at
+#'        flat_resolution), so that clusters correspond to cell types. Each cluster's mean log2(CPM + 1) profile is
+#'        centred on its own genome-wide mean (not on the mean of all cells, which a tumour majority would dominate),
+#'        smoothed along each chromosome (running mean of window_length genes) and scored by its mean square. The
+#'        flattest cluster is the provisional reference; clusters scoring within flat_tolerance times its score are
+#'        added (flat_tolerance = 1: the flattest only; larger values admit more clusters for exploring which cell
+#'        types look normal). All scores are written to auto_reference.flatness.tsv. The score is not CNV-specific
+#'        (each cell type's expression pattern along the genome contributes), so it is reliable for tumours with many
+#'        large CNVs; in tumours with few CNVs (e.g. some gliomas) a tumour cluster can be the flattest. Check the
+#'        table.
 #' 2. inferCNV is rerun with the provisional reference. Each subcluster is scored as in Tirosh et al. 2016 (Science
 #'    352:189) and Puram et al. 2017 (Cell 171:1611): CNV score (mean squared deviation of its mean profile) and CNV
 #'    correlation (Pearson correlation of its mean profile with the mean profile of the top-scoring subclusters,
@@ -42,20 +48,28 @@
 #'                    (default: 4)
 #' @param score_quantile quantile of the reference-group null used as the threshold (default: 0.99)
 #' @param min_ref_cells minimum number of provisional reference cells (default: 20)
-#' @param min_separation flattest-profile fallback: minimum difference of the two k-means centres of log CNV score
-#'                       (default: 1, i.e. an e-fold difference); below it no distinct normal population is assumed and
-#'                       the function stops
+#' @param reference_method how the provisional reference is found when normal_groups is not given: "auto" (markers
+#'                         if enough marker-positive cells, otherwise self_centered), "markers" or "self_centered"
+#' @param flat_tolerance self_centered: subclusters whose flatness score is at most flat_tolerance times that of the
+#'                       flattest subcluster join the provisional reference (default: 1, the flattest only)
+#' @param min_flat_cells self_centered: minimum cells for a cluster to be a candidate (default: 10)
+#' @param flat_resolution self_centered: clustering resolution of the expression clusters (default: 1)
+#' @param flat_n_features self_centered: number of variable genes for the expression clustering (default: 2000)
 #' @param ... further arguments to run() for both passes (e.g. num_threads, k_nn, leiden_resolution)
 #'
 #' @return list(infercnv_obj = object with the new reference groups, cells = data.frame per cell: cell, group,
-#'         subcluster, class (reference / normal / malignant / unresolved), cnv_score, cnv_cor, marker_positive),
-#'         reference_method ("normal_groups", "markers" or "flattest"))
+#'         subcluster, class (reference / normal / malignant / unresolved), cnv_score, cnv_cor, marker_positive,
+#'         pass1_subcluster, expr_cluster), reference_method ("normal_groups", "markers" or "self_centered"), flatness =
+#'         data.frame per expression cluster: cluster, cells, flat_score, ratio_to_flattest, marker_positive, selected)
 #'
 #' @export
 
 infercnv_auto_reference <- function(infercnv_obj, out_dir, cutoff = 1, normal_groups = NULL,
                                     normal_markers = .default_normal_markers, marker_fold = 4, score_quantile = 0.99,
-                                    min_ref_cells = 20, min_separation = 1, ...) {
+                                    min_ref_cells = 20, reference_method = c("auto", "markers", "self_centered"),
+                                    flat_tolerance = 1, min_flat_cells = 10, flat_resolution = 1, flat_n_features = 2000,
+                                    ...) {
+    reference_method <- match.arg(reference_method)
     dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
     groups <- c(infercnv_obj@observation_grouped_cell_indices, infercnv_obj@reference_grouped_cell_indices)
     cells <- colnames(infercnv_obj@expr.data)
@@ -84,32 +98,38 @@ infercnv_auto_reference <- function(infercnv_obj, out_dir, cutoff = 1, normal_gr
     sub1 <- unlist(o1@tumor_subclusters$subclusters, recursive = FALSE)
     cn1 <- colnames(o1@expr.data)
     mpos <- .marker_positive_subclusters(counts, sub1, cn1, normal_markers, marker_fold)
+    win <- if (!is.null(list(...)$window_length)) list(...)$window_length else 101
+    ecl <- .expression_clusters(counts[, cn1, drop = FALSE], flat_resolution, flat_n_features)
+    esub <- split(seq_along(cn1), ecl)
+    fs <- .self_centered_flatness(counts, o1@gene_order, esub, cn1, win)
+    ok <- lengths(esub) >= min_flat_cells
+    if (!any(ok)) stop(sprintf("auto reference: no expression cluster of at least %d cells", min_flat_cells))
+    fmin <- min(fs[ok])
+    flat_sel <- ok & fs <= flat_tolerance * fmin
+    flatness <- data.frame(cluster = names(esub), cells = lengths(esub), flat_score = fs, ratio_to_flattest = fs / fmin,
+                           marker_positive = .marker_positive_subclusters(counts, esub, cn1, normal_markers, marker_fold),
+                           selected = flat_sel, stringsAsFactors = FALSE)
+    flatness <- flatness[order(flatness$flat_score), ]
+    utils::write.table(flatness, file.path(out_dir, "auto_reference.flatness.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
+    use_markers <- reference_method == "markers" || (reference_method == "auto" && sum(lengths(sub1)[mpos]) >= min_ref_cells)
     if (!is.null(normal_groups)) {
         method <- "normal_groups"
         ref_cells <- rownames(ann)[ann$group %in% normal_groups]
         flog.info(sprintf("auto reference, pass 1: %d cells of the normal groups %s", length(ref_cells),
                           paste(normal_groups, collapse = ", ")))
-    } else if (sum(lengths(sub1)[mpos]) >= min_ref_cells) {
+    } else if (use_markers) {
         method <- "markers"
         ref_cells <- cn1[unlist(sub1[mpos])]
         flog.info(sprintf("auto reference, pass 1: %d of %d subclusters (%d cells) express non-malignant lineage markers",
                           sum(mpos), length(sub1), length(ref_cells)))
     } else {
-        method <- "flattest"
-        P1 <- vapply(sub1, function(ix) rowMeans(o1@expr.data[, ix, drop = FALSE]), numeric(nrow(o1@expr.data)))
-        ls1 <- log(score(P1))
-        km <- stats::kmeans(ls1, centers = range(ls1))
-        low <- which.min(km$centers)
-        sep <- abs(diff(km$centers[, 1]))
-        ref_cells <- cn1[unlist(sub1[km$cluster == low])]
-        flog.warn(sprintf(paste0("auto reference, pass 1: no marker-positive normal cells; using the %d of %d subclusters ",
-                                 "(%d cells) with the flattest profiles (separation %.2f, log). This is unreliable when ",
-                                 "most cells are tumour cells: check the result, or give normal_groups."),
-                          sum(km$cluster == low), length(sub1), length(ref_cells), sep))
-        if (sep < min_separation) {
-            stop(sprintf(paste0("auto reference: no distinct population of normal cells found (separation %.2f); ",
-                                "provide reference cells (ref_group_names or normal_groups)"), sep))
-        }
+        method <- "self_centered"
+        ref_cells <- cn1[unlist(esub[flat_sel])]
+        flog.info(sprintf(paste0("auto reference, pass 1: %d of %d expression clusters (%d cells) with the flattest self-centred ",
+                                 "profiles (flat_tolerance %.2f; next flattest at %.2f x). Not CNV-specific: check ",
+                                 "auto_reference.flatness.tsv, or give normal_groups."),
+                          sum(flat_sel), length(esub), length(ref_cells), flat_tolerance,
+                          if (sum(ok & !flat_sel)) min(fs[ok & !flat_sel]) / fmin else NA))
     }
     if (length(ref_cells) < min_ref_cells) {
         stop(sprintf("auto reference: only %d provisional reference cells; provide reference cells", length(ref_cells)))
@@ -159,8 +179,11 @@ infercnv_auto_reference <- function(infercnv_obj, out_dir, cutoff = 1, normal_gr
 
     cn <- colnames(X)
     res <- data.frame(cell = cn, group = ann[cn, "group"], subcluster = NA_character_, class = NA_character_,
-                      cnv_score = NA_real_, cnv_cor = NA_real_, marker_positive = NA, stringsAsFactors = FALSE)
+                      cnv_score = NA_real_, cnv_cor = NA_real_, marker_positive = NA, pass1_subcluster = NA_character_,
+                      expr_cluster = NA_character_, stringsAsFactors = FALSE)
     rownames(res) <- cn
+    res[cn1[unlist(sub1)], "pass1_subcluster"] <- rep(names(sub1), lengths(sub1))
+    res[cn1, "expr_cluster"] <- as.character(ecl)
     res[cn[ref_idx], "class"] <- "reference"
     for (j in seq_along(obs2)) {
         cc <- cn[obs2[[j]]]
@@ -169,7 +192,45 @@ infercnv_auto_reference <- function(infercnv_obj, out_dir, cutoff = 1, normal_gr
     }
     utils::write.table(res, file.path(out_dir, "auto_reference.cells.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
     new_ref <- res$cell[res$class %in% c("reference", "normal")]
-    list(infercnv_obj = make_obj(new_ref), cells = res, reference_method = method)
+    list(infercnv_obj = make_obj(new_ref), cells = res, reference_method = method, flatness = flatness)
+}
+
+
+# Expression clusters (standard Seurat workflow; Louvain on the shared-nearest-neighbour graph): cell types, not
+# copy-number groups, so that a cluster's self-centred profile is not a mixture of cell types.
+.expression_clusters <- function(counts, resolution, n_features) {
+    so <- Seurat::CreateSeuratObject(counts, min.cells = 0, min.features = 0)
+    so <- Seurat::NormalizeData(so, verbose = FALSE)
+    so <- Seurat::FindVariableFeatures(so, nfeatures = n_features, verbose = FALSE)
+    so <- Seurat::ScaleData(so, verbose = FALSE)
+    npcs <- min(30, ncol(so) - 1)
+    so <- Seurat::RunPCA(so, npcs = npcs, verbose = FALSE)
+    so <- Seurat::FindNeighbors(so, dims = seq_len(npcs), verbose = FALSE)
+    so <- Seurat::FindClusters(so, resolution = resolution, verbose = FALSE)
+    cl <- as.character(Seurat::Idents(so))
+    stats::setNames(paste0("expr_", cl), colnames(so))[colnames(counts)]
+}
+
+
+# Self-centred flatness per subcluster (CopyKAT's baseline principle, no shared baseline): mean log2(CPM + 1) over the
+# subcluster's cells (genes of the processed object, in genome order), minus its own genome-wide mean, smoothed by a
+# running mean of `window` genes within each chromosome (shorter at chromosome ends); score = mean square.
+.self_centered_flatness <- function(counts, gene_order, subs, cell_names, window) {
+    g <- intersect(rownames(gene_order), rownames(counts))
+    C <- counts[g, cell_names, drop = FALSE]
+    N <- methods::as(C %*% Matrix::Diagonal(x = 1e6 / pmax(Matrix::colSums(C), 1)), "CsparseMatrix")
+    N@x <- log2(1 + N@x)
+    chr <- as.character(gene_order[g, "chr"])
+    h <- window %/% 2
+    run_mean <- function(x) {
+        n <- length(x); cs <- c(0, cumsum(x)); lo <- pmax(1, seq_len(n) - h); hi <- pmin(n, seq_len(n) + h)
+        (cs[hi + 1] - cs[lo]) / (hi - lo + 1)
+    }
+    vapply(subs, function(ix) {
+        p <- Matrix::rowMeans(N[, ix, drop = FALSE]); p <- p - mean(p)
+        sm <- unlist(lapply(split(p, factor(chr, levels = unique(chr))), run_mean))
+        mean(sm^2)
+    }, numeric(1))
 }
 
 
