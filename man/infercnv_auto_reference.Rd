@@ -6,7 +6,7 @@
 infercnv_auto_reference(
   infercnv_obj,
   out_dir,
-  cutoff = 1,
+  cutoff = "auto",
   normal_groups = NULL,
   normal_markers = .default_normal_markers,
   marker_fold = 4,
@@ -25,7 +25,7 @@ infercnv_auto_reference(
 
 \item{out_dir}{directory for the two passes (subdirectories auto_reference_pass1 and _pass2)}
 
-\item{cutoff}{expression cutoff passed to run() (1 for Smart-seq2, 0.1 for 10x)}
+\item{cutoff}{expression cutoff passed to run() (default "auto"; see run())}
 
 \item{normal_groups}{annotation groups known to be normal (optional; used as the provisional reference)}
 

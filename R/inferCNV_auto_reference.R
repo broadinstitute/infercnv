@@ -40,7 +40,7 @@
 #'
 #' @param infercnv_obj infercnv object (references, if any, are ignored and treated as observations)
 #' @param out_dir directory for the two passes (subdirectories auto_reference_pass1 and _pass2)
-#' @param cutoff expression cutoff passed to run() (1 for Smart-seq2, 0.1 for 10x)
+#' @param cutoff expression cutoff passed to run() (default "auto"; see run())
 #' @param normal_groups annotation groups known to be normal (optional; used as the provisional reference)
 #' @param normal_markers named list of marker gene panels of non-malignant lineages (default: immune, endothelial,
 #'                       fibroblast), or NULL to skip the marker step
@@ -64,7 +64,7 @@
 #'
 #' @export
 
-infercnv_auto_reference <- function(infercnv_obj, out_dir, cutoff = 1, normal_groups = NULL,
+infercnv_auto_reference <- function(infercnv_obj, out_dir, cutoff = "auto", normal_groups = NULL,
                                     normal_markers = .default_normal_markers, marker_fold = 4, score_quantile = 0.99,
                                     min_ref_cells = 20, reference_method = c("auto", "markers", "self_centered"),
                                     flat_tolerance = 1, min_flat_cells = 10, flat_resolution = 1, flat_n_features = 2000,

@@ -5,12 +5,13 @@
 #'
 #' @param infercnv_obj An infercnv object populated with raw count data
 #'
-#' @param cutoff Cut-off for the min average read counts per gene, computed over all cells (references and observations). (default: 1)
+#' @param cutoff Cut-off for the min average read counts per gene, computed over all cells (references and observations). (default: "auto")
 #'               Usual values: 1 for Smart-seq2 (full-length, read counts), 0.1 for 10x single-cell and Visium HD 16-32 um
 #'               (UMI counts). "auto": the largest of 1, 0.1, 0.03, 0.01, 0.003, 0.001 that keeps a median of at least
 #'               3 x window_length genes per chromosome (autosomes), so that sparse data (e.g. Visium HD 8 um bins, a few
 #'               hundred UMI per bin) keep enough genes for the smoothing window and the HMM; the value chosen is logged
 #'               and stored in infercnv_obj@options$cutoff_auto.
+#'               Give a number to fix the cutoff (the default before "auto" was 1).
 #'
 #' @param min_cells_per_gene minimum number of cells (references and observations) with nonzero expression required to include the corresponding gene.
 #'                           default: 3
@@ -281,7 +282,7 @@
 run <- function(infercnv_obj,
 
                 # gene filtering settings
-                cutoff=1,
+                cutoff="auto",
                 min_cells_per_gene=3,
 
                 # allele filtering settings
