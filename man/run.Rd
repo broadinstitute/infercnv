@@ -93,7 +93,9 @@ run(
 \arguments{
 \item{infercnv_obj}{An infercnv object populated with raw count data}
 
-\item{cutoff}{Cut-off for the min average read counts per gene, computed over all cells (references and observations). (default: "auto")
+\item{cutoff}{Cut-off for the min average read counts per gene. A number is applied to the mean over all cells
+(references and observations); "auto" (default) is chosen from, and applied to, the mean over the
+observations only, so that references of a different depth (e.g. bulk samples) do not set it.
 Usual values: 1 for Smart-seq2 (full-length, read counts), 0.1 for 10x single-cell and Visium HD 16-32 um
 (UMI counts). "auto": the largest of 1, 0.1, 0.03, 0.01, 0.003, 0.001 that keeps a median of at least
 3 x window_length genes per chromosome (autosomes), so that sparse data (e.g. Visium HD 8 um bins, a few
@@ -288,7 +290,10 @@ HMM_null_fpr_thresholds[2], "none" to skip. A warning is given above HMM_null_fp
 merged into their most similar subcluster of the same group (small groups of cells
 give many false HMM calls). "auto" (default; i6 only) runs the HMM on random groups of
 reference cells of increasing size and uses the smallest size whose false-call rate is
-at most HMM_min_subcluster_fpr; a number sets the size; 0 or 1 disables merging.}
+at most HMM_min_subcluster_fpr; a number sets the size; 0 or 1 disables merging.
+If single reference profiles already meet the target (bulk or pseudobulk references,
+which lack single-cell sampling noise), "auto" warns and uses 5 cells, the smallest size
+found on single-cell data.}
 
 \item{HMM_min_subcluster_fpr}{target false-call rate for HMM_min_subcluster_size = "auto" (default: 0.02)}
 

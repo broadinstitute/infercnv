@@ -5,7 +5,9 @@
 #'
 #' @param infercnv_obj An infercnv object populated with raw count data
 #'
-#' @param cutoff Cut-off for the min average read counts per gene, computed over all cells (references and observations). (default: "auto")
+#' @param cutoff Cut-off for the min average read counts per gene. A number is applied to the mean over all cells
+#'               (references and observations); "auto" (default) is chosen from, and applied to, the mean over the
+#'               observations only, so that references of a different depth (e.g. bulk samples) do not set it.
 #'               Usual values: 1 for Smart-seq2 (full-length, read counts), 0.1 for 10x single-cell and Visium HD 16-32 um
 #'               (UMI counts). "auto": the largest of 1, 0.1, 0.03, 0.01, 0.003, 0.001 that keeps a median of at least
 #'               3 x window_length genes per chromosome (autosomes), so that sparse data (e.g. Visium HD 8 um bins, a few
@@ -218,6 +220,9 @@
 #'                                give many false HMM calls). "auto" (default; i6 only) runs the HMM on random groups of
 #'                                reference cells of increasing size and uses the smallest size whose false-call rate is
 #'                                at most HMM_min_subcluster_fpr; a number sets the size; 0 or 1 disables merging.
+#'                                If single reference profiles already meet the target (bulk or pseudobulk references,
+#'                                which lack single-cell sampling noise), "auto" warns and uses 5 cells, the smallest size
+#'                                found on single-cell data.
 #'
 #' @param HMM_min_subcluster_fpr target false-call rate for HMM_min_subcluster_size = "auto" (default: 0.02)
 #'
@@ -696,8 +701,10 @@ run <- function(infercnv_obj,
         if (identical(cutoff, "auto")) {
             cutoff <- .auto_expression_cutoff(infercnv_obj, window_length, min_cells_per_gene)
             infercnv_obj@options$cutoff_auto <- cutoff
+            infercnv_obj <- require_above_min_mean_expr_cutoff(infercnv_obj, cutoff, cells=.obs_cell_idx(infercnv_obj))
+        } else {
+            infercnv_obj <- require_above_min_mean_expr_cutoff(infercnv_obj, cutoff)
         }
-        infercnv_obj <- require_above_min_mean_expr_cutoff(infercnv_obj, cutoff)
         
         ## require each gene to be present in a min number of cells for ref sets
         
@@ -2737,12 +2744,13 @@ center_cell_expr_across_chromosome <- function(infercnv_obj, method="mean") { # 
 #' @noRd
 #'
 
-require_above_min_mean_expr_cutoff <- function(infercnv_obj, min_mean_expr_cutoff) {
+require_above_min_mean_expr_cutoff <- function(infercnv_obj, min_mean_expr_cutoff, cells=NULL) {
     
     flog.info(paste("::above_min_mean_expr_cutoff:Start", sep=""))
     
-    
-    indices <-.below_min_mean_expr_cutoff(infercnv_obj@expr.data, min_mean_expr_cutoff)
+    ## cells: column indices the mean is taken over (default: all cells)
+    indices <- if (is.null(cells)) .below_min_mean_expr_cutoff(infercnv_obj@expr.data, min_mean_expr_cutoff) else
+        .below_min_mean_expr_cutoff(infercnv_obj@expr.data[, cells, drop=FALSE], min_mean_expr_cutoff)
     if (length(indices) > 0) {
         flog.info(sprintf("Removing %d genes from matrix as below mean expr threshold: %g",
                           length(indices), min_mean_expr_cutoff))
@@ -2764,11 +2772,18 @@ require_above_min_mean_expr_cutoff <- function(infercnv_obj, min_mean_expr_cutof
 #'
 
 # cutoff = "auto": the largest grid value that keeps a median of at least 3 x window_length genes per autosome after
-# the mean-count cutoff and the min_cells_per_gene filter (computed on the raw counts, as step 2 applies them).
+# the mean-count cutoff and the min_cells_per_gene filter (computed on the raw counts, as step 2 applies them). The mean
+# is taken over the observations only (step 2 applies it the same way), so that references of another depth, such as
+# bulk samples, do not set it; the min_cells_per_gene filter counts all cells, as step 2 does.
+.obs_cell_idx <- function(infercnv_obj) {
+    idx <- sort(unlist(infercnv_obj@observation_grouped_cell_indices))
+    if (length(idx) == 0) seq_len(ncol(infercnv_obj@expr.data)) else idx
+}
+
 .auto_expression_cutoff <- function(infercnv_obj, window_length, min_cells_per_gene,
                                     grid=c(1, 0.1, 0.03, 0.01, 0.003, 0.001)) {
     X <- infercnv_obj@expr.data
-    m <- Matrix::rowMeans(X)
+    m <- Matrix::rowMeans(X[, .obs_cell_idx(infercnv_obj), drop=FALSE])
     det <- Matrix::rowSums(X > 0)
     chr <- as.character(infercnv_obj@gene_order[rownames(X), "chr"])
     lv <- unique(chr)

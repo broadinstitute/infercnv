@@ -779,7 +779,7 @@ add_single_branch_to_phylo = function(in_tree, label) {
 # size; the smallest size whose false-call rate is at most target is returned (the largest size tested, with a warning,
 # if none is). The random number state is restored afterwards.
 .hmm_min_subcluster_size <- function(infercnv_obj, target = 0.02, sizes = c(1, 2, 3, 5, 10, 15, 20, 30, 50, 75, 100),
-                                     groups_per_size = 10, t = 1e-6) {
+                                     groups_per_size = 10, t = 1e-6, bulk_fallback = 5) {
     ref_groups <- infercnv_obj@reference_grouped_cell_indices
     if (length(ref_groups) == 0) {
         flog.info("minimum subcluster size: no reference cells, not determined")
@@ -817,6 +817,15 @@ add_single_branch_to_phylo = function(in_tree, label) {
     flog.info(sprintf("HMM false calls on random reference groups by size: %s",
                       paste(sprintf("%s cells %.1f%%", names(tested), 100 * tested), collapse = ", ")))
     hit <- names(tested)[tested <= target]
+    if (length(hit) && hit[1] == "1") {
+        ## single reference profiles already meet the target: the references do not carry single-cell sampling noise
+        ## (bulk samples or pseudobulks), so they cannot calibrate the size; use the smallest size found on
+        ## single-cell data (Smart-seq2)
+        flog.warn(paste("HMM_min_subcluster_size = 'auto': single reference profiles give no false calls, as bulk or",
+                        "pseudobulk references do; they cannot calibrate the minimum subcluster size. Using", bulk_fallback,
+                        "cells; set HMM_min_subcluster_size to a number to change it"))
+        return(list(size = bulk_fallback, fpr = tested))
+    }
     if (length(hit) == 0) {
         flog.warn(sprintf("no group size up to %s cells keeps HMM false calls at or below %g%%; using %s",
                           tail(names(tested), 1), 100 * target, tail(names(tested), 1)))

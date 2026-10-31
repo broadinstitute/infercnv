@@ -14,7 +14,9 @@
 #     minimises the squared distance between the clone's segment level and the level of the chosen state (weighted by
 #     the number of genes) plus `lambda` per change of state; allowed states at a segment are neutral and the states
 #     any clone was called with there. A per-segment offset common to all clones (expression of the region's genes in
-#     these cells, not copy number) is removed first. Clones whose re-calls differ only by events of fewer than
+#     these cells, not copy number) is removed first, except where every clone has the same call (truncal events, where
+#     the offset and the event cannot be told apart). A clone is not re-called neutral at a segment where the HMM
+#     called one direction in more than half of its cells over at least `min_event_genes` consecutive genes. Clones whose re-calls differ only by events of fewer than
 #     `min_event_genes` genes, or by less than `d_frac` of a one-copy step (median per-gene difference), are merged
 #     and the re-call repeated.
 #  4. Clone tree. Each event (consecutive segments with the same direction and the same carrier clones) has a carrier
@@ -339,12 +341,17 @@ infercnv_clones <- function(infercnv_obj, hmm_states, HMM_type = c("i6", "i3"), 
 
 ## ---- 3. parsimony re-call and merging ----
 
-.clone_recall <- function(cons, seg, chr, Mc, w, lambda = 10, n_iter = 3) {
+.clone_recall <- function(cons, seg, chr, Mc, w, lambda = 10, n_iter = 3, hold = NULL) {
     first <- !duplicated(seg); sg <- seg[first]; ch <- chr[first]
     len <- as.vector(table(seg)[as.character(sg)])
     Y <- rowsum(Mc, seg)[as.character(sg), , drop = FALSE] / len
     S0 <- cons[first, , drop = FALSE]
+    ## hold (genes x clones, -1/0/1): direction the HMM called in most of a clone's cells; the re-call keeps it
+    H <- if (is.null(hold)) matrix(0, nrow(S0), ncol(S0), dimnames = list(NULL, colnames(S0))) else hold[first, colnames(S0), drop = FALSE]
     neut <- apply(S0, 1, function(x) all(x == 3))
+    ## segments called the same in every clone (truncal events, neutral regions): the offset common to the clones is
+    ## not separable from the event there, so none is removed
+    same <- apply(S0, 1, function(x) all(x == x[1]))
     if (any(neut)) Y <- sweep(Y, 2, colSums(len[neut] * Y[neut, , drop = FALSE]) / sum(len[neut]))
     sig2 <- apply(Mc, 2, function(y) stats::median(tapply(y, seg, stats::var), na.rm = TRUE))
     big <- len >= 30
@@ -360,21 +367,24 @@ infercnv_clones <- function(infercnv_obj, hmm_states, HMM_type = c("i6", "i3"), 
     wk <- w[colnames(Y)]
     b <- rep(0, nrow(Y)); S1 <- S0
     for (it in seq_len(if (ncol(Y) > 1) n_iter else 1)) {
-        if (ncol(Y) > 1) b <- as.vector(((Y - sweep(matrix(mu[S1], nrow = nrow(S1)), 2, amp, "*")) %*% wk) / sum(wk))
+        if (ncol(Y) > 1) { b <- as.vector(((Y - sweep(matrix(mu[S1], nrow = nrow(S1)), 2, amp, "*")) %*% wk) / sum(wk))
+            b[same] <- 0 }
         Yb <- Y - b; S1 <- S0
         for (c0 in unique(ch)) { j <- which(ch == c0)
             allowed <- lapply(j, function(i) sort(unique(c(3, S0[i, ]))))
             for (k in colnames(S0)) {
-                cost <- lapply(seq_along(j), function(t) len[j[t]] * (Yb[j[t], k] - amp[k] * mu[allowed[[t]]])^2 / sig2[k])
+                alw <- lapply(seq_along(j), function(t) { a <- allowed[[t]]; h <- H[j[t], k]
+                    if (h != 0 && any(sign(a - 3) == h)) a[sign(a - 3) == h] else a })
+                cost <- lapply(seq_along(j), function(t) len[j[t]] * (Yb[j[t], k] - amp[k] * mu[alw[[t]]])^2 / sig2[k])
                 V <- cost[[1]]; bp <- list()
                 if (length(j) > 1) for (t in 2:length(j)) {
-                    prev <- allowed[[t - 1]]; cur <- allowed[[t]]
+                    prev <- alw[[t - 1]]; cur <- alw[[t]]
                     tr <- outer(seq_along(prev), seq_along(cur), function(a, b) V[a] + lambda * (prev[a] != cur[b]))
                     bp[[t]] <- apply(tr, 2, which.min); V <- apply(tr, 2, min) + cost[[t]]
                 }
                 path <- integer(length(j)); path[length(j)] <- which.min(V)
                 if (length(j) > 1) for (t in length(j):2) path[t - 1] <- bp[[t]][path[t]]
-                S1[j, k] <- mapply(function(t, p) allowed[[t]][p], seq_along(j), path)
+                S1[j, k] <- mapply(function(t, p) alw[[t]][p], seq_along(j), path)
             }
         }
     }
@@ -393,7 +403,15 @@ infercnv_clones <- function(infercnv_obj, hmm_states, HMM_type = c("i6", "i3"), 
         if (!is.matrix(Mc)) Mc <- matrix(Mc, ncol = 1)
         colnames(cons) <- colnames(Mc) <- ks
         w <- setNames(vapply(members, function(ss) sum(ns[ss]), numeric(1)), ks)
-        pr <- .clone_recall(cons, seg, chr, Mc, w, lambda = lambda)
+        ## direction called by the HMM in more than half of the clone's cells (all member subclusters)
+        hold <- vapply(members, function(ss) { d <- sign(P2[, ss, drop = FALSE] - 3); f <- ns[ss] / sum(ns[ss])
+            ifelse(as.vector((d > 0) %*% f) > 0.5, 1, ifelse(as.vector((d < 0) %*% f) > 0.5, -1, 0)) }, numeric(nrow(P2)))
+        if (!is.matrix(hold)) hold <- matrix(hold, ncol = 1)
+        ## only runs of at least min_event_genes genes are held (shorter HMM calls are left to the re-call)
+        for (k in seq_len(ncol(hold))) { r <- rle(paste(chr, hold[, k])); short <- r$lengths < min_event_genes
+            hold[rep(short, r$lengths), k] <- 0 }
+        colnames(hold) <- ks
+        pr <- .clone_recall(cons, seg, chr, Mc, w, lambda = lambda, hold = hold)
         if (length(ks) < 2) break
         D <- .clone_dir(pr$cons); pairs <- utils::combn(ks, 2); step <- mean(abs(pr$mu[c(2, 4)]))
         score <- apply(pairs, 2, function(p) {
