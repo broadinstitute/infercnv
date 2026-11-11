@@ -1076,19 +1076,19 @@ run_gibb_sampling <- function(gene_exp,
     if (getArgs(MCMC_inferCNV_obj)$HMM_type == "i6"){
         # i6 method 
         inits <- list(
-            list(epsilon = rep(1, C)),
-            list(epsilon = rep(2, C)),
-            list(epsilon = rep(3, C)),
-            list(epsilon = rep(4, C)),
-            list(epsilon = rep(5, C)),
-            list(epsilon = rep(6, C))
+            list(epsilon = rep(1, C), .RNG.name = "base::Mersenne-Twister", .RNG.seed = 1007),
+            list(epsilon = rep(2, C), .RNG.name = "base::Mersenne-Twister", .RNG.seed = 2007),
+            list(epsilon = rep(3, C), .RNG.name = "base::Mersenne-Twister", .RNG.seed = 3007),
+            list(epsilon = rep(4, C), .RNG.name = "base::Mersenne-Twister", .RNG.seed = 4007),
+            list(epsilon = rep(5, C), .RNG.name = "base::Mersenne-Twister", .RNG.seed = 5007),
+            list(epsilon = rep(6, C), .RNG.name = "base::Mersenne-Twister", .RNG.seed = 6007)
         )
     } else {
         # i3 method 
         inits <- list(
-            list(epsilon = rep(1, C)),
-            list(epsilon = rep(2, C)),
-            list(epsilon = rep(3, C))
+            list(epsilon = rep(1, C), .RNG.name = "base::Mersenne-Twister", .RNG.seed = 1007),
+            list(epsilon = rep(2, C), .RNG.name = "base::Mersenne-Twister", .RNG.seed = 2007),
+            list(epsilon = rep(3, C), .RNG.name = "base::Mersenne-Twister", .RNG.seed = 3007)
         )   
     }
     # Create the model for rjags
